@@ -9,5 +9,5 @@ export function postSimulation(request: Request, response: Response) {
   }
 
   const result = simulateFight(player1 as ShinobiBuild, player2 as ShinobiBuild)
-  response.status(result.player1.validationErrors.length || result.player2.validationErrors.length ? 422 : 200).json(result)
+  response.status(result.player1.validationErrors.length || result.player2.validationErrors.length ? 422 : 200).json({ ...result, resolutionMode: 'simulation' })
 }

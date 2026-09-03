@@ -2,7 +2,7 @@ import type { RuleContext } from './types.js'
 import { cardName, hasClan, percentage, points, setStat } from './ruleHelpers.js'
 import { BIJU_GENJUTSU_PENALTY_POINTS, EIGHT_GATES_BONUS, IQ_MASTER_BONUS, OTSUTSUKI_BONUS, PERFECT_NINJUTSU_DEFENSE_REDUCTION, PERFECT_TAIJUTSU_NINJUTSU_BONUS, SENJU_CHAKRA_BONUS, UZUMAKI_CHAKRA_BONUS } from './constants.js'
 
-const activeStats = ['chakra', 'invocation', 'iq', 'ninjutsuAttack', 'ninjutsuDefense', 'genjutsu', 'taijutsu', 'avatar', 'fuinjutsu', 'senjutsu', 'kenjutsu', 'kekkeiGenkai', 'sensory'] as const
+const activeStats = ['chakra', 'invocation', 'iq', 'ninjutsuAttack', 'ninjutsuDefense', 'genjutsu', 'taijutsu', 'avatar', 'fuinjutsu', 'senjutsu', 'kenjutsu', 'kekkeiGenkai'] as const
 const bijuNames = ['shukaku', 'matatabi', 'isobu', 'son gokû', 'son goku', 'kokuô', 'kokuo', 'saiken', 'chômei', 'chomei', 'gyûki', 'gyuki', 'kurama', 'jûbi', 'juubi']
 const hasName = (context: RuleContext, slot: string, values: string[]) => values.some((value) => cardName(context, slot).includes(value))
 const hasBiju = (context: RuleContext) => hasName(context, 'avatar', bijuNames)

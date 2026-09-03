@@ -18,5 +18,5 @@ export async function simulateFight(player1: CombatComposition, player2: CombatC
     throw new CombatApiError(message, payload && 'player1' in payload ? payload : undefined)
   }
   if (!payload || !('player1' in payload) || !('player2' in payload)) throw new CombatApiError('Réponse de combat invalide.')
-  return payload
+  return { ...payload, resolutionMode: 'simulation' }
 }

@@ -55,10 +55,6 @@ export function createPlayerBuildsForCount(playerCount: 2 | 3): PlayerBuild[] {
   return Array.from({ length: playerCount }, (_, index) => createPlayerBuild((index + 1) as PlayerId))
 }
 
-export function chooseComputerCategory(build: PlayerBuild): CategorySlug | null {
-  return CATEGORY_DEFINITIONS.find(([, slug]) => !build.slots[slug])?.[1] ?? null
-}
-
 export function isBuildComplete(build: PlayerBuild): boolean {
   return CATEGORY_DEFINITIONS.every(([, slug]) => build.slots[slug] !== null)
 }

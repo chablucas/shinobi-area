@@ -2,12 +2,12 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { calculateCombat, calculateFinalStats, calculateTotal, simulateFight, type CombatStats } from '../src/game/gameEngine.js'
 
-const zeroStats = (): CombatStats => ({ chakra: 0, invocation: 0, iq: 0, ninjutsuAttack: 0, ninjutsuDefense: 0, genjutsu: 0, taijutsu: 0, avatar: 0, body: 0, fuinjutsu: 0, senjutsu: 0, kenjutsu: 0, clan: 0, speed: 0, kekkeiGenkai: 0, sensory: 0 })
+const zeroStats = (): CombatStats => ({ chakra: 0, invocation: 0, iq: 0, ninjutsuAttack: 0, ninjutsuDefense: 0, genjutsu: 0, taijutsu: 0, avatar: 0, body: 0, fuinjutsu: 0, senjutsu: 0, kenjutsu: 0, clan: 0, speed: 0, kekkeiGenkai: 0 })
 function card(name: string, stats: Partial<CombatStats> = {}, clans: string[] = []): object { return { name, slug: name.toLowerCase().replaceAll(' ', '-'), clans, stats: { ...zeroStats(), ...stats } } }
 function build(slots: Record<string, object | string>): { slots: Record<string, object | string> } { return { slots } }
 const iq100 = card('IQ 100', { iq: 100 })
 const iq99 = card('IQ 99', { iq: 99 })
-const neutral = card('Neutral', { chakra: 80, invocation: 80, iq: 80, ninjutsuAttack: 80, ninjutsuDefense: 80, genjutsu: 80, taijutsu: 80, avatar: 80, body: 80, fuinjutsu: 80, senjutsu: 80, kenjutsu: 80, speed: 80, kekkeiGenkai: 80, sensory: 80 })
+const neutral = card('Neutral', { chakra: 80, invocation: 80, iq: 80, ninjutsuAttack: 80, ninjutsuDefense: 80, genjutsu: 80, taijutsu: 80, avatar: 80, body: 80, fuinjutsu: 80, senjutsu: 80, kenjutsu: 80, speed: 80, kekkeiGenkai: 80 })
 const defense100 = card('Defense parfaite', { ninjutsuDefense: 100 })
 const genjutsu100 = card('Genjutsu parfait', { genjutsu: 100 })
 const biju = (name: string) => card(name, { avatar: 40 })
@@ -45,6 +45,7 @@ test('29. Sasuke en Kekkei Môra perd 50% contre Guy 8 Portes', () => { const re
 test('30. Kekkei Genkai, Kekkei Môra et Ninjutsu restent séparés', () => { const stats = calculateFinalStats(build({ 'kekkei-genkai': card('KG', { kekkeiGenkai: 80 }), 'kekkei-mora': card('Mora'), ninjutsu: card('N', { ninjutsuAttack: 70, ninjutsuDefense: 60 }) })); assert.equal(stats.kekkeiGenkai, 80); assert.equal(stats.ninjutsuAttack, 70); assert.equal(stats.ninjutsuDefense, 60) })
 test('31. stats.clan reste égal à zéro', () => assert.equal(calculateFinalStats(build({ clan: card('Clan', { clan: 99 }) })).clan, 0))
 test('32. le slot Clan est exclu du total', () => { const stats = calculateFinalStats(build({ clan: card('Clan', { clan: 99 }) })); assert.equal(calculateTotal(stats), 0) })
+test('sensory ne participe jamais au total', () => { const stats = calculateFinalStats(build({ chakra: card('Sensory fixture', { chakra: 10, sensory: 100 } as Partial<CombatStats>), clan: card('Clan') })); assert.equal(calculateTotal(stats), 10) })
 test('33. aucune statistique finale ne devient négative', () => assert.ok(Object.values(calculateFinalStats(build({ ninjutsu: card('Uchiwa', { ninjutsuAttack: 0, ninjutsuDefense: 0 }) }))).every((value) => value >= 0)))
 test('34. chaque règle déclenchée est tracée', () => { const result = calculateCombat(build({ clan: card('Uzumaki', {}, ['UZUMAKI']), chakra: card('C', { chakra: 80 }) })); assert.ok(result.appliedRules.some((rule) => rule.ruleId === 'clan-uzumaki-chakra')) })
 test('35. une composition invalide ne lance pas le combat', () => { const result = simulateFight(build({ chakra: 'unknown-card' }), build({ chakra: 'neutral' })); assert.equal(result.winner, 'draw'); assert.ok(result.player1.validationErrors.length > 0) })

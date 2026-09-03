@@ -2,7 +2,7 @@ import cardStatsData from '../data/shinobi-card-stats.json' with { type: 'json' 
 import { applyRules } from './rules/applyRules.js'
 import type { AppliedRule, Card, CombatPermissions, ValidationError, RuleContext } from './rules/types.js'
 
-export const STAT_KEYS = ['chakra', 'invocation', 'iq', 'ninjutsuAttack', 'ninjutsuDefense', 'genjutsu', 'taijutsu', 'avatar', 'body', 'fuinjutsu', 'senjutsu', 'kenjutsu', 'clan', 'speed', 'kekkeiGenkai', 'sensory'] as const
+export const STAT_KEYS = ['chakra', 'invocation', 'iq', 'ninjutsuAttack', 'ninjutsuDefense', 'genjutsu', 'taijutsu', 'avatar', 'body', 'fuinjutsu', 'senjutsu', 'kenjutsu', 'clan', 'speed', 'kekkeiGenkai'] as const
 export type StatKey = (typeof STAT_KEYS)[number]
 export type CombatStats = Record<StatKey, number>
 export type CardSelection = string | { slug?: string; id?: number; name?: string; clans?: string[]; stats?: Partial<CombatStats> }
@@ -15,7 +15,7 @@ type RawCard = { id: number; name: string; slug: string; clans: string[]; stats:
 const cards = cardStatsData as RawCard[]
 const bySlug = new Map(cards.map((card) => [card.slug, card]))
 const byId = new Map(cards.map((card) => [card.id, card]))
-const categoryStats: Record<string, StatKey[]> = { chakra: ['chakra'], invocation: ['invocation'], iq: ['iq'], ninjutsu: ['ninjutsuAttack', 'ninjutsuDefense'], genjutsu: ['genjutsu'], taijutsu: ['taijutsu'], avatar: ['avatar'], body: ['body'], fuinjutsu: ['fuinjutsu'], 'fūinjutsu': ['fuinjutsu'], senjutsu: ['senjutsu'], kenjutsu: ['kenjutsu'], vitesse: ['speed'], speed: ['speed'], 'kekkei-genkai': ['kekkeiGenkai'], kekkeigenkai: ['kekkeiGenkai'], 'kekkei-mora': [], kekkeimora: [], sensory: ['sensory'] }
+const categoryStats: Record<string, StatKey[]> = { chakra: ['chakra'], invocation: ['invocation'], iq: ['iq'], ninjutsu: ['ninjutsuAttack', 'ninjutsuDefense'], genjutsu: ['genjutsu'], taijutsu: ['taijutsu'], avatar: ['avatar'], body: ['body'], fuinjutsu: ['fuinjutsu'], 'fūinjutsu': ['fuinjutsu'], senjutsu: ['senjutsu'], kenjutsu: ['kenjutsu'], vitesse: ['speed'], speed: ['speed'], 'kekkei-genkai': ['kekkeiGenkai'], kekkeigenkai: ['kekkeiGenkai'], 'kekkei-mora': [], kekkeimora: [] }
 
 function emptyStats(): CombatStats { return Object.fromEntries(STAT_KEYS.map((key) => [key, 0])) as CombatStats }
 function slotsOf(build: ShinobiBuild): ShinobiSlots { const slots = (build as { slots?: unknown }).slots; return slots && typeof slots === 'object' ? slots as ShinobiSlots : build as ShinobiSlots }

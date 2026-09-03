@@ -18,8 +18,9 @@ test('la route de simulation est montée en POST /simulate', () => {
 test('la simulation accepte deux compositions valides et appelle le moteur', () => {
   const output = response()
   postSimulation(request({ player1: composition({ chakra: 'hagoromo' }), player2: composition({ chakra: 'dan' }) }) as never, output as never)
-  const body = output.result.body as { winner: string; player1: { total: number }; player2: { total: number } }
+  const body = output.result.body as { resolutionMode: string; winner: string; player1: { total: number }; player2: { total: number } }
   assert.equal(output.result.statusCode, 200)
+  assert.equal(body.resolutionMode, 'simulation')
   assert.equal(body.winner, 'player1')
   assert.equal(body.player1.total, 100)
   assert.equal(body.player2.total, 43)
