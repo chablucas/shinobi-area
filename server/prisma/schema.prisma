@@ -16,6 +16,51 @@ model Card {
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
   stats             CardStat[]
+  savedBuildSlots   SavedBuildSlot[]
+}
+
+model User {
+  id          Int         @id @default(autoincrement())
+  email       String      @unique
+  passwordHash String
+  displayName String
+  wins        Int         @default(0)
+  losses      Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  savedBuilds SavedBuild[]
+  gameResults GameResult[]
+}
+
+model GameResult {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  gameId    String
+  won       Boolean
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, gameId])
+}
+
+model SavedBuild {
+  id        Int              @id @default(autoincrement())
+  userId    Int
+  name      String
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slots     SavedBuildSlot[]
+}
+
+model SavedBuildSlot {
+  id           Int        @id @default(autoincrement())
+  savedBuildId Int
+  categorySlug String
+  cardId       Int
+  savedBuild   SavedBuild @relation(fields: [savedBuildId], references: [id], onDelete: Cascade)
+  card         Card       @relation(fields: [cardId], references: [id])
+
+  @@unique([savedBuildId, categorySlug])
 }
 
 model Category {

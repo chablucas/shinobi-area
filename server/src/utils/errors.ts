@@ -6,5 +6,6 @@ export const notFound: RequestHandler = (_request, response) => {
 
 export const errorHandler: ErrorRequestHandler = (error, _request, response, _next) => {
   console.error(error)
-  response.status(500).json({ error: 'Erreur interne du serveur' })
+  const statusCode = typeof error?.statusCode === 'number' ? error.statusCode : 500
+  response.status(statusCode).json({ error: statusCode === 500 ? 'Erreur interne du serveur' : error.message })
 }

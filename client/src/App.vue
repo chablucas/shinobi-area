@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { fetchAllCards } from './services/cardApi'
+import { useAuthStore } from './stores/auth'
 
 const modes = [
   { number: '01', eyebrow: 'Forge ton identité', title: 'Création de personnage', description: 'Compose un shinobi qui te ressemble, de son clan à sa technique signature.', accent: 'coral' },
@@ -10,8 +11,10 @@ const modes = [
 
 const cards = ref<Awaited<ReturnType<typeof fetchAllCards>>>([])
 const failedImages = ref(new Set<string>())
+const auth = useAuthStore()
 
 onMounted(async () => {
+  await auth.loadCurrentUser()
   try {
     cards.value = await fetchAllCards()
   } catch {
@@ -30,7 +33,7 @@ function markImageAsFailed(slug: string) {
     <nav class="topbar" aria-label="Navigation principale">
       <a class="brand" href="#accueil" aria-label="Shinobi Area, accueil"><img class="brand-logo" src="/logo.png" alt="" aria-hidden="true" /></a>
       <div class="nav-links"><a class="nav-tab active" href="/solo">Solo</a><a class="nav-tab" href="/partie">2 joueurs</a><a class="nav-tab" href="/3-joueurs">3 joueurs</a></div>
-      <a class="profile-link" href="/profil">Profil</a>
+      <a class="profile-link" :href="auth.isAuthenticated ? '/profil' : '/connexion'">{{ auth.isAuthenticated ? 'Profil' : 'Connexion' }}</a>
     </nav>
 
     <section id="accueil" class="hero">

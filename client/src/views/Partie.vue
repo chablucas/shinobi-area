@@ -2,6 +2,8 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import GameCard from '../components/GameCard.vue'
 import { fetchAllCards } from '../services/cardApi'
+import { useAuthStore } from '../stores/auth'
+import { saveBuild } from '../services/buildApi'
 import type { Card } from '../types/card'
 import {
   CATEGORY_DEFINITIONS,
@@ -24,6 +26,7 @@ type Phase = 'construction' | 'combat' | 'result'
 type GameMode = 'solo' | 'local2' | 'local3'
 
 const props = withDefaults(defineProps<{ mode?: GameMode }>(), { mode: 'local2' })
+const auth = useAuthStore()
 
 const cards = ref<Card[]>([])
 const builds = ref<PlayerBuild[]>(createPlayerBuildsForCount(props.mode === 'local3' ? 3 : 2))
@@ -35,6 +38,8 @@ const phase = ref<Phase>('construction')
 const winnerId = ref<PlayerId | null>(null)
 const loading = ref(true)
 const errorMessage = ref('')
+const saved = ref(false)
+const gameId = ref(crypto.randomUUID())
 
 const activeBuild = computed(() => builds.value[activePlayerId.value - 1]!)
 const availableCardCount = computed(() => cards.value.length - usedCardIds.value.size)
@@ -44,6 +49,7 @@ const playerCount = computed<2 | 3>(() => props.mode === 'local3' ? 3 : 2)
 const isComputerTurn = computed(() => props.mode === 'solo' && activePlayerId.value === 2)
 
 onMounted(async () => {
+  await auth.loadCurrentUser()
   try {
     cards.value = await fetchAllCards()
     if (cards.value.length < 30) errorMessage.value = 'Il faut au moins 30 cartes pour commencer une partie.'
@@ -110,6 +116,17 @@ function chooseWinner(playerId: PlayerId) {
   if (phase.value !== 'combat') return
   winnerId.value = resolveManualCombat(playerId).winnerId
   phase.value = 'result'
+  if (props.mode === 'solo' && auth.isAuthenticated) void auth.recordResult(gameId.value, playerId === 1)
+}
+
+async function saveHumanBuild() {
+  if (!auth.token || saved.value) return
+  const slots = CATEGORY_DEFINITIONS.map(([_, slug]) => {
+    const cardId = builds.value[0]?.slots[slug]?.id
+    return typeof cardId === 'number' ? { categorySlug: slug, cardId } : null
+  }).filter((slot): slot is { categorySlug: typeof CATEGORY_DEFINITIONS[number][1]; cardId: number } => slot !== null)
+  if (slots.length !== CATEGORY_DEFINITIONS.length) return
+  try { await saveBuild(auth.token, `Composition ${new Date().toLocaleDateString('fr-FR')}`, slots); saved.value = true } catch (error) { errorMessage.value = error instanceof Error ? error.message : 'Impossible de sauvegarder la composition.' }
 }
 
 function replay() {
@@ -121,6 +138,8 @@ function replay() {
   winnerId.value = null
   errorMessage.value = ''
   phase.value = 'construction'
+  saved.value = false
+  gameId.value = crypto.randomUUID()
 }
 
 function slotCard(build: PlayerBuild, slug: CategorySlug) {
@@ -133,7 +152,7 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
     <nav class="game-nav">
       <a class="brand" href="/" aria-label="Shinobi Area, accueil"><img class="brand-logo" src="/logo.png" alt="" aria-hidden="true" /></a>
       <div class="game-nav-links"><a class="game-nav-tab" :class="{ active: props.mode === 'solo' }" href="/solo">Solo</a><a class="game-nav-tab" :class="{ active: props.mode === 'local2' }" href="/partie">2 joueurs</a><a class="game-nav-tab" :class="{ active: props.mode === 'local3' }" href="/3-joueurs">3 joueurs</a></div>
-      <a class="profile-link" href="/profil">Profil</a>
+      <a class="profile-link" :href="auth.isAuthenticated ? '/profil' : '/connexion'">{{ auth.isAuthenticated ? 'Profil' : 'Connexion' }}</a>
     </nav>
 
     <header class="page-heading">
@@ -189,7 +208,7 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
     <section v-else class="result-panel">
       <p class="eyebrow">Combat terminé</p><h2>{{ winnerName }} gagne.</h2><p>Victoire enregistrée manuellement. Les deux compositions restent disponibles ci-dessous.</p>
       <div class="result-builds"><article v-for="build in builds" :key="build.playerId"><h3>Joueur {{ build.playerId }}</h3><div v-for="[label, slug] in CATEGORY_DEFINITIONS" :key="slug"><span>{{ label }}</span><strong>{{ slotCard(build, slug)?.name }}</strong></div></article></div>
-      <div class="result-actions"><button class="primary-button" type="button" @click="replay">Rejouer <span>↻</span></button><a class="secondary-button" href="/">Retour à l’accueil <span>↗</span></a></div>
+      <div class="result-actions"><button v-if="auth.isAuthenticated" class="primary-button" type="button" :disabled="saved" @click="saveHumanBuild">{{ saved ? 'Perso sauvegardé' : 'Sauvegarder mon perso' }} <span>↓</span></button><a v-else class="secondary-button" href="/connexion">Connecte-toi pour sauvegarder</a><button class="primary-button" type="button" @click="replay">Rejouer <span>↻</span></button><a class="secondary-button" href="/">Retour à l’accueil <span>↗</span></a></div>
     </section>
   </main>
 </template>
