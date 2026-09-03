@@ -63,16 +63,22 @@ const imageFailed = ref(false)
 
 .card-image-frame {
   position: relative;
-  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: min(280px, 42vh);
+  overflow: hidden;
   background: linear-gradient(180deg, rgba(17, 20, 24, 0.96), rgba(22, 18, 17, 0.92));
 }
 
 .card-image-frame img,
 .card-image-fallback {
-  width: 100%;
-  height: min(280px, 42vh);
+  width: calc(100% - 4px);
+  height: calc(100% - 10px);
   object-fit: cover;
   display: block;
+  margin: 0;
 }
 
 .card-image-fallback {
