@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { fetchAllCards } from './services/cardApi'
 
 const modes = [
   { number: '01', eyebrow: 'Forge ton identité', title: 'Création de personnage', description: 'Compose un shinobi qui te ressemble, de son clan à sa technique signature.', accent: 'coral' },
@@ -7,23 +8,12 @@ const modes = [
   { number: '03', eyebrow: 'Pense plusieurs coups', title: 'Défi de cartes', description: 'Mets ton deck à l’épreuve dans des défis courts, imprévisibles et nerveux.', accent: 'gold' },
 ]
 
-type Card = { id: number; name: string; slug: string; imageUrl: string | null }
-const cards = ref<Card[]>([])
+const cards = ref<Awaited<ReturnType<typeof fetchAllCards>>>([])
 const failedImages = ref(new Set<string>())
 
 onMounted(async () => {
   try {
-    const apiUrl = import.meta.env.VITE_API_URL ?? ''
-    const response = await fetch(`${apiUrl}/api/cards?limit=100&page=1`)
-    if (!response.ok) return
-    const firstPage = await response.json()
-    const allCards = [...firstPage.data]
-    for (let page = 2; page <= firstPage.pagination.pages; page++) {
-      const nextResponse = await fetch(`${apiUrl}/api/cards?limit=100&page=${page}`)
-      if (!nextResponse.ok) return
-      allCards.push(...(await nextResponse.json()).data)
-    }
-    cards.value = allCards
+    cards.value = await fetchAllCards()
   } catch {
     cards.value = []
   }

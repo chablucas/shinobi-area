@@ -13,7 +13,11 @@ export const env = {
 
 export function isAllowedOrigin(origin: string | undefined): boolean {
   if (!origin) return true
-  if (origin === env.clientUrl || origin === 'http://localhost:5173') return true
+  if (
+    origin === env.clientUrl ||
+    origin === 'http://localhost:5173' ||
+    origin === 'https://shinobi-area.vercel.app'
+  ) return true
   return /^https:\/\/[^.]+-5173\.app\.github\.dev$/.test(origin)
 }
 
