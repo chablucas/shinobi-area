@@ -34,6 +34,8 @@ model User {
   friendshipsAsB Friendship[] @relation("FriendshipUserB")
   sentFriendships Friendship[] @relation("FriendshipSender")
   receivedFriendships Friendship[] @relation("FriendshipReceiver")
+  createdGameLobbies GameLobby[] @relation("GameLobbyCreator")
+  gameInvites       GameInvite[] @relation("GameInviteInvitee")
 }
 
 enum FriendshipStatus {
@@ -41,6 +43,50 @@ enum FriendshipStatus {
   ACCEPTED
   REJECTED
   CANCELLED
+}
+
+enum GameMode {
+  ONE_V_ONE
+  ONE_V_ONE_V_THREE
+}
+
+enum GameInviteStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+enum GameLobbyStatus {
+  WAITING
+  READY
+}
+
+model GameLobby {
+  id        String          @id @default(cuid())
+  mode      GameMode
+  creatorId Int
+  status    GameLobbyStatus @default(WAITING)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  creator   User            @relation("GameLobbyCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  invites   GameInvite[]
+
+  @@index([creatorId, status])
+}
+
+model GameInvite {
+  id        String           @id @default(cuid())
+  lobbyId   String
+  inviteeId Int
+  status    GameInviteStatus @default(PENDING)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  lobby     GameLobby        @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
+  invitee   User             @relation("GameInviteInvitee", fields: [inviteeId], references: [id], onDelete: Cascade)
+
+  @@unique([lobbyId, inviteeId])
+  @@index([inviteeId, status])
 }
 
 model Friendship {

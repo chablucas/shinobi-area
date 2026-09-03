@@ -2,20 +2,24 @@
 import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import { acceptFriendRequest, listFriendRequests, rejectFriendRequest, searchGlobal, sendFriendRequest, type FriendRequest, type SearchResult } from '../services/socialApi'
+import { acceptFriendRequest, acceptGameInvite, listFriendRequests, listGameInvites, rejectFriendRequest, rejectGameInvite, searchGlobal, sendFriendRequest, type FriendRequest, type GameInvite, type SearchResult } from '../services/socialApi'
 
 const auth = useAuthStore()
 const router = useRouter()
 const query = ref('')
 const results = ref<SearchResult>({ players: [], shinobis: [] })
 const requests = ref<FriendRequest[]>([])
+const gameInvites = ref<GameInvite[]>([])
 const open = ref(false)
 const notificationsOpen = ref(false)
 const loading = ref(false)
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 
 onMounted(async () => {
-  if (auth.token) requests.value = await listFriendRequests(auth.token, 'received').catch(() => [])
+  if (auth.token) {
+    requests.value = await listFriendRequests(auth.token, 'received').catch(() => [])
+    gameInvites.value = await listGameInvites(auth.token).catch(() => [])
+  }
 })
 
 watch(query, (value) => {
@@ -32,6 +36,7 @@ function publicProfile(id: number) { open.value = false; void router.push(`/prof
 async function addFriend(id: number) { if (!auth.token) return; await sendFriendRequest(auth.token, id); const player = results.value.players.find((item) => item.id === id); if (player) { player.friendshipStatus = 'PENDING'; player.friendshipDirection = 'sent' } }
 async function acceptSearchRequest(player: SearchResult['players'][number]) { if (!auth.token || !player.friendshipRequestId) return; await acceptFriendRequest(auth.token, player.friendshipRequestId); player.friendshipStatus = 'ACCEPTED'; player.friendshipDirection = null }
 async function answer(request: FriendRequest, accepted: boolean) { if (!auth.token) return; if (accepted) await acceptFriendRequest(auth.token, request.id); else await rejectFriendRequest(auth.token, request.id); requests.value = requests.value.filter((item) => item.id !== request.id) }
+async function answerGameInvite(invite: GameInvite, accepted: boolean) { if (!auth.token) return; const lobby = accepted ? await acceptGameInvite(auth.token, invite.id) : await rejectGameInvite(auth.token, invite.id); gameInvites.value = gameInvites.value.filter((item) => item.id !== invite.id); if (accepted) void router.push(`/lobby/${lobby.id}`) }
 function statusLabel(player: SearchResult['players'][number]) { if (player.friendshipStatus === 'ACCEPTED') return 'AMI'; if (player.friendshipDirection === 'received') return 'ACCEPTER'; if (player.friendshipStatus === 'PENDING') return 'DEMANDE ENVOYÉE'; return 'AJOUTER EN AMI' }
 </script>
 
@@ -50,10 +55,10 @@ function statusLabel(player: SearchResult['players'][number]) { if (player.frien
       </div>
     </div>
     <div class="social-actions">
-      <button v-if="auth.isAuthenticated" class="notification-button" type="button" aria-label="Notifications" @click="notificationsOpen = !notificationsOpen">◉<span v-if="requests.length" class="notification-badge">{{ requests.length }}</span></button>
+      <button v-if="auth.isAuthenticated" class="notification-button" type="button" aria-label="Notifications" @click="notificationsOpen = !notificationsOpen">◉<span v-if="requests.length + gameInvites.length" class="notification-badge">{{ requests.length + gameInvites.length }}</span></button>
       <a class="social-profile-link" :href="auth.isAuthenticated ? '/profil' : '/connexion'">{{ auth.isAuthenticated ? 'Profil' : 'Connexion' }}</a>
     </div>
-    <div v-if="notificationsOpen" class="notifications-panel"><strong>NOTIFICATIONS</strong><p v-if="!requests.length" class="social-muted">Aucune notification.</p><article v-for="request in requests" :key="request.id"><button type="button" @click="publicProfile(request.sender.id)">{{ request.sender.displayName }}</button><span>demande à devenir ton ami</span><div><button type="button" @click="answer(request, true)">ACCEPTER</button><button type="button" @click="answer(request, false)">REFUSER</button></div></article></div>
+    <div v-if="notificationsOpen" class="notifications-panel"><strong>NOTIFICATIONS</strong><p v-if="!requests.length && !gameInvites.length" class="social-muted">Aucune notification.</p><article v-for="request in requests" :key="`friend-${request.id}`"><button type="button" @click="publicProfile(request.sender.id)">{{ request.sender.displayName }}</button><span>demande à devenir ton ami</span><div><button type="button" @click="answer(request, true)">ACCEPTER</button><button type="button" @click="answer(request, false)">REFUSER</button></div></article><article v-for="invite in gameInvites" :key="`game-${invite.id}`"><span><b>{{ invite.creator.displayName }}</b> vous défie en {{ invite.mode }}</span><div><button type="button" @click="answerGameInvite(invite, true)">ACCEPTER</button><button type="button" @click="answerGameInvite(invite, false)">REFUSER</button></div></article></div>
   </nav>
 </template>
 

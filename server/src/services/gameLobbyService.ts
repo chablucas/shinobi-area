@@ -1,0 +1,88 @@
+import { GameInviteStatus, GameLobbyStatus, GameMode } from '@prisma/client'
+import { prisma } from '../config/prisma.js'
+
+const userSelect = { id: true, displayName: true } as const
+
+function invalid(message: string, statusCode = 400) {
+  return Object.assign(new Error(message), { statusCode })
+}
+
+function modeOf(mode: unknown) {
+  if (mode === '1v1') return GameMode.ONE_V_ONE
+  if (mode === '1v1v1') return GameMode.ONE_V_ONE_V_THREE
+  throw invalid('Mode de combat invalide.')
+}
+
+function publicUser(user: { id: number; displayName: string }) {
+  return { id: user.id, displayName: user.displayName, avatarUrl: null }
+}
+
+function lobbyInclude() {
+  return { creator: { select: userSelect }, invites: { include: { invitee: { select: userSelect } }, orderBy: { createdAt: 'asc' as const } } }
+}
+
+function formatLobby(lobby: Awaited<ReturnType<typeof findLobby>>) {
+  if (!lobby) return null
+  return {
+    id: lobby.id,
+    mode: lobby.mode === GameMode.ONE_V_ONE ? '1v1' : '1v1v1',
+    creatorId: lobby.creatorId,
+    status: lobby.status,
+    createdAt: lobby.createdAt,
+    updatedAt: lobby.updatedAt,
+    players: [
+      { ...publicUser(lobby.creator), status: 'ACCEPTED', inviteId: null },
+      ...lobby.invites.map((invite) => ({ ...publicUser(invite.invitee), status: invite.status, inviteId: invite.id })),
+    ],
+  }
+}
+
+async function findLobby(id: string) {
+  return prisma.gameLobby.findUnique({ where: { id }, include: lobbyInclude() })
+}
+
+export async function createGameLobby(creatorId: number, mode: unknown, opponentIds: unknown) {
+  const gameMode = modeOf(mode)
+  if (!Array.isArray(opponentIds) || opponentIds.length !== (gameMode === GameMode.ONE_V_ONE ? 1 : 2)) throw invalid('Le nombre d’adversaires ne correspond pas au mode.')
+  const ids = opponentIds.map(Number)
+  if (ids.some((id) => !Number.isInteger(id) || id <= 0) || new Set(ids).size !== ids.length || ids.includes(creatorId)) throw invalid('Les adversaires doivent être distincts et différents du créateur.')
+  const users = await prisma.user.findMany({ where: { id: { in: ids } }, select: userSelect })
+  if (users.length !== ids.length) throw invalid('Un adversaire est introuvable.', 404)
+  const duplicate = await prisma.gameLobby.findFirst({ where: { creatorId, status: { in: [GameLobbyStatus.WAITING, GameLobbyStatus.READY] }, invites: { some: { inviteeId: { in: ids }, status: GameInviteStatus.PENDING } } } })
+  if (duplicate) throw invalid('Une invitation est déjà en attente pour cet adversaire.', 409)
+  const lobby = await prisma.gameLobby.create({ data: { creatorId, mode: gameMode, invites: { create: ids.map((inviteeId) => ({ inviteeId })) } }, include: lobbyInclude() })
+  return formatLobby(lobby)
+}
+
+export async function listGameInvites(userId: number) {
+  const invites = await prisma.gameInvite.findMany({ where: { inviteeId: userId, status: GameInviteStatus.PENDING }, include: { lobby: { include: { creator: { select: userSelect } } } }, orderBy: { createdAt: 'desc' } })
+  return invites.map((invite) => ({ id: invite.id, lobbyId: invite.lobbyId, mode: invite.lobby.mode === GameMode.ONE_V_ONE ? '1v1' : '1v1v1', status: invite.status, createdAt: invite.createdAt, creator: publicUser(invite.lobby.creator) }))
+}
+
+async function pendingInvite(userId: number, inviteId: string) {
+  const invite = await prisma.gameInvite.findUnique({ where: { id: inviteId } })
+  if (!invite || invite.inviteeId !== userId || invite.status !== GameInviteStatus.PENDING) throw invalid('Invitation de combat introuvable.', 404)
+  return invite
+}
+
+async function updateInvite(userId: number, inviteId: string, status: GameInviteStatus) {
+  const invite = await pendingInvite(userId, inviteId)
+  await prisma.$transaction(async (transaction) => {
+    await transaction.gameInvite.update({ where: { id: invite.id }, data: { status } })
+    if (status === GameInviteStatus.ACCEPTED) {
+      const remaining = await transaction.gameInvite.count({ where: { lobbyId: invite.lobbyId, status: GameInviteStatus.PENDING } })
+      if (remaining === 0) await transaction.gameLobby.update({ where: { id: invite.lobbyId }, data: { status: GameLobbyStatus.READY } })
+    }
+  })
+  return getGameLobby(userId, invite.lobbyId)
+}
+
+export function acceptGameInvite(userId: number, inviteId: string) { return updateInvite(userId, inviteId, GameInviteStatus.ACCEPTED) }
+export function rejectGameInvite(userId: number, inviteId: string) { return updateInvite(userId, inviteId, GameInviteStatus.REJECTED) }
+
+export async function getGameLobby(userId: number, lobbyId: string) {
+  const lobby = await findLobby(lobbyId)
+  if (!lobby) throw invalid('Salon introuvable.', 404)
+  if (lobby.creatorId !== userId && !lobby.invites.some((invite) => invite.inviteeId === userId)) throw invalid('Vous ne participez pas à ce salon.', 403)
+  return formatLobby(lobby)
+}

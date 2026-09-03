@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import SocialHeader from '../components/SocialHeader.vue'
-import { getPublicUser, listFriends, type Friend, type PublicUser, type ChallengeMode } from '../services/socialApi'
+import { createGameLobby, getPublicUser, listFriends, type Friend, type PublicUser, type ChallengeMode } from '../services/socialApi'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -12,6 +12,7 @@ const profile = ref<PublicUser | null>(null)
 const friends = ref<Friend[]>([])
 const selectedMode = ref<ChallengeMode | null>(null)
 const error = ref('')
+const sending = ref(false)
 
 onMounted(async () => {
   await auth.loadCurrentUser()
@@ -19,8 +20,8 @@ onMounted(async () => {
   try { profile.value = await getPublicUser(auth.token, Number(route.params.id)); friends.value = await listFriends(auth.token) } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Profil introuvable.' }
 })
 
-function chooseMode(mode: ChallengeMode) { selectedMode.value = mode }
-function chooseThirdPlayer(friend: Friend) { if (profile.value) void router.push({ path: `/profil-public/${profile.value.id}`, query: { mode: '1v1v1', opponent: String(friend.id), third: String(friend.id) } }) }
+function chooseMode(mode: ChallengeMode) { selectedMode.value = mode; if (mode === '1v1') void challenge([profile.value!.id]) }
+async function challenge(opponentIds: number[]) { if (!auth.token || !profile.value) return; sending.value = true; error.value = ''; try { const lobby = await createGameLobby(auth.token, selectedMode.value!, opponentIds); await router.push(`/lobby/${lobby.id}`) } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Invitation impossible.' } finally { sending.value = false } }
 </script>
 
 <template>
@@ -36,8 +37,8 @@ function chooseThirdPlayer(friend: Friend) { if (profile.value) void router.push
         <div v-if="profile.friendshipStatus === 'ACCEPTED'" class="challenge-area">
           <p class="eyebrow">Défi</p>
           <div v-if="!selectedMode" class="challenge-buttons"><button type="button" @click="chooseMode('1v1')">DÉFIER · 1V1</button><button type="button" @click="chooseMode('1v1v1')">DÉFIER · 1V1V1</button></div>
-          <div v-else-if="selectedMode === '1v1'" class="challenge-confirm"><strong>COMBAT 1V1</strong><p>Moi <b>VS</b> {{ profile.displayName }}</p><button type="button" disabled>ENVOYER L’INVITATION · ÉTAPE 3</button></div>
-          <div v-else class="challenge-confirm"><strong>CHOISIR LE TROISIÈME JOUEUR</strong><button v-for="friend in friends.filter((item) => item.id !== profile?.id && item.id !== auth.user?.id)" :key="friend.id" type="button" @click="chooseThirdPlayer(friend)">{{ friend.displayName }}</button><p v-if="!friends.some((item) => item.id !== profile?.id && item.id !== auth.user?.id)">Aucun ami disponible.</p></div>
+          <div v-else-if="selectedMode === '1v1'" class="challenge-confirm"><strong>COMBAT 1V1</strong><p>Moi <b>VS</b> {{ profile.displayName }}</p><button type="button" disabled>{{ sending ? 'ENVOI...' : 'INVITATION ENVOYÉE' }}</button></div>
+          <div v-else class="challenge-confirm"><strong>CHOISIR LE TROISIÈME JOUEUR</strong><button v-for="friend in friends.filter((item) => item.id !== profile?.id && item.id !== auth.user?.id)" :key="friend.id" type="button" :disabled="sending" @click="challenge([profile!.id, friend.id])">{{ friend.displayName }}</button><p v-if="!friends.some((item) => item.id !== profile?.id && item.id !== auth.user?.id)">Aucun ami disponible.</p></div>
         </div>
       </article>
     </section>
