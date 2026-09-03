@@ -1,0 +1,38 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Card {
+  id                Int        @id @default(autoincrement())
+  name              String
+  slug              String     @unique
+  imageUrl          String?
+  cloudinaryPublicId String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  stats             CardStat[]
+}
+
+model Category {
+  id       Int        @id @default(autoincrement())
+  name     String
+  slug     String     @unique
+  position Int
+  stats    CardStat[]
+}
+
+model CardStat {
+  id         Int      @id @default(autoincrement())
+  cardId     Int
+  categoryId Int
+  value      Int?
+  card       Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, categoryId])
+}

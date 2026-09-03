@@ -1,0 +1,17 @@
+export const CATEGORY_DEFINITIONS = [
+  ['Chakra', 'chakra'],
+  ['Invocation', 'invocation'],
+  ['IQ', 'iq'],
+  ['Ninjutsu', 'ninjutsu'],
+  ['Genjutsu', 'genjutsu'],
+  ['Taijutsu', 'taijutsu'],
+  ['Avatar', 'avatar'],
+  ['Body', 'body'],
+  ['Fūinjutsu', 'fuinjutsu'],
+  ['Senjutsu', 'senjutsu'],
+  ['Kenjutsu', 'kenjutsu'],
+  ['Clan', 'clan'],
+  ['Vitesse', 'vitesse'],
+  ['Kekkei Genkai', 'kekkei-genkai'],
+  ['Kekkei Mōra', 'kekkei-mora'],
+] as const

@@ -119,6 +119,13 @@ dist
 # Firebase cache directory
 .firebase/
 
+# Local card assets and archives
+Carte Naruto.zip
+server/import/
+
+# Backend build output
+server/dist/
+
 # TernJS port file
 .tern-port
 
@@ -141,3 +148,6 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+server/.env
+*.zip
