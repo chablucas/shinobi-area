@@ -10,10 +10,17 @@ export type GameInvite = { id: string; lobbyId: string; mode: ChallengeMode; sta
 export type LobbyPlayer = Partial<PublicUser> & { id: number | null; displayName: string; avatarUrl: string | null; status: 'ACCEPTED' | 'PENDING' | 'REJECTED' | 'CANCELLED'; inviteId: string | null; isAi: boolean }
 export type GameLobby = { id: string; mode: ChallengeMode; creatorId: number; includesAi: boolean; players: LobbyPlayer[]; status: 'WAITING' | 'READY' | 'PLAYING'; createdAt: string; updatedAt: string }
 
+export class SocialApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message)
+    this.name = 'SocialApiError'
+  }
+}
+
 async function request<T>(token: string, path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(options.headers ?? {}) } })
   const payload = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(payload.error ?? 'Une erreur sociale est survenue.')
+  if (!response.ok) throw new SocialApiError(payload.error ?? 'Une erreur sociale est survenue.', response.status)
   return payload as T
 }
 

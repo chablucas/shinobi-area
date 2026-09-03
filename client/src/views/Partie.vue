@@ -5,7 +5,7 @@ import { fetchAllCards } from '../services/cardApi'
 import { useAuthStore } from '../stores/auth'
 import { saveBuild } from '../services/buildApi'
 import { CombatApiError, simulateFight } from '../services/gameApi'
-import { getGameLobby } from '../services/socialApi'
+import { getGameLobby, SocialApiError } from '../services/socialApi'
 import type { Card } from '../types/card'
 import type { CombatResult } from '../types/combat'
 import {
@@ -62,9 +62,11 @@ onMounted(async () => {
     if (!auth.token) { lobbyAccessError.value = 'Connecte-toi pour rejoindre ce combat.'; loading.value = false; return }
     try {
       const lobby = await getGameLobby(auth.token, props.lobbyId)
-      if (lobby.status !== 'PLAYING') { lobbyAccessError.value = 'Ce combat n’a pas encore été démarré par le créateur.'; loading.value = false; return }
+      if (lobby.status !== 'PLAYING') { lobbyAccessError.value = lobby.status === 'READY' ? 'Le combat n’a pas encore commencé.' : 'Le salon attend encore les participants.'; loading.value = false; return }
     } catch (error) {
-      lobbyAccessError.value = error instanceof Error ? error.message : 'Accès au combat impossible.'
+      lobbyAccessError.value = error instanceof SocialApiError
+        ? error.status === 404 ? 'Salon introuvable' : error.status === 401 || error.status === 403 ? 'Vous n’avez pas accès à ce combat.' : error.message
+        : 'Accès au combat impossible.'
       loading.value = false
       return
     }

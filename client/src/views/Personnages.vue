@@ -61,6 +61,11 @@ const statKeys = [
   'speed',
   'kekkeiGenkai',
 ]
+const statLabels: Record<string, string> = {
+  chakra: 'Chakra', invocation: 'Invocation', iq: 'IQ', genjutsu: 'Genjutsu', taijutsu: 'Taijutsu',
+  avatar: 'Avatar', body: 'Body', fuinjutsu: 'Fûinjutsu', senjutsu: 'Senjutsu', kenjutsu: 'Kenjutsu',
+  speed: 'Vitesse', kekkeiGenkai: 'KG',
+}
 const editValues = ref<Record<string, number>>({})
 const selectedRarity = ref('')
 const modifierForm = ref({
@@ -95,6 +100,12 @@ function closeAdmin() {
 }
 function traitList(value?: string[]) {
   return value?.length ? value.join(', ') : 'Aucun'
+}
+function compactStats(card: Card) {
+  return [
+    ...Object.entries(statLabels).map(([key, label]) => ({ label, value: card.effectiveStats[key as keyof Card['effectiveStats']] ?? 0 })),
+    { label: 'Ninjutsu', value: `${card.effectiveStats.ninjutsuAttack ?? 0} / ${card.effectiveStats.ninjutsuDefense ?? 0}` },
+  ]
 }
 async function openAdmin(card: Card) {
   if (!auth.token || auth.user?.role !== 'ADMIN') return
@@ -242,52 +253,12 @@ function modifierText(modifier: CardModifier) {
               <p class="rarity-label">{{ card.rarityMetadata.label }}</p>
               <h2>{{ card.name }}</h2>
               <div class="card-facts">
-                <span
-                  ><b>Stats</b
-                  >{{
-                    Object.entries(card.effectiveStats)
-                      .map(([key, value]) => `${key}: ${value}`)
-                      .join(' · ')
-                  }}</span
-                ><span><b>Clans</b>{{ traitList(card.clans) }}</span
-                ><span
-                  ><b>Capacités</b
-                  >{{
-                    traitList(
-                      [
-                        ...(card.traits?.abilities?.ninjutsu ?? []),
-                        ...(card.traits?.abilities?.genjutsu ?? []),
-                        ...(card.traits?.abilities?.kekkeiGenkai ?? []),
-                      ].slice(0, 4),
-                    )
-                  }}</span
-                ><span
-                  ><b>Avatars / powerUps</b
-                  >{{
-                    traitList(
-                      (card.traits?.avatars ?? [])
-                        .map((avatar) => avatar.id)
-                        .concat(card.traits?.powerUps ?? []),
-                    )
-                  }}</span
-                ><span
-                  ><b>Conditions</b
-                  >{{
-                    traitList([
-                      ...(card.traits?.requirements?.ninjutsu ?? []),
-                      ...(card.traits?.requirements?.genjutsu ?? []),
-                      ...(card.traits?.requirements?.avatar ?? []),
-                    ])
-                  }}</span
-                ><span v-if="card.modifiers.some((modifier) => modifier.active)"
-                  ><b>Modificateurs</b
-                  >{{
-                    card.modifiers
-                      .filter((modifier) => modifier.active)
-                      .map(modifierText)
-                      .join(' · ')
-                  }}</span
-                >
+                <div class="stats-section"><b>Stats</b><div class="stats-grid"><span v-for="stat in compactStats(card)" :key="stat.label"><span>{{ stat.label }}</span><strong>{{ stat.value }}</strong></span></div></div>
+                <span><b>Clans</b>{{ traitList(card.clans) }}</span>
+                <span><b>Capacités</b>{{ traitList([...(card.traits?.abilities?.ninjutsu ?? []), ...(card.traits?.abilities?.genjutsu ?? []), ...(card.traits?.abilities?.kekkeiGenkai ?? [])].slice(0, 4)) }}</span>
+                <span><b>Avatars / powerUps</b>{{ traitList((card.traits?.avatars ?? []).map((avatar) => avatar.id).concat(card.traits?.powerUps ?? [])) }}</span>
+                <span><b>Conditions</b>{{ traitList([...(card.traits?.requirements?.ninjutsu ?? []), ...(card.traits?.requirements?.genjutsu ?? []), ...(card.traits?.requirements?.avatar ?? [])]) }}</span>
+                <span v-if="card.modifiers.some((modifier) => modifier.active)"><b>Modificateurs</b>{{ card.modifiers.filter((modifier) => modifier.active).map(modifierText).join(' · ') }}</span>
               </div>
             </div>
           </div>
@@ -473,20 +444,48 @@ function modifierText(modifier: CardModifier) {
 }
 .card-back {
   transform: rotateY(180deg);
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 .card-facts {
   display: grid;
-  gap: 8px;
-  margin-top: 14px;
+  gap: 9px;
+  margin-top: 9px;
   color: var(--text-muted);
-  font-size: 0.56rem;
-  line-height: 1.45;
+  font-size: 0.62rem;
+  line-height: 1.3;
 }
 .card-facts b {
   display: block;
+  margin-bottom: 4px;
   color: var(--text-soft);
   text-transform: uppercase;
+  font-size: 0.54rem;
+  letter-spacing: 0.08em;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 12px;
+  padding: 5px 0;
+  border-top: 1px solid var(--border-light);
+  border-bottom: 1px solid var(--border-light);
+}
+.stats-grid > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 5px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 0.62rem;
+}
+.stats-grid strong {
+  color: var(--text-main);
+  font-size: 0.66rem;
+  font-weight: 700;
 }
 .edit-button,
 .admin-panel button {

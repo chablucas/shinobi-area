@@ -11,15 +11,19 @@ const router = useRouter()
 const lobby = ref<GameLobby | null>(null)
 const error = ref('')
 const starting = ref(false)
-let pollTimer: ReturnType<typeof setInterval> | undefined
+let pollTimer: ReturnType<typeof setTimeout> | undefined
+let pollInFlight = false
+let isMounted = false
 
 onMounted(async () => {
+  isMounted = true
   await auth.loadCurrentUser()
   if (!auth.token) { await router.replace('/connexion'); return }
-  try { await refreshLobby(); pollTimer = setInterval(() => { void refreshLobby() }, 5000) } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Salon introuvable.' }
+  try { await refreshLobby(); schedulePoll() } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Salon introuvable.' }
 })
-onUnmounted(() => { if (pollTimer) clearInterval(pollTimer) })
-async function refreshLobby() { if (!auth.token) return; lobby.value = await getGameLobby(auth.token, String(route.params.id)) }
+onUnmounted(() => { isMounted = false; if (pollTimer) clearTimeout(pollTimer) })
+async function refreshLobby() { if (!auth.token || pollInFlight) return; pollInFlight = true; try { lobby.value = await getGameLobby(auth.token, String(route.params.id)); error.value = '' } finally { pollInFlight = false } }
+function schedulePoll() { if (!isMounted || !auth.token) return; pollTimer = setTimeout(async () => { try { await refreshLobby() } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Salon indisponible.' } if (isMounted) schedulePoll() }, 2000) }
 async function start() { if (!auth.token || !lobby.value || lobby.value.status !== 'READY' || lobby.value.creatorId !== auth.user?.id) return; starting.value = true; error.value = ''; try { const started = await startGameLobby(auth.token, lobby.value.id); lobby.value = started; await router.push({ path: `/partie/${started.id}`, query: { mode: started.mode } }) } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Impossible de démarrer le combat.' } finally { starting.value = false } }
 </script>
 

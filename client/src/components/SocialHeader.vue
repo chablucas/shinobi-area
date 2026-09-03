@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { acceptFriendRequest, acceptGameInvite, listFriendRequests, listGameInvites, rejectFriendRequest, rejectGameInvite, searchGlobal, sendFriendRequest, type FriendRequest, type GameInvite, type SearchResult } from '../services/socialApi'
@@ -14,12 +14,45 @@ const open = ref(false)
 const notificationsOpen = ref(false)
 const loading = ref(false)
 let searchTimer: ReturnType<typeof setTimeout> | undefined
+let notificationTimer: ReturnType<typeof setTimeout> | undefined
+let notificationRefreshInFlight = false
+let isMounted = false
+
+async function refreshNotifications() {
+  if (!auth.token || notificationRefreshInFlight) return
+  notificationRefreshInFlight = true
+  try {
+    const [nextRequests, nextInvites] = await Promise.all([
+      listFriendRequests(auth.token, 'received'),
+      listGameInvites(auth.token),
+    ])
+    requests.value = nextRequests
+    gameInvites.value = nextInvites
+  } catch {
+    // Notifications are auxiliary; a transient network error must not disrupt navigation.
+  } finally {
+    notificationRefreshInFlight = false
+  }
+}
+
+function scheduleNotificationRefresh() {
+  clearTimeout(notificationTimer)
+  if (!isMounted || !auth.token) return
+  notificationTimer = setTimeout(async () => {
+    await refreshNotifications()
+    if (isMounted) scheduleNotificationRefresh()
+  }, 2500)
+}
 
 onMounted(async () => {
-  if (auth.token) {
-    requests.value = await listFriendRequests(auth.token, 'received').catch(() => [])
-    gameInvites.value = await listGameInvites(auth.token).catch(() => [])
-  }
+  isMounted = true
+  await refreshNotifications()
+  scheduleNotificationRefresh()
+})
+onUnmounted(() => {
+  isMounted = false
+  clearTimeout(searchTimer)
+  clearTimeout(notificationTimer)
 })
 
 watch(query, (value) => {
@@ -35,8 +68,8 @@ watch(query, (value) => {
 function publicProfile(id: number) { open.value = false; void router.push(`/profil-public/${id}`) }
 async function addFriend(id: number) { if (!auth.token) return; await sendFriendRequest(auth.token, id); const player = results.value.players.find((item) => item.id === id); if (player) { player.friendshipStatus = 'PENDING'; player.friendshipDirection = 'sent' } }
 async function acceptSearchRequest(player: SearchResult['players'][number]) { if (!auth.token || !player.friendshipRequestId) return; await acceptFriendRequest(auth.token, player.friendshipRequestId); player.friendshipStatus = 'ACCEPTED'; player.friendshipDirection = null }
-async function answer(request: FriendRequest, accepted: boolean) { if (!auth.token) return; if (accepted) await acceptFriendRequest(auth.token, request.id); else await rejectFriendRequest(auth.token, request.id); requests.value = requests.value.filter((item) => item.id !== request.id) }
-async function answerGameInvite(invite: GameInvite, accepted: boolean) { if (!auth.token) return; const lobby = accepted ? await acceptGameInvite(auth.token, invite.id) : await rejectGameInvite(auth.token, invite.id); gameInvites.value = gameInvites.value.filter((item) => item.id !== invite.id); if (accepted) void router.push(`/lobby/${lobby.id}`) }
+async function answer(request: FriendRequest, accepted: boolean) { if (!auth.token) return; requests.value = requests.value.filter((item) => item.id !== request.id); try { if (accepted) await acceptFriendRequest(auth.token, request.id); else await rejectFriendRequest(auth.token, request.id) } finally { await refreshNotifications() } }
+async function answerGameInvite(invite: GameInvite, accepted: boolean) { if (!auth.token) return; gameInvites.value = gameInvites.value.filter((item) => item.id !== invite.id); try { const lobby = accepted ? await acceptGameInvite(auth.token, invite.id) : await rejectGameInvite(auth.token, invite.id); if (accepted) void router.push(`/lobby/${lobby.id}`) } finally { await refreshNotifications() } }
 function statusLabel(player: SearchResult['players'][number]) { if (player.friendshipStatus === 'ACCEPTED') return 'AMI'; if (player.friendshipDirection === 'received') return 'ACCEPTER'; if (player.friendshipStatus === 'PENDING') return 'DEMANDE ENVOYÉE'; return 'AJOUTER EN AMI' }
 </script>
 
