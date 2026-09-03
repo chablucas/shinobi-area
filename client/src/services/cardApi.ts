@@ -1,7 +1,7 @@
 import type { Card } from '../types/card'
 
 function getApiBaseUrl(): string {
-  if (import.meta.env.DEV) return ''
+  if (import.meta.env.DEV) return '/api'
 
   const configuredUrl = import.meta.env.VITE_API_URL?.trim()
   if (!configuredUrl) {
@@ -19,7 +19,8 @@ function getApiBaseUrl(): string {
     throw new Error('VITE_API_URL doit utiliser HTTP ou HTTPS.')
   }
 
-  return apiUrl.origin
+  const apiPath = apiUrl.pathname.replace(/\/+$/, '').replace(/\/api$/, '')
+  return `${apiUrl.origin}${apiPath}/api`
 }
 
 export const API_BASE_URL = getApiBaseUrl()
@@ -30,7 +31,18 @@ export async function fetchAllCards(): Promise<Card[]> {
   let pages = 1
 
   do {
-    const response = await fetch(`${API_BASE_URL}/api/cards?limit=100&page=${page}`)
+    const requestUrl = `${API_BASE_URL}/cards?limit=100&page=${page}`
+    console.debug('[cardApi] URL appelée:', requestUrl)
+
+    let response: Response
+    try {
+      response = await fetch(requestUrl)
+    } catch (error) {
+      console.error('[cardApi] Échec fetch:', error instanceof Error ? error.message : String(error))
+      throw error
+    }
+
+    console.debug('[cardApi] Status HTTP:', response.status)
     if (!response.ok) throw new Error('Impossible de charger les cartes.')
     const payload = await response.json()
     cards.push(...payload.data)
