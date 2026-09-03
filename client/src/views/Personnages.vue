@@ -21,7 +21,7 @@ const query = ref('')
 const rarity = ref('')
 const sort = ref<'name' | 'rarity-asc' | 'rarity-desc'>('rarity-asc')
 const flipped = ref(new Set<string>())
-const selected = ref<Card>(null as unknown as Card)
+const selected = ref<Card | null>(null)
 const error = ref('')
 const loading = ref(true)
 const rarityOrder = computed(() =>
@@ -91,7 +91,7 @@ function toggle(slug: string) {
   flipped.value = next
 }
 function closeAdmin() {
-  selected.value = null as unknown as Card
+  selected.value = null
 }
 function traitList(value?: string[]) {
   return value?.length ? value.join(', ') : 'Aucun'
@@ -215,10 +215,9 @@ function modifierText(modifier: CardModifier) {
       </div>
       <p v-if="loading" class="state-message">Chargement des shinobis...</p>
       <p v-else-if="error" class="state-message">{{ error }}</p>
-      <div v-else class="characters-grid">
-        <article
-          v-for="card in filteredCards"
-          :key="card.slug"
+        <div v-else-if="filteredCards.length" class="characters-grid">
+          <div v-for="card in filteredCards" :key="card.slug" class="character-tile">
+          <article
           class="flip-card"
           :class="{ flipped: flipped.has(card.slug) }"
           tabindex="0"
@@ -290,18 +289,13 @@ function modifierText(modifier: CardModifier) {
                   }}</span
                 >
               </div>
-              <button
-                v-if="auth.user?.role === 'ADMIN'"
-                type="button"
-                class="edit-button"
-                @click.stop="openAdmin(card)"
-              >
-                MODIFIER
-              </button>
             </div>
           </div>
         </article>
+        <button v-if="auth.user?.role === 'ADMIN'" type="button" class="edit-button" @click.stop="openAdmin(card)">MODIFIER</button>
+        </div>
       </div>
+      <p v-else class="state-message">Aucun shinobi ne correspond à ces critères.</p>
     </section>
     <div v-if="selected" class="admin-overlay" @click.self="closeAdmin">
       <section class="admin-panel" role="dialog" aria-modal="true">
@@ -328,7 +322,7 @@ function modifierText(modifier: CardModifier) {
         <h3>RARETÉ</h3>
         <p>
           Rareté de base :
-          <b>{{ rarityOrder.find((item) => item.id === selected.baseRarity)?.label }}</b>
+          <b>{{ rarityOrder.find((item) => item.id === selected?.baseRarity)?.label }}</b>
         </p>
         <select v-model="selectedRarity" class="auth-input">
           <option v-for="item in rarityOrder" :key="item.id" :value="item.id">

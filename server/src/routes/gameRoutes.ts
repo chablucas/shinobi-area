@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { acceptInvite, getGameInvites, getLobby, postGameLobby, postSimulation, rejectInvite } from '../controllers/gameController.js'
+import { acceptInvite, getGameInvites, getLobby, postGameLobby, postSimulation, rejectInvite, startLobby } from '../controllers/gameController.js'
 import { requireAuth } from '../middleware/auth.js'
 
 export const gameRoutes = Router()
@@ -10,3 +10,4 @@ gameRoutes.post('/lobbies', postGameLobby)
 gameRoutes.post('/invites/:inviteId/accept', acceptInvite)
 gameRoutes.post('/invites/:inviteId/reject', rejectInvite)
 gameRoutes.get('/lobbies/:lobbyId', getLobby)
+gameRoutes.post('/lobbies/:lobbyId/start', startLobby)

@@ -44,13 +44,18 @@ export async function fetchAllCards(): Promise<Card[]> {
 
     console.debug('[cardApi] Status HTTP:', response.status)
     if (!response.ok) throw new Error('Impossible de charger les cartes.')
-    const payload = await response.json()
-    cards.push(...payload.data)
-    pages = payload.pagination.pages
+    const payload = await response.json().catch(() => null) as { data?: unknown; pagination?: { pages?: unknown } } | null
+    if (!payload || !Array.isArray(payload.data) || !payload.pagination || !Number.isInteger(payload.pagination.pages)) throw new Error('Réponse cartes invalide.')
+    const responsePages = payload.pagination.pages as number
+    if (responsePages < page) throw new Error('Réponse cartes invalide.')
+    cards.push(...payload.data as Card[])
+    pages = responsePages
     page += 1
   } while (page <= pages)
 
-  return cards
+  const uniqueCards = new Map(cards.map((card) => [card.slug, card]))
+  if (uniqueCards.size !== cards.length) throw new Error('La collection contient des cartes dupliquées.')
+  return [...uniqueCards.values()]
 }
 
 export async function fetchCard(slug: string): Promise<Card> {

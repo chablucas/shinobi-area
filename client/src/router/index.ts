@@ -16,6 +16,7 @@ const router = createRouter({
   routes: [
     { path: '/', component: App },
     { path: '/partie', component: Partie, props: { mode: 'local2' } },
+    { path: '/partie/:lobbyId', component: Partie, props: (route) => ({ lobbyId: String(route.params.lobbyId), mode: route.query.mode === '1v1v1' ? 'local3' : 'local2' }) },
     { path: '/solo', component: Partie, props: { mode: 'solo' } },
     { path: '/2-joueurs', redirect: '/partie' },
     { path: '/3-joueurs', component: Partie, props: { mode: 'local3' } },

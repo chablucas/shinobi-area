@@ -8,7 +8,7 @@ export type SearchResult = { players: PublicUser[]; shinobis: SearchCard[] }
 export type ChallengeMode = '1v1' | '1v1v1'
 export type GameInvite = { id: string; lobbyId: string; mode: ChallengeMode; status: 'PENDING'; createdAt: string; creator: Friend }
 export type LobbyPlayer = Partial<PublicUser> & { id: number | null; displayName: string; avatarUrl: string | null; status: 'ACCEPTED' | 'PENDING' | 'REJECTED' | 'CANCELLED'; inviteId: string | null; isAi: boolean }
-export type GameLobby = { id: string; mode: ChallengeMode; creatorId: number; includesAi: boolean; players: LobbyPlayer[]; status: 'WAITING' | 'READY'; createdAt: string; updatedAt: string }
+export type GameLobby = { id: string; mode: ChallengeMode; creatorId: number; includesAi: boolean; players: LobbyPlayer[]; status: 'WAITING' | 'READY' | 'PLAYING'; createdAt: string; updatedAt: string }
 
 async function request<T>(token: string, path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(options.headers ?? {}) } })
@@ -29,3 +29,4 @@ export function createGameLobby(token: string, mode: ChallengeMode, opponentIds:
 export function acceptGameInvite(token: string, inviteId: string) { return request<GameLobby>(token, `/game/invites/${inviteId}/accept`, { method: 'POST' }) }
 export function rejectGameInvite(token: string, inviteId: string) { return request<GameLobby>(token, `/game/invites/${inviteId}/reject`, { method: 'POST' }) }
 export function getGameLobby(token: string, lobbyId: string) { return request<GameLobby>(token, `/game/lobbies/${lobbyId}`) }
+export function startGameLobby(token: string, lobbyId: string) { return request<GameLobby>(token, `/game/lobbies/${lobbyId}/start`, { method: 'POST' }) }

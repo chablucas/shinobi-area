@@ -94,6 +94,7 @@ enum GameInviteStatus {
 enum GameLobbyStatus {
   WAITING
   READY
+  PLAYING
 }
 
 model GameLobby {

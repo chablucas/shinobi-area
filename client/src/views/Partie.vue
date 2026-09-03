@@ -5,6 +5,7 @@ import { fetchAllCards } from '../services/cardApi'
 import { useAuthStore } from '../stores/auth'
 import { saveBuild } from '../services/buildApi'
 import { CombatApiError, simulateFight } from '../services/gameApi'
+import { getGameLobby } from '../services/socialApi'
 import type { Card } from '../types/card'
 import type { CombatResult } from '../types/combat'
 import {
@@ -27,7 +28,7 @@ import SocialHeader from '../components/SocialHeader.vue'
 type Phase = 'construction' | 'combat' | 'result'
 type GameMode = 'solo' | 'local2' | 'local3'
 
-const props = withDefaults(defineProps<{ mode?: GameMode }>(), { mode: 'local2' })
+const props = withDefaults(defineProps<{ mode?: GameMode; lobbyId?: string }>(), { mode: 'local2' })
 const auth = useAuthStore()
 
 const cards = ref<Card[]>([])
@@ -42,6 +43,7 @@ const combatResult = ref<CombatResult | null>(null)
 const simulating = ref(false)
 const loading = ref(true)
 const errorMessage = ref('')
+const lobbyAccessError = ref('')
 const saved = ref(false)
 const gameId = ref(crypto.randomUUID())
 
@@ -56,6 +58,17 @@ const gameStatKeys: Record<string, keyof CombatResult['player1']['finalStats'] |
 
 onMounted(async () => {
   await auth.loadCurrentUser()
+  if (props.lobbyId) {
+    if (!auth.token) { lobbyAccessError.value = 'Connecte-toi pour rejoindre ce combat.'; loading.value = false; return }
+    try {
+      const lobby = await getGameLobby(auth.token, props.lobbyId)
+      if (lobby.status !== 'PLAYING') { lobbyAccessError.value = 'Ce combat n’a pas encore été démarré par le créateur.'; loading.value = false; return }
+    } catch (error) {
+      lobbyAccessError.value = error instanceof Error ? error.message : 'Accès au combat impossible.'
+      loading.value = false
+      return
+    }
+  }
   try {
     cards.value = await fetchAllCards()
     if (cards.value.length < 30) errorMessage.value = 'Il faut au moins 30 cartes pour commencer une partie.'
@@ -203,6 +216,8 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
       </div>
     </header>
 
+    <p v-if="lobbyAccessError" class="error-message">{{ lobbyAccessError }}</p>
+    <template v-else>
     <p v-if="loading" class="loading-message">Chargement des 163 cartes...</p>
     <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
 
@@ -255,6 +270,7 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
       <div v-else class="error-message">Aucun résultat de combat disponible.</div>
       <div class="result-actions"><button v-if="auth.isAuthenticated" class="primary-button" type="button" :disabled="saved" @click="saveHumanBuild">{{ saved ? 'Perso sauvegardé' : 'Sauvegarder mon perso' }} <span>↓</span></button><a v-else class="secondary-button" href="/connexion">Connecte-toi pour sauvegarder</a><button class="primary-button" type="button" @click="replay">Rejouer <span>↻</span></button><a class="secondary-button" href="/">Retour à l’accueil <span>↗</span></a></div>
     </section>
+    </template>
   </main>
 </template>
 

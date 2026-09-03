@@ -81,7 +81,8 @@ async function updateInvite(userId: number, inviteId: string, status: GameInvite
       if (remaining === 0) await transaction.gameLobby.update({ where: { id: invite.lobbyId }, data: { status: GameLobbyStatus.READY } })
     }
   })
-  return getGameLobby(userId, invite.lobbyId)
+  const updatedLobby = await findLobby(invite.lobbyId)
+  return formatLobby(updatedLobby)
 }
 
 export function acceptGameInvite(userId: number, inviteId: string) { return updateInvite(userId, inviteId, GameInviteStatus.ACCEPTED) }
@@ -90,6 +91,23 @@ export function rejectGameInvite(userId: number, inviteId: string) { return upda
 export async function getGameLobby(userId: number, lobbyId: string) {
   const lobby = await findLobby(lobbyId)
   if (!lobby) throw invalid('Salon introuvable.', 404)
-  if (lobby.creatorId !== userId && !lobby.invites.some((invite) => invite.inviteeId === userId)) throw invalid('Vous ne participez pas à ce salon.', 403)
+  if (lobby.creatorId !== userId && !lobby.invites.some((invite) => invite.inviteeId === userId && invite.status === GameInviteStatus.ACCEPTED)) throw invalid('Vous ne participez pas à ce salon.', 403)
   return formatLobby(lobby)
+}
+
+export async function startGameLobby(userId: number, lobbyId: string) {
+  try {
+    return await prisma.$transaction(async (transaction) => {
+      const lobby = await transaction.gameLobby.findUnique({ where: { id: lobbyId }, select: { creatorId: true, status: true } })
+      if (!lobby) throw invalid('Salon introuvable.', 404)
+      if (lobby.creatorId !== userId) throw invalid('Seul le créateur peut démarrer ce salon.', 403)
+      if (lobby.status === GameLobbyStatus.PLAYING) throw invalid('Le salon a déjà été démarré.', 409)
+      if (lobby.status !== GameLobbyStatus.READY) throw invalid('Le salon n’est pas prêt.', 409)
+      const updated = await transaction.gameLobby.update({ where: { id: lobbyId }, data: { status: GameLobbyStatus.PLAYING }, include: lobbyInclude() })
+      return { ...formatLobby(updated), status: GameLobbyStatus.PLAYING }
+    })
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'P2025') throw invalid('Le salon a déjà été démarré.', 409)
+    throw error
+  }
 }
