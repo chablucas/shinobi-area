@@ -58,6 +58,27 @@ body::before {
   mix-blend-mode: screen;
 }
 
+.card-image-surface {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(17, 20, 24, 0.96), rgba(22, 18, 17, 0.92));
+}
+
+.card-image-surface > img,
+.card-image-surface > .card-image-fallback,
+.card-image-surface > .slot-card-fallback,
+.card-image-surface .card-image-inner {
+  width: calc(100% - 6px);
+  height: calc(100% - 2px);
+  display: block;
+  margin: 0;
+  object-fit: cover;
+}
+
 img {
   display: block;
   max-width: 100%;

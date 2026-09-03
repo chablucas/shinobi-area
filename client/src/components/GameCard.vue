@@ -74,8 +74,8 @@ const imageFailed = ref(false)
 
 .card-image-frame img,
 .card-image-fallback {
-  width: calc(100% - 4px);
-  height: calc(100% - 10px);
+  width: calc(100% - 6px);
+  height: calc(100% - 2px);
   object-fit: cover;
   display: block;
   margin: 0;

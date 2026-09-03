@@ -429,7 +429,9 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
 }
 
 .slot-card-preview {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 46px;
   height: 66px;
   min-width: 46px;
@@ -445,9 +447,10 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
 .slot-card-preview img,
 .slot-card-fallback {
   display: block;
-  width: 100%;
-  height: 100%;
+  width: calc(100% - 6px);
+  height: calc(100% - 2px);
   object-fit: cover;
+  margin: 0;
 }
 
 .slot-card-fallback {

@@ -51,8 +51,10 @@ function markImageAsFailed(slug: string) {
       <div class="section-heading"><p class="kicker"><span class="kicker-dot"></span>Le catalogue</p><h2 id="cards-title">Les cartes<br /><i>de l’arène.</i></h2><span class="section-index">/ {{ cards.length }}</span></div>
       <div class="cards-grid">
         <article v-for="card in cards" :key="card.id" class="character-card">
-          <div v-if="!card.imageUrl || failedImages.has(card.slug)" class="image-fallback" aria-hidden="true">{{ card.name.slice(0, 1) }}</div>
-          <img v-else :src="card.imageUrl" :alt="`Carte ${card.name}`" loading="lazy" @error="markImageAsFailed(card.slug)" />
+          <div class="card-image-surface character-card-media">
+            <div v-if="!card.imageUrl || failedImages.has(card.slug)" class="image-fallback card-image-fallback" aria-hidden="true">{{ card.name.slice(0, 1) }}</div>
+            <img v-else class="card-image-inner" :src="card.imageUrl" :alt="`Carte ${card.name}`" loading="lazy" @error="markImageAsFailed(card.slug)" />
+          </div>
           <h3>{{ card.name }}</h3>
         </article>
       </div>
@@ -551,10 +553,14 @@ footer {
   border-color: rgba(84, 196, 255, 0.5);
 }
 
+.character-card-media {
+  aspect-ratio: 2 / 3;
+}
+
 .character-card img,
 .image-fallback {
-  width: 100%;
-  aspect-ratio: 2 / 3;
+  width: calc(100% - 6px);
+  height: calc(100% - 2px);
   object-fit: cover;
 }
 
