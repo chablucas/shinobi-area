@@ -16,11 +16,15 @@ const categoryValue: Record<CategorySlug, (card: Card) => number> = {
   clan: () => 0,
   vitesse: (card) => card.stats.speed ?? 0,
   'kekkei-genkai': (card) => card.stats.kekkeiGenkai ?? 0,
-  'kekkei-mora': () => 0,
+  'kekkei-mora': (card) => card.stats.kekkeiMora ?? 0,
 }
 
 export function chooseBestCategory(build: PlayerBuild, card: Card): CategorySlug | null {
   return (Object.keys(categoryValue) as CategorySlug[])
     .filter((category) => !build.slots[category])
-    .sort((left, right) => categoryValue[right](card) - categoryValue[left](card) || left.localeCompare(right))[0] ?? null
+    .sort((left, right) => categoryValue[right](card) - categoryValue[left](card) || categoryOrder(left) - categoryOrder(right))[0] ?? null
+}
+
+function categoryOrder(category: CategorySlug): number {
+  return Object.keys(categoryValue).indexOf(category)
 }

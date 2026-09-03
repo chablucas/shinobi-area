@@ -51,9 +51,6 @@ const winnerName = computed(() => winnerId.value ? `Joueur ${winnerId.value}` : 
 const playerCount = computed<2 | 3>(() => props.mode === 'local3' ? 3 : 2)
 const isComputerTurn = computed(() => props.mode === 'solo' && activePlayerId.value === 2)
 const combatBlocked = computed(() => Boolean(combatResult.value && (combatResult.value.player1.validationErrors.length || combatResult.value.player2.validationErrors.length)))
-const statRows = [
-  ['Chakra', 'chakra'], ['Invocation', 'invocation'], ['IQ', 'iq'], ['Ninjutsu attaque', 'ninjutsuAttack'], ['Ninjutsu défense', 'ninjutsuDefense'], ['Genjutsu', 'genjutsu'], ['Taijutsu', 'taijutsu'], ['Avatar', 'avatar'], ['Body', 'body'], ['Fûinjutsu', 'fuinjutsu'], ['Senjutsu', 'senjutsu'], ['Kenjutsu', 'kenjutsu'], ['Clan', 'clan'], ['Vitesse', 'speed'], ['Kekkei Genkai', 'kekkeiGenkai'], ['Kekkei Mōra', 'kekkeiMora'],
-] as const
 const gameStatKeys: Record<string, keyof CombatResult['player1']['finalStats'] | null> = { chakra: 'chakra', invocation: 'invocation', iq: 'iq', ninjutsu: 'ninjutsuAttack', genjutsu: 'genjutsu', taijutsu: 'taijutsu', avatar: 'avatar', body: 'body', fuinjutsu: 'fuinjutsu', senjutsu: 'senjutsu', kenjutsu: 'kenjutsu', clan: null, vitesse: 'speed', 'kekkei-genkai': 'kekkeiGenkai', 'kekkei-mora': null }
 
 onMounted(async () => {
@@ -142,7 +139,7 @@ function chooseManualWinner(winner: 'player1' | 'player2' | 'draw') {
 }
 
 function cardFor(build: PlayerBuild, slug: CategorySlug) { return build.slots[slug] }
-function statFor(player: CombatResult['player1'], build: PlayerBuild, slug: CategorySlug, key: string) { return key === 'kekkei-mora' ? 0 : player.finalStats[gameStatKeys[slug]!] }
+function finalValue(player: CombatResult['player1'], slug: CategorySlug) { return slug === 'clan' || slug === 'kekkei-mora' ? null : player.finalStats[gameStatKeys[slug]!] }
 
 async function runSimulation() {
   if (phase.value !== 'combat' || simulating.value || builds.value.length < 2) return
@@ -256,7 +253,7 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
       <template v-else-if="combatResult">
         <h2>{{ combatResult.resolutionMode === 'manual' ? (combatResult.winner === 'draw' ? 'Égalité' : `Vainqueur choisi : Joueur ${combatResult.winner === 'player1' ? 1 : 2}`) : (combatResult.winner === 'draw' ? 'Égalité' : `Gagnant : Joueur ${combatResult.winner === 'player1' ? 1 : 2}`) }}</h2>
         <div class="combat-score"><article><h3>Joueur 1</h3><strong>{{ combatResult.player1.total }}</strong><span>Total</span></article><b>VS</b><article><h3>Joueur 2</h3><strong>{{ combatResult.player2.total }}</strong><span>Total</span></article></div>
-        <div class="result-stats"><article v-for="(player, index) in [combatResult.player1, combatResult.player2]" :key="index"><h3>Joueur {{ index + 1 }} · Statistiques finales</h3><div v-for="[label, key] in statRows" :key="key" class="stat-row"><img v-if="cardFor(builds[index]!, CATEGORY_DEFINITIONS.find(([, category]) => key === gameStatKeys[category] || (key === 'kekkeiMora' && category === 'kekkei-mora'))?.[1] ?? 'clan')?.imageUrl" :src="cardFor(builds[index]!, CATEGORY_DEFINITIONS.find(([, category]) => key === gameStatKeys[category] || (key === 'kekkeiMora' && category === 'kekkei-mora'))?.[1] ?? 'clan')?.imageUrl ?? undefined" alt="" /><span>{{ label }}</span><strong>{{ key === 'kekkeiMora' ? 'Carte sélectionnée' : key === 'clan' ? cardFor(builds[index]!, 'clan')?.name : player.finalStats[key as keyof typeof player.finalStats] }}</strong></div><h4>Règles appliquées</h4><p v-for="rule in player.appliedRules" :key="rule.ruleId + rule.target + rule.after" class="rule-row">{{ rule.label }} · {{ rule.target }} : {{ rule.before }} → {{ rule.after }}<small>({{ rule.operation }} {{ rule.value }})</small></p></article></div>
+        <div class="result-builds final-builds"><article v-for="(player, index) in [combatResult.player1, combatResult.player2]" :key="index" class="build-panel" :class="{ 'player-one': index === 0, 'player-two': index === 1 }"><header class="build-header"><h3>Joueur {{ index + 1 }} · Statistiques finales</h3></header><div class="category-grid"><div v-for="[label, slug] in CATEGORY_DEFINITIONS" :key="slug" class="category-slot filled"><span class="slot-label">{{ label }}</span><span class="slot-card-preview"><img v-if="cardFor(builds[index]!, slug)?.imageUrl" :src="cardFor(builds[index]!, slug)?.imageUrl ?? undefined" :alt="`Miniature de ${cardFor(builds[index]!, slug)?.name}`" /><span v-else class="slot-card-fallback">{{ cardFor(builds[index]!, slug)?.name.slice(0, 1) }}</span></span><span class="slot-card-details"><span class="slot-card-name">{{ cardFor(builds[index]!, slug)?.name }}</span><span v-if="slug === 'ninjutsu'" class="final-stat-pair">ATQ {{ player.finalStats.ninjutsuAttack }} · DEF {{ player.finalStats.ninjutsuDefense }}</span><span v-else-if="slug === 'clan'" class="final-stat-pair">{{ cardFor(builds[index]!, slug)?.name }}</span><span v-else-if="slug === 'kekkei-mora'" class="final-stat-pair">Carte sélectionnée</span><span v-else class="final-stat-value">{{ finalValue(player, slug) }}</span></span></div></div><h4>Règles appliquées</h4><p v-for="rule in player.appliedRules" :key="rule.ruleId + rule.target + rule.after" class="rule-row">{{ rule.label }} · {{ rule.target }} : {{ rule.before }} → {{ rule.after }}<small>({{ rule.operation }} {{ rule.value }})</small></p></article></div>
       </template>
       <div v-else class="error-message">Aucun résultat de combat disponible.</div>
       <div class="result-actions"><button v-if="auth.isAuthenticated" class="primary-button" type="button" :disabled="saved" @click="saveHumanBuild">{{ saved ? 'Perso sauvegardé' : 'Sauvegarder mon perso' }} <span>↓</span></button><a v-else class="secondary-button" href="/connexion">Connecte-toi pour sauvegarder</a><button class="primary-button" type="button" @click="replay">Rejouer <span>↻</span></button><a class="secondary-button" href="/">Retour à l’accueil <span>↗</span></a></div>
@@ -880,6 +877,30 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
   font-size: 0.78rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.final-builds {
+  align-items: start;
+}
+
+.final-builds h4 {
+  margin: 24px 0 12px;
+  color: var(--accent-gold);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.final-stat-value,
+.final-stat-pair {
+  color: var(--text-main);
+  font-size: 0.55rem;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.final-stat-pair {
+  color: var(--accent-cyan);
 }
 
 .result-stats h4 {
