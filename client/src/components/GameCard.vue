@@ -10,8 +10,10 @@ const imageFailed = ref(false)
   <article class="game-card" :class="{ 'is-active': active }">
     <div v-if="!revealed" class="card-back"><span>影</span><small>SHINOBI AREA</small></div>
     <template v-else>
-      <div v-if="!card.imageUrl || imageFailed" class="card-image-fallback">{{ card.name.slice(0, 1) }}</div>
-      <img v-else :src="card.imageUrl" :alt="`Carte ${card.name}`" @error="imageFailed = true" />
+      <div class="card-image-frame">
+        <div v-if="!card.imageUrl || imageFailed" class="card-image-fallback">{{ card.name.slice(0, 1) }}</div>
+        <img v-else :src="card.imageUrl" :alt="`Carte ${card.name}`" @error="imageFailed = true" />
+      </div>
       <div class="game-card-copy">
         <span>Carte révélée</span>
         <h3>{{ card.name }}</h3>

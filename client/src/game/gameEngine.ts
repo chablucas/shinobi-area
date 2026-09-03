@@ -27,6 +27,12 @@ export type PlayerBuild = {
   slots: Record<CategorySlug, Card | null>
 }
 
+export type LastPlacement = {
+  playerId: 1 | 2
+  category: CategorySlug
+  card: Card
+}
+
 export type ManualCombatResult = {
   winnerId: 1 | 2
 }
@@ -64,6 +70,13 @@ export function drawRandomCard(cards: Card[], usedCardIds: Set<number>): Card | 
 export function placeCard(build: PlayerBuild, category: CategorySlug, card: Card): PlayerBuild {
   if (build.slots[category]) throw new Error('Cette catégorie est déjà remplie.')
   return { ...build, slots: { ...build.slots, [category]: card } }
+}
+
+export function undoPlacement(build: PlayerBuild, placement: LastPlacement): PlayerBuild {
+  if (build.playerId !== placement.playerId || build.slots[placement.category]?.id !== placement.card.id) {
+    throw new Error('Le dernier placement ne correspond plus à cette composition.')
+  }
+  return { ...build, slots: { ...build.slots, [placement.category]: null } }
 }
 
 export function getNextPlayerId(playerId: 1 | 2): 1 | 2 {
