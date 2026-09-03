@@ -6,6 +6,7 @@ import { categoryRoutes } from './routes/categoryRoutes.js'
 import { authRoutes } from './routes/authRoutes.js'
 import { userRoutes } from './routes/userRoutes.js'
 import { buildRoutes } from './routes/buildRoutes.js'
+import { gameRoutes } from './routes/gameRoutes.js'
 import { errorHandler, notFound } from './utils/errors.js'
 
 export const app = express()
@@ -17,5 +18,6 @@ app.use('/api/cards', cardRoutes)
 app.use('/api/auth', authRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/builds', buildRoutes)
+app.use('/api/game', gameRoutes)
 app.use(notFound)
 app.use(errorHandler)

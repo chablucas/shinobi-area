@@ -7,6 +7,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "prisma generate && tsc -p tsconfig.json",
     "start": "node dist/src/server.js",
+    "test": "tsx --test test/**/*.test.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "categories:seed": "tsx src/scripts/seedCategories.ts",

@@ -4,7 +4,9 @@ import GameCard from '../components/GameCard.vue'
 import { fetchAllCards } from '../services/cardApi'
 import { useAuthStore } from '../stores/auth'
 import { saveBuild } from '../services/buildApi'
+import { CombatApiError, simulateFight } from '../services/gameApi'
 import type { Card } from '../types/card'
+import type { CombatResult } from '../types/combat'
 import {
   CATEGORY_DEFINITIONS,
   createPlayerBuildsForCount,
@@ -14,7 +16,6 @@ import {
   getNextPlayerId,
   isBuildComplete,
   placeCard,
-  resolveManualCombat,
   undoPlacement,
   type CategorySlug,
   type LastPlacement,
@@ -36,6 +37,8 @@ const lastPlacement = ref<LastPlacement | null>(null)
 const activePlayerId = ref<PlayerId>(1)
 const phase = ref<Phase>('construction')
 const winnerId = ref<PlayerId | null>(null)
+const combatResult = ref<CombatResult | null>(null)
+const simulating = ref(false)
 const loading = ref(true)
 const errorMessage = ref('')
 const saved = ref(false)
@@ -47,6 +50,10 @@ const allBuildsComplete = computed(() => builds.value.every(isBuildComplete))
 const winnerName = computed(() => winnerId.value ? `Joueur ${winnerId.value}` : '')
 const playerCount = computed<2 | 3>(() => props.mode === 'local3' ? 3 : 2)
 const isComputerTurn = computed(() => props.mode === 'solo' && activePlayerId.value === 2)
+const combatBlocked = computed(() => Boolean(combatResult.value && (combatResult.value.player1.validationErrors.length || combatResult.value.player2.validationErrors.length)))
+const statRows = [
+  ['Chakra', 'chakra'], ['Invocation', 'invocation'], ['IQ', 'iq'], ['Ninjutsu attaque', 'ninjutsuAttack'], ['Ninjutsu défense', 'ninjutsuDefense'], ['Genjutsu', 'genjutsu'], ['Taijutsu', 'taijutsu'], ['Avatar', 'avatar'], ['Body', 'body'], ['Fûinjutsu', 'fuinjutsu'], ['Senjutsu', 'senjutsu'], ['Kenjutsu', 'kenjutsu'], ['Vitesse', 'speed'], ['Kekkei Genkai', 'kekkeiGenkai'], ['Kekkei Mōra', 'kekkeiMora'], ['Sensory', 'sensory'],
+] as const
 
 onMounted(async () => {
   await auth.loadCurrentUser()
@@ -112,11 +119,23 @@ function undoLastPlacement() {
   lastPlacement.value = null
 }
 
-function chooseWinner(playerId: PlayerId) {
-  if (phase.value !== 'combat') return
-  winnerId.value = resolveManualCombat(playerId).winnerId
-  phase.value = 'result'
-  if (props.mode === 'solo' && auth.isAuthenticated) void auth.recordResult(gameId.value, playerId === 1)
+function compositionFor(build: PlayerBuild) {
+  return { slots: Object.fromEntries(CATEGORY_DEFINITIONS.map(([, slug]) => [slug, build.slots[slug]?.slug ?? ''])) }
+}
+
+async function runSimulation() {
+  if (phase.value !== 'combat' || simulating.value || builds.value.length < 2) return
+  simulating.value = true
+  errorMessage.value = ''
+  try {
+    combatResult.value = await simulateFight(compositionFor(builds.value[0]!), compositionFor(builds.value[1]!))
+    winnerId.value = combatResult.value.winner === 'player1' ? 1 : combatResult.value.winner === 'player2' ? 2 : null
+    phase.value = 'result'
+    if (props.mode === 'solo' && auth.isAuthenticated && winnerId.value) void auth.recordResult(gameId.value, winnerId.value === 1)
+  } catch (error) {
+    if (error instanceof CombatApiError && error.result) { combatResult.value = error.result; phase.value = 'result' }
+    errorMessage.value = error instanceof Error ? error.message : 'Impossible de simuler le combat.'
+  } finally { simulating.value = false }
 }
 
 async function saveHumanBuild() {
@@ -136,6 +155,8 @@ function replay() {
   lastPlacement.value = null
   activePlayerId.value = 1
   winnerId.value = null
+  combatResult.value = null
+  simulating.value = false
   errorMessage.value = ''
   phase.value = 'construction'
   saved.value = false
@@ -200,14 +221,23 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
     </template>
 
     <section v-else-if="phase === 'combat'" class="combat-panel">
-      <div class="combat-intro"><p class="eyebrow">Étape suivante</p><h2>Qui gagne le combat ?</h2><p>Les deux compositions sont complètes. Le résultat manuel est disponible pour cette version.</p></div>
-      <div class="combat-actions"><button v-for="build in builds" :key="build.playerId" type="button" @click="chooseWinner(build.playerId)">Joueur {{ build.playerId }} gagne <span>→</span></button></div>
+      <div class="combat-intro"><p class="eyebrow">Étape suivante</p><h2>Simuler le combat</h2><p>Les deux compositions sont complètes. Le serveur calcule le résultat.</p></div>
+      <div class="combat-actions"><button type="button" :disabled="simulating" @click="runSimulation">{{ simulating ? 'Simulation en cours...' : 'Lancer la simulation' }} <span>→</span></button></div>
       <div class="combat-builds"><article v-for="build in builds" :key="build.playerId" class="build-panel" :class="{ 'player-one': build.playerId === 1, 'player-two': build.playerId === 2 }"><header class="build-header"><h3>Joueur {{ build.playerId }}</h3><span class="build-count">15 <small>/ 15</small></span></header><div class="category-grid"><div v-for="[label, slug] in CATEGORY_DEFINITIONS" :key="slug" class="category-slot filled"><span class="slot-label">{{ label }}</span><span class="slot-card-preview"><img v-if="slotCard(build, slug)?.imageUrl" :src="slotCard(build, slug)?.imageUrl ?? undefined" :alt="`Miniature de ${slotCard(build, slug)?.name}`" /><span v-else class="slot-card-fallback">{{ slotCard(build, slug)?.name.slice(0, 1) }}</span></span><span class="slot-card-details"><span class="slot-card-name">{{ slotCard(build, slug)?.name }}</span><span class="slot-state">Remplie</span></span></div></div></article></div>
     </section>
 
     <section v-else class="result-panel">
-      <p class="eyebrow">Combat terminé</p><h2>{{ winnerName }} gagne.</h2><p>Victoire enregistrée manuellement. Les deux compositions restent disponibles ci-dessous.</p>
-      <div class="result-builds"><article v-for="build in builds" :key="build.playerId"><h3>Joueur {{ build.playerId }}</h3><div v-for="[label, slug] in CATEGORY_DEFINITIONS" :key="slug"><span>{{ label }}</span><strong>{{ slotCard(build, slug)?.name }}</strong></div></article></div>
+      <p class="eyebrow">Combat terminé</p>
+      <template v-if="combatResult && combatBlocked">
+        <h2>Composition invalide</h2>
+        <div class="validation-errors"><p v-for="error in [...combatResult.player1.validationErrors, ...combatResult.player2.validationErrors]" :key="error.ruleId + error.message">{{ error.message }}</p></div>
+      </template>
+      <template v-else-if="combatResult">
+        <h2>{{ combatResult.winner === 'draw' ? 'Égalité' : `Joueur ${combatResult.winner === 'player1' ? 1 : 2} gagne.` }}</h2>
+        <div class="combat-score"><article><h3>Joueur 1</h3><strong>{{ combatResult.player1.total }}</strong><span>Total</span></article><b>VS</b><article><h3>Joueur 2</h3><strong>{{ combatResult.player2.total }}</strong><span>Total</span></article></div>
+        <div class="result-stats"><article v-for="(player, index) in [combatResult.player1, combatResult.player2]" :key="index"><h3>Joueur {{ index + 1 }} · Statistiques finales</h3><div v-for="[label, key] in statRows" :key="key" class="stat-row"><span>{{ label }}</span><strong>{{ key === 'kekkeiMora' ? 0 : player.finalStats[key as keyof typeof player.finalStats] }}</strong></div><h4>Règles appliquées</h4><p v-for="rule in player.appliedRules" :key="rule.ruleId + rule.target + rule.after" class="rule-row">{{ rule.label }} · {{ rule.target }} : {{ rule.before }} → {{ rule.after }}<small>({{ rule.operation }} {{ rule.value }})</small></p></article></div>
+      </template>
+      <div v-else class="error-message">Aucun résultat de combat disponible.</div>
       <div class="result-actions"><button v-if="auth.isAuthenticated" class="primary-button" type="button" :disabled="saved" @click="saveHumanBuild">{{ saved ? 'Perso sauvegardé' : 'Sauvegarder mon perso' }} <span>↓</span></button><a v-else class="secondary-button" href="/connexion">Connecte-toi pour sauvegarder</a><button class="primary-button" type="button" @click="replay">Rejouer <span>↻</span></button><a class="secondary-button" href="/">Retour à l’accueil <span>↗</span></a></div>
     </section>
   </main>
@@ -772,6 +802,102 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
   box-shadow: var(--shadow-glow-blue);
 }
 
+.combat-actions button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.combat-score {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 18px;
+  margin: 28px 0;
+}
+
+.combat-score article {
+  padding: 18px;
+  border: 1px solid var(--border-light);
+  background: rgba(15, 20, 27, 0.88);
+}
+
+.combat-score h3,
+.combat-score strong,
+.combat-score span {
+  display: block;
+}
+
+.combat-score strong {
+  margin-top: 8px;
+  color: var(--accent-gold);
+  font-family: 'Syne', 'Segoe UI', sans-serif;
+  font-size: 2.5rem;
+}
+
+.combat-score span {
+  color: var(--text-muted);
+  font-size: 0.55rem;
+  text-transform: uppercase;
+}
+
+.result-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.result-stats article {
+  padding: 18px 16px;
+  border: 1px solid var(--border-light);
+  background: rgba(15, 20, 27, 0.88);
+}
+
+.result-stats h3,
+.result-stats h4 {
+  margin: 0 0 12px;
+  color: var(--accent-gold);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.result-stats h4 {
+  margin-top: 24px;
+}
+
+.stat-row,
+.rule-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-top: 1px solid rgba(160, 174, 175, 0.18);
+  color: var(--text-muted);
+  font-size: 0.58rem;
+}
+
+.stat-row strong {
+  color: var(--text-main);
+}
+
+.rule-row {
+  display: block;
+  line-height: 1.5;
+}
+
+.rule-row small {
+  display: block;
+  color: var(--accent-cyan);
+}
+
+.validation-errors {
+  padding: 16px;
+  border: 1px solid var(--accent-red);
+  color: var(--accent-red);
+  font-size: 0.68rem;
+  line-height: 1.7;
+}
+
 .combat-builds,
 .result-builds {
   display: grid;
@@ -852,7 +978,8 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
   }
 
   .combat-builds,
-  .result-builds {
+  .result-builds,
+  .result-stats {
     grid-template-columns: 1fr;
   }
 
@@ -875,6 +1002,14 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
 
   .combat-actions {
     display: grid;
+  }
+
+  .combat-score {
+    grid-template-columns: 1fr;
+  }
+
+  .combat-score > b {
+    text-align: center;
   }
 }
 
