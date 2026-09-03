@@ -30,6 +30,36 @@ model User {
   updatedAt   DateTime    @updatedAt
   savedBuilds SavedBuild[]
   gameResults GameResult[]
+  friendshipsAsA Friendship[] @relation("FriendshipUserA")
+  friendshipsAsB Friendship[] @relation("FriendshipUserB")
+  sentFriendships Friendship[] @relation("FriendshipSender")
+  receivedFriendships Friendship[] @relation("FriendshipReceiver")
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+model Friendship {
+  id         Int              @id @default(autoincrement())
+  userAId    Int
+  userBId    Int
+  senderId   Int
+  receiverId Int
+  status     FriendshipStatus @default(PENDING)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  userA      User             @relation("FriendshipUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB      User             @relation("FriendshipUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  sender     User             @relation("FriendshipSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User             @relation("FriendshipReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([userAId, userBId])
+  @@index([receiverId, status])
+  @@index([senderId, status])
 }
 
 model GameResult {
