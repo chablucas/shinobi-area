@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import router from './router'
 import { RouterView } from 'vue-router'
+import './styles/shinobi-theme.css'
 
 const app = createApp(RouterView)
 
