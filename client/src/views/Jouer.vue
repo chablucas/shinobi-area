@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import SocialHeader from '../components/SocialHeader.vue'
 
 const auth = useAuthStore()
 
@@ -15,11 +16,7 @@ onMounted(() => auth.loadCurrentUser())
 
 <template>
   <main class="mode-page">
-    <nav class="mode-nav" aria-label="Navigation principale">
-      <a class="brand" href="/" aria-label="Shinobi Area, accueil"><img class="brand-logo" src="/logo.png" alt="" aria-hidden="true" /></a>
-      <a class="create-link active" href="/jouer">Créer ton perso</a>
-      <a class="profile-link" :href="auth.isAuthenticated ? '/profil' : '/connexion'">{{ auth.isAuthenticated ? 'Profil' : 'Connexion' }}</a>
-    </nav>
+    <SocialHeader />
     <section class="mode-content" aria-labelledby="mode-title">
       <header class="mode-heading"><p class="eyebrow">Sélection de mission</p><h1 id="mode-title">Crée ton perso</h1><p>Choisis ton terrain avant d’entrer dans l’arène.</p></header>
       <div class="mode-choice-grid">

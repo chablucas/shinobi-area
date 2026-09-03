@@ -52,3 +52,10 @@ export async function fetchAllCards(): Promise<Card[]> {
 
   return cards
 }
+
+export async function fetchCard(slug: string): Promise<Card> {
+  const response = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(slug)}`)
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(payload.error ?? 'Carte introuvable.')
+  return payload as Card
+}

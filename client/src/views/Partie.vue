@@ -22,6 +22,7 @@ import {
   type PlayerId,
 } from '../game/gameEngine'
 import { chooseBestCategory } from '../game/ai/categoryEvaluator'
+import SocialHeader from '../components/SocialHeader.vue'
 
 type Phase = 'construction' | 'combat' | 'result'
 type GameMode = 'solo' | 'local2' | 'local3'
@@ -188,11 +189,7 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
 
 <template>
   <main class="game-shell">
-    <nav class="game-nav">
-      <a class="brand" href="/" aria-label="Shinobi Area, accueil"><img class="brand-logo" src="/logo.png" alt="" aria-hidden="true" /></a>
-      <a class="create-link" href="/jouer">Créer ton perso</a>
-      <a class="profile-link" :href="auth.isAuthenticated ? '/profil' : '/connexion'">{{ auth.isAuthenticated ? 'Profil' : 'Connexion' }}</a>
-    </nav>
+    <SocialHeader />
 
     <header class="page-heading">
       <div>

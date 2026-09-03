@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router'
 import { CATEGORY_DEFINITIONS } from '../game/gameEngine'
 import { deleteBuild, fetchBuilds, type SavedBuild } from '../services/buildApi'
 import { useAuthStore } from '../stores/auth'
+import SocialHeader from '../components/SocialHeader.vue'
+import { listFriends, type Friend } from '../services/socialApi'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -14,12 +16,15 @@ const displayName = ref('')
 const error = ref('')
 const total = computed(() => (auth.user?.wins ?? 0) + (auth.user?.losses ?? 0))
 const winRate = computed(() => total.value ? Math.round(((auth.user?.wins ?? 0) / total.value) * 100) : 0)
+const friends = ref<Friend[]>([])
+const friendsOpen = ref(false)
 
 onMounted(async () => {
   await auth.loadCurrentUser()
   if (!auth.isAuthenticated || !auth.token) { await router.replace('/connexion'); return }
   displayName.value = auth.user?.displayName ?? ''
   try { builds.value = await fetchBuilds(auth.token) } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Impossible de charger les compositions.' }
+  friends.value = await listFriends(auth.token).catch(() => [])
 })
 
 async function saveName() { try { await auth.updateProfile(displayName.value); editing.value = false } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Impossible de modifier le profil.' } }
@@ -30,11 +35,7 @@ function categoryLabel(slug: string) { return CATEGORY_DEFINITIONS.find(([, item
 
 <template>
   <main class="profile-page">
-    <nav class="profile-nav" aria-label="Navigation principale">
-      <a class="brand" href="/" aria-label="Shinobi Area, accueil"><img class="brand-logo" src="/logo.png" alt="" aria-hidden="true" /></a>
-      <a class="create-link" href="/jouer">Créer ton perso</a>
-      <button class="profile-link active" type="button" @click="logout">Déconnexion</button>
-    </nav>
+    <SocialHeader />
 
     <section class="profile-content" aria-labelledby="profile-title">
       <header class="profile-heading"><p class="eyebrow">Dossier shinobi</p><h1 id="profile-title">Profil</h1><p>Ton parcours apparaîtra ici au fil des parties.</p></header>
@@ -42,6 +43,7 @@ function categoryLabel(slug: string) { return CATEGORY_DEFINITIONS.find(([, item
         <article class="profile-card profile-identity"><div class="profile-avatar"><img src="/logo.png" alt="" aria-hidden="true" /></div><p class="eyebrow">Joueur local</p><h2>{{ auth.user.displayName }}</h2><p class="profile-email">{{ auth.user.email }}</p><button v-if="!editing" class="profile-action" type="button" @click="editing = true">Modifier le profil</button><div v-else class="edit-profile"><input v-model.trim="displayName" aria-label="Nom du profil" /><div><button class="profile-action" type="button" @click="saveName">Sauvegarder</button><button class="profile-cancel" type="button" @click="editing = false">Annuler</button></div></div></article>
         <article class="profile-card profile-statistics"><p class="eyebrow">Statistiques</p><div class="stat-grid"><div><strong>{{ auth.user.wins }}</strong><span>Victoires</span></div><div><strong>{{ auth.user.losses }}</strong><span>Défaites</span></div><div><strong>{{ total }}</strong><span>Parties</span></div><div><strong>{{ winRate }} %</strong><span>Taux de victoire</span></div></div></article>
         <article class="profile-card saved-builds"><p class="eyebrow">Persos sauvegardés</p><p v-if="!builds.length" class="profile-empty">Aucune composition sauvegardée.</p><div v-for="build in builds" :key="build.id" class="saved-build"><div><strong>{{ build.name }}</strong><small>{{ new Date(build.createdAt).toLocaleDateString('fr-FR') }}</small><div class="build-preview"><img v-for="slot in build.slots.slice(0, 4)" :key="slot.id" :src="slot.card.imageUrl ?? '/logo.png'" :alt="slot.card.name" /></div></div><div class="saved-actions"><button class="profile-action" type="button" @click="selectedBuild = build">Voir</button><button class="profile-cancel" type="button" @click="removeBuild(build)">Supprimer</button></div></div></article>
+        <article class="profile-card social-card"><div class="social-card-heading"><div><p class="eyebrow">Réseau</p><h2>Amis ({{ friends.length }})</h2></div><button class="profile-action" type="button" @click="friendsOpen = !friendsOpen">{{ friendsOpen ? 'Fermer' : 'Voir' }}</button></div><div v-if="friendsOpen" class="friends-list"><div v-for="friend in friends" :key="friend.id" class="friend-row"><span class="profile-friend-avatar">{{ friend.displayName.slice(0, 1) }}</span><strong>{{ friend.displayName }}</strong><a class="profile-cancel" :href="`/profil-public/${friend.id}`">Voir le profil</a></div><p v-if="!friends.length" class="profile-empty">Aucun ami pour le moment.</p></div></article>
       </div>
       <p v-if="error" class="profile-error">{{ error }}</p>
       <article v-if="selectedBuild" class="profile-card build-detail"><div class="detail-heading"><div><p class="eyebrow">Composition sauvegardée</p><h2>{{ selectedBuild.name }}</h2></div><button class="profile-cancel" type="button" @click="selectedBuild = null">Fermer</button></div><div class="detail-grid"><div v-for="[label, slug] in CATEGORY_DEFINITIONS" :key="slug" class="detail-slot"><span>{{ label }}</span><img v-if="selectedBuild.slots.find((slot) => slot.categorySlug === slug)?.card.imageUrl" :src="selectedBuild.slots.find((slot) => slot.categorySlug === slug)?.card.imageUrl ?? undefined" :alt="selectedBuild.slots.find((slot) => slot.categorySlug === slug)?.card.name" /><strong>{{ selectedBuild.slots.find((slot) => slot.categorySlug === slug)?.card.name ?? 'Carte introuvable' }}</strong></div></div></article>

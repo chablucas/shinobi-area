@@ -27,8 +27,16 @@ export async function searchUsers(userId: number, query: string) {
   const users = await prisma.user.findMany({ where: { id: { not: userId }, displayName: { contains: term, mode: 'insensitive' } }, select: publicUserSelect, orderBy: { displayName: 'asc' }, take: 20 })
   return Promise.all(users.map(async (user) => {
     const relation = await findRelation(userId, user.id)
-    return { ...publicUser(user), friendshipStatus: relation?.status ?? null, friendshipDirection: relation?.senderId === userId ? 'sent' : relation ? 'received' : null }
+    return { ...publicUser(user), friendshipStatus: relation?.status ?? null, friendshipDirection: relation?.senderId === userId ? 'sent' : relation ? 'received' : null, friendshipRequestId: relation?.id ?? null }
   }))
+}
+
+export async function getPublicUser(userId: number, otherUserId: number) {
+  assertOtherUser(userId, otherUserId)
+  const user = await prisma.user.findUnique({ where: { id: otherUserId }, select: publicUserSelect })
+  if (!user) throw Object.assign(new Error('Utilisateur introuvable.'), { statusCode: 404 })
+  const relation = await findRelation(userId, otherUserId)
+  return { ...publicUser(user), friendshipStatus: relation?.status ?? null, friendshipDirection: relation?.senderId === userId ? 'sent' : relation ? 'received' : null, friendshipRequestId: relation?.id ?? null }
 }
 
 export async function listFriends(userId: number) {

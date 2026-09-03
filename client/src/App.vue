@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { fetchAllCards } from './services/cardApi'
 import { useAuthStore } from './stores/auth'
+import SocialHeader from './components/SocialHeader.vue'
 
 const modes = [
   { number: '01', eyebrow: 'Forge ton identité', title: 'Création de personnage', description: 'Compose un shinobi qui te ressemble, de son clan à sa technique signature.', accent: 'coral' },
@@ -30,11 +31,7 @@ function markImageAsFailed(slug: string) {
 <template>
   <main class="site-shell">
     <div class="noise" aria-hidden="true"></div>
-    <nav class="topbar" aria-label="Navigation principale">
-      <a class="brand" href="/" aria-label="Shinobi Area, accueil"><img class="brand-logo" src="/logo.png" alt="" aria-hidden="true" /></a>
-      <a class="create-link" href="/jouer">Créer ton perso</a>
-      <a class="profile-link" :href="auth.isAuthenticated ? '/profil' : '/connexion'">{{ auth.isAuthenticated ? 'Profil' : 'Connexion' }}</a>
-    </nav>
+    <SocialHeader />
 
     <section id="accueil" class="hero">
       <div class="hero-copy">
