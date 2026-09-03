@@ -23,6 +23,7 @@ onMounted(async () => {
 })
 
 async function saveName() { try { await auth.updateProfile(displayName.value); editing.value = false } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Impossible de modifier le profil.' } }
+function logout() { auth.logout(); void router.push('/') }
 async function removeBuild(build: SavedBuild) { if (!auth.token || !window.confirm('Supprimer cette composition ?')) return; try { await deleteBuild(auth.token, build.id); builds.value = builds.value.filter((item) => item.id !== build.id); if (selectedBuild.value?.id === build.id) selectedBuild.value = null } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Suppression impossible.' } }
 function categoryLabel(slug: string) { return CATEGORY_DEFINITIONS.find(([, itemSlug]) => itemSlug === slug)?.[0] ?? slug }
 </script>
@@ -31,8 +32,8 @@ function categoryLabel(slug: string) { return CATEGORY_DEFINITIONS.find(([, item
   <main class="profile-page">
     <nav class="profile-nav" aria-label="Navigation principale">
       <a class="brand" href="/" aria-label="Shinobi Area, accueil"><img class="brand-logo" src="/logo.png" alt="" aria-hidden="true" /></a>
-      <div class="profile-nav-links"><a href="/solo">Solo</a><a href="/partie">2 joueurs</a><a href="/3-joueurs">3 joueurs</a></div>
-      <button class="profile-link active" type="button" @click="auth.logout">Déconnexion</button>
+      <a class="create-link" href="/jouer">Créer ton perso</a>
+      <button class="profile-link active" type="button" @click="logout">Déconnexion</button>
     </nav>
 
     <section class="profile-content" aria-labelledby="profile-title">
@@ -52,6 +53,7 @@ function categoryLabel(slug: string) { return CATEGORY_DEFINITIONS.find(([, item
 .profile-page { min-height: 100vh; background: var(--bg-main); }
 .profile-nav { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 78px; padding: 10px max(20px, calc((100vw - 1320px) / 2)); background: var(--accent-orange); }
 .profile-nav .brand-logo { display: block; width: auto; height: 52px; object-fit: contain; }
+.profile-nav .create-link { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: .75rem 1.2rem; border: 1px solid rgba(76,48,15,.42); background: #fff0bd; color: #2b2113; clip-path: var(--clip-soft); text-transform: uppercase; letter-spacing: .1em; font-size: .64rem; font-weight: 700; }
 .profile-nav-links { display: flex; gap: 8px; color: #2b2113; text-transform: uppercase; font-size: .68rem; letter-spacing: .1em; }
 .profile-nav-links a, .profile-link { padding: .75rem 1.05rem; border: 1px solid rgba(76, 48, 15, .35); background: rgba(255, 214, 102, .34); clip-path: var(--clip-soft); }
 .profile-link { color: #fff0bd; background: #2b2113; text-transform: uppercase; letter-spacing: .12em; font-size: .64rem; }

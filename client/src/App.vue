@@ -31,8 +31,8 @@ function markImageAsFailed(slug: string) {
   <main class="site-shell">
     <div class="noise" aria-hidden="true"></div>
     <nav class="topbar" aria-label="Navigation principale">
-      <a class="brand" href="#accueil" aria-label="Shinobi Area, accueil"><img class="brand-logo" src="/logo.png" alt="" aria-hidden="true" /></a>
-      <div class="nav-links"><a class="nav-tab active" href="/solo">Solo</a><a class="nav-tab" href="/partie">2 joueurs</a><a class="nav-tab" href="/3-joueurs">3 joueurs</a></div>
+      <a class="brand" href="/" aria-label="Shinobi Area, accueil"><img class="brand-logo" src="/logo.png" alt="" aria-hidden="true" /></a>
+      <a class="create-link" href="/jouer">Créer ton perso</a>
       <a class="profile-link" :href="auth.isAuthenticated ? '/profil' : '/connexion'">{{ auth.isAuthenticated ? 'Profil' : 'Connexion' }}</a>
     </nav>
 
@@ -41,7 +41,7 @@ function markImageAsFailed(slug: string) {
         <p class="kicker"><span class="kicker-dot"></span>La voie commence ici</p>
         <h1>Trace ta voie.<br /><span>Défie le monde.</span></h1>
         <p class="intro">Shinobi Area est un jeu de stratégie où chaque choix forge ta légende. Crée ton guerrier, maîtrise tes cartes et impose ton style.</p>
-        <div id="creer" class="hero-actions"><a class="button button-primary" href="/partie">Jouer à 2 <span>→</span></a><a class="button button-quiet" href="/solo">Jouer en solo <span>→</span></a></div>
+        <div id="creer" class="hero-actions"><a class="button button-primary" href="/jouer">Créer ton perso <span>→</span></a></div>
         <div class="hero-meta"><div><strong>03</strong><span>voies à<br />explorer</span></div><div><strong>∞</strong><span>combats<br />possibles</span></div><div><strong>01</strong><span>légende<br />à écrire</span></div></div>
       </div>
       <div class="hero-art" aria-label="Logo Shinobi Area"><img src="/logo.png" alt="Logo Shinobi Area" /></div>
@@ -127,6 +127,22 @@ footer {
   width: auto;
   height: 52px;
   object-fit: contain;
+}
+
+.create-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0.75rem 1.2rem;
+  border: 1px solid rgba(76, 48, 15, 0.42);
+  background: #fff0bd;
+  color: #2b2113;
+  clip-path: var(--clip-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.64rem;
+  font-weight: 700;
 }
 
 .nav-links {

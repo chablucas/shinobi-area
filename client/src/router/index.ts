@@ -4,6 +4,7 @@ import Partie from '../views/Partie.vue'
 import Profil from '../views/Profil.vue'
 import Connexion from '../views/Connexion.vue'
 import Inscription from '../views/Inscription.vue'
+import Jouer from '../views/Jouer.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -16,6 +17,7 @@ const router = createRouter({
     { path: '/profil', component: Profil },
     { path: '/connexion', component: Connexion },
     { path: '/inscription', component: Inscription },
+    { path: '/jouer', component: Jouer },
   ],
 })
 

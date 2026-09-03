@@ -151,7 +151,7 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
   <main class="game-shell">
     <nav class="game-nav">
       <a class="brand" href="/" aria-label="Shinobi Area, accueil"><img class="brand-logo" src="/logo.png" alt="" aria-hidden="true" /></a>
-      <div class="game-nav-links"><a class="game-nav-tab" :class="{ active: props.mode === 'solo' }" href="/solo">Solo</a><a class="game-nav-tab" :class="{ active: props.mode === 'local2' }" href="/partie">2 joueurs</a><a class="game-nav-tab" :class="{ active: props.mode === 'local3' }" href="/3-joueurs">3 joueurs</a></div>
+      <a class="create-link" href="/jouer">Créer ton perso</a>
       <a class="profile-link" :href="auth.isAuthenticated ? '/profil' : '/connexion'">{{ auth.isAuthenticated ? 'Profil' : 'Connexion' }}</a>
     </nav>
 
@@ -244,6 +244,22 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
   width: auto;
   height: 48px;
   object-fit: contain;
+}
+
+.game-nav .create-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0.75rem 1.2rem;
+  border: 1px solid rgba(76, 48, 15, 0.42);
+  background: #fff0bd;
+  color: #2b2113;
+  clip-path: var(--clip-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.64rem;
+  font-weight: 700;
 }
 
 .game-nav-links {
