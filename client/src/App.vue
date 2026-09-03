@@ -28,9 +28,9 @@ function markImageAsFailed(slug: string) {
   <main class="site-shell">
     <div class="noise" aria-hidden="true"></div>
     <nav class="topbar" aria-label="Navigation principale">
-      <a class="brand" href="#accueil" aria-label="Shinobi Area, accueil"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><span>Shinobi <em>Area</em></span></a>
-      <div class="nav-links"><a href="#univers">L’univers</a><a href="#modes">Modes de jeu</a></div>
-      <a class="nav-cta" href="/partie">Entrer dans l’arène <span>↗</span></a>
+      <a class="brand" href="#accueil" aria-label="Shinobi Area, accueil"><img class="brand-logo" src="/logo.png" alt="" aria-hidden="true" /></a>
+      <div class="nav-links"><a class="nav-tab active" href="/partie">Combat 2</a><a class="nav-tab" href="/partie">Combat 3</a></div>
+      <a class="profile-link" href="/partie">Profil</a>
     </nav>
 
     <section id="accueil" class="hero">
@@ -41,7 +41,7 @@ function markImageAsFailed(slug: string) {
         <div id="creer" class="hero-actions"><a class="button button-primary" href="/partie">Créer mon shinobi <span>→</span></a><a class="button button-quiet" href="/partie"><span class="play-icon">▶</span> Lancer un combat</a></div>
         <div class="hero-meta"><div><strong>03</strong><span>voies à<br />explorer</span></div><div><strong>∞</strong><span>combats<br />possibles</span></div><div><strong>01</strong><span>légende<br />à écrire</span></div></div>
       </div>
-      <div class="hero-art" aria-label="Emblème abstrait de Shinobi Area"><div class="sun-disc"></div><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="crest"><span>影</span></div><span class="art-label label-top">N° 001 / SECTOR</span><span class="art-label label-bottom">DISCIPLINE · INSTINCT · HONNEUR</span></div>
+      <div class="hero-art" aria-label="Logo Shinobi Area"><img src="/logo.png" alt="Logo Shinobi Area" /></div>
     </section>
 
     <section id="modes" class="modes-section"><div class="section-heading" id="univers"><p class="kicker"><span class="kicker-dot"></span>Choisis ton terrain</p><h2>Trois façons<br /><i>de devenir légende.</i></h2><span class="section-index">/ 03</span></div>
@@ -69,10 +69,7 @@ function markImageAsFailed(slug: string) {
 .site-shell {
   position: relative;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 18% 10%, rgba(246, 128, 72, 0.18), transparent 18%),
-    radial-gradient(circle at 82% 4%, rgba(84, 196, 255, 0.12), transparent 20%),
-    linear-gradient(180deg, var(--bg-main) 0%, #0b1015 100%);
+  background: var(--bg-main);
   overflow: hidden;
 }
 
@@ -80,9 +77,7 @@ function markImageAsFailed(slug: string) {
   content: '';
   position: absolute;
   inset: 0;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.015), transparent 36%),
-    linear-gradient(315deg, rgba(84, 196, 255, 0.05), transparent 30%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 38%);
   pointer-events: none;
 }
 
@@ -109,74 +104,58 @@ footer {
 
 .topbar {
   display: flex;
+  max-width: none;
   align-items: center;
   justify-content: space-between;
-  min-height: 94px;
-  border-bottom: 1px solid var(--border-light);
-  padding-top: 16px;
-  padding-bottom: 16px;
+  min-height: 78px;
+  border-bottom: 1px solid rgba(84, 48, 12, 0.35);
+  padding-top: 10px;
+  padding-bottom: 10px;
+  background: var(--accent-orange);
 }
 
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
-  font-size: 1.05rem;
-  letter-spacing: -0.04em;
-  text-transform: uppercase;
 }
 
-.brand em {
-  color: var(--accent-orange);
-  font-style: normal;
-}
-
-.brand-mark {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border: 1px solid rgba(246, 128, 72, 0.9);
-  box-shadow: var(--shadow-glow-orange);
-  transform: rotate(45deg);
-}
-
-.brand-mark i {
+.brand-logo {
   display: block;
-  width: 2px;
-  height: 16px;
-  background: linear-gradient(180deg, var(--accent-orange), rgba(246, 128, 72, 0.4));
-  transform: skewX(-22deg);
-}
-
-.brand-mark i:nth-child(2) {
-  height: 22px;
-  background: linear-gradient(180deg, var(--accent-gold), rgba(241, 212, 141, 0.4));
+  width: auto;
+  height: 52px;
+  object-fit: contain;
 }
 
 .nav-links {
   display: flex;
   align-items: center;
-  gap: 30px;
-  color: var(--text-muted);
+  gap: 8px;
+  color: #2b2113;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  font-size: 0.62rem;
+  font-size: 0.68rem;
 }
 
 .nav-links a {
-  opacity: 0.8;
-  transition: opacity 0.2s ease, color 0.2s ease;
+  padding: 0.75rem 1.15rem;
+  border: 1px solid rgba(76, 48, 15, 0.35);
+  background: rgba(255, 214, 102, 0.34);
+  clip-path: var(--clip-soft);
+  transition: background 0.2s ease, transform 0.2s ease;
 }
 
 .nav-links a:hover,
 .nav-links a:focus-visible {
-  color: var(--text-main);
-  opacity: 1;
+  background: rgba(255, 236, 174, 0.58);
+  transform: translateY(-1px);
 }
 
-.nav-cta,
+.nav-tab.active {
+  background: #fff0bd;
+  font-weight: 700;
+}
+
+.profile-link,
 .button,
 .button-primary,
 .button-quiet {
@@ -184,27 +163,27 @@ footer {
   align-items: center;
   justify-content: center;
   gap: 0.9rem;
-  min-height: 46px;
-  padding: 0.85rem 1.1rem;
-  border: 1px solid rgba(161, 176, 175, 0.28);
-  background: rgba(15, 20, 27, 0.72);
-  color: var(--text-main);
+  min-height: 42px;
+  padding: 0.75rem 1.25rem;
+  border: 1px solid rgba(76, 48, 15, 0.42);
+  background: #2b2113;
+  color: #fff0bd;
+  clip-path: var(--clip-soft);
   text-transform: uppercase;
   letter-spacing: 0.12em;
   font-size: 0.64rem;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  transition: transform 0.2s ease, background 0.2s ease;
 }
 
-.nav-cta:hover,
+.profile-link:hover,
+.profile-link:focus-visible,
 .button:hover,
 .button-primary:hover,
 .button-quiet:hover {
   transform: translateY(-1px);
-  border-color: rgba(246, 128, 72, 0.8);
-  box-shadow: var(--shadow-glow-orange);
+  background: #473316;
 }
 
-.nav-cta span,
 .button span,
 .button-primary span,
 .button-quiet span {
@@ -213,16 +192,21 @@ footer {
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  grid-template-columns: minmax(0, 7fr) minmax(260px, 3fr);
   align-items: center;
   gap: 36px;
-  min-height: 630px;
+  min-height: 560px;
+  padding-top: 34px;
+  padding-bottom: 34px;
 }
 
 .hero-copy {
   position: relative;
   z-index: 1;
-  padding: 76px 0 56px;
+  padding: 42px 42px 46px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-panel-soft);
+  clip-path: var(--clip-soft);
   animation: rise 0.7s ease both;
 }
 
@@ -333,84 +317,16 @@ footer {
   position: relative;
   display: grid;
   place-items: center;
-  height: 560px;
+  min-height: 420px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-panel);
+  clip-path: var(--clip-strong);
 }
 
-.sun-disc {
-  width: min(32vw, 400px);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, rgba(255, 248, 224, 0.9), rgba(246, 128, 72, 0.95) 26%, rgba(101, 28, 18, 0.8) 72%, rgba(15, 24, 32, 0.9) 100%);
-  box-shadow: 0 0 30px rgba(246, 128, 72, 0.34), 0 0 80px rgba(246, 128, 72, 0.18);
-}
-
-.orbit {
-  position: absolute;
-  width: 88%;
-  height: 42%;
-  border: 1px solid rgba(138, 233, 255, 0.3);
-  border-radius: 50%;
-  transform: rotate(-28deg);
-}
-
-.orbit-two {
-  width: 72%;
-  height: 62%;
-  border-color: rgba(241, 212, 141, 0.22);
-  transform: rotate(36deg);
-}
-
-.crest {
-  position: absolute;
-  display: grid;
-  place-items: center;
-  width: min(25vw, 290px);
-  aspect-ratio: 1;
-  border: 1px solid rgba(243, 245, 242, 0.65);
-  background: rgba(9, 12, 16, 0.14);
-  transform: rotate(45deg);
-  box-shadow: inset 0 0 0 1px rgba(243, 245, 242, 0.15);
-}
-
-.crest::before,
-.crest::after {
-  content: '';
-  position: absolute;
-  width: 120%;
-  height: 1px;
-  background: rgba(243, 245, 242, 0.26);
-}
-
-.crest::after {
-  transform: rotate(90deg);
-}
-
-.crest span {
-  font-family: 'Syne', 'Segoe UI', sans-serif;
-  font-size: clamp(4rem, 5vw, 6.2rem);
-  font-weight: 700;
-  transform: rotate(-45deg);
-  color: rgba(243, 245, 242, 0.9);
-  text-shadow: 0 0 20px rgba(84, 196, 255, 0.25);
-}
-
-.art-label {
-  position: absolute;
-  color: var(--accent-gold);
-  font-size: 0.58rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
-.label-top {
-  top: 12%;
-  right: 5%;
-}
-
-.label-bottom {
-  bottom: 10%;
-  left: 8%;
-  color: rgba(255, 255, 255, 0.65);
+.hero-art img {
+  width: min(82%, 360px);
+  height: min(82%, 360px);
+  object-fit: contain;
 }
 
 .modes-section,
@@ -610,29 +526,51 @@ footer span:first-child {
 }
 
 @media (max-width: 960px) {
-  .nav-links {
-    display: none;
+  .topbar {
+    gap: 12px;
   }
 
-  .hero {
-    grid-template-columns: 1fr;
-    min-height: auto;
+  .nav-links {
+    gap: 4px;
+  }
+
+  .nav-links a {
+    padding-inline: 0.75rem;
   }
 
   .hero-copy {
-    padding-top: 48px;
+    padding-inline: 28px;
   }
 
   .hero-art {
-    height: 440px;
+    min-height: 360px;
+  }
+
+  .mode-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .cards-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .hero {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-copy {
+    padding-top: 36px;
+    padding-bottom: 38px;
+  }
+
+  .hero-art {
+    min-height: 300px;
   }
 
   .mode-grid {
     grid-template-columns: 1fr;
-  }
-
-  .cards-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -641,10 +579,21 @@ footer span:first-child {
     min-height: 78px;
   }
 
-  .nav-cta {
+  .brand-logo {
+    height: 44px;
+  }
+
+  .nav-links a {
+    padding: 0.55rem 0.45rem;
+    font-size: 0.55rem;
+    letter-spacing: 0.06em;
+  }
+
+  .profile-link {
     min-height: 42px;
-    padding-inline: 0.8rem;
-    letter-spacing: 0.08em;
+    padding-inline: 0.65rem;
+    font-size: 0.55rem;
+    letter-spacing: 0.06em;
   }
 
   .hero h1 {

@@ -108,16 +108,15 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
 <template>
   <main class="game-shell">
     <nav class="game-nav">
-      <a class="brand" href="/"><span class="brand-mark"><i></i><i></i><i></i></span><span>Shinobi <em>Area</em></span></a>
-      <a class="back-link" href="/">Retour accueil <span>↗</span></a>
+      <a class="brand" href="/" aria-label="Shinobi Area, accueil"><img class="brand-logo" src="/logo.png" alt="" aria-hidden="true" /></a>
+      <div class="game-nav-links"><a class="game-nav-tab active" href="/partie">Combat 2</a><a class="game-nav-tab" href="/partie">Combat 3</a></div>
+      <a class="profile-link" href="/partie">Profil</a>
     </nav>
 
     <header class="page-heading">
       <div>
         <p class="eyebrow">Construction locale · 30 placements</p>
-        <h1 v-if="phase === 'construction'">Forge tes <i>compositions.</i></h1>
-        <h1 v-else-if="phase === 'combat'">Place au <i>combat.</i></h1>
-        <h1 v-else>Le verdict est <i>tombé.</i></h1>
+        <h1>Fight</h1>
       </div>
       <div v-if="phase === 'construction'" class="turn-status" :class="{ active: !pendingCard }">
         <span class="status-dot"></span>
@@ -175,10 +174,7 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
 <style>
 .game-shell {
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 12% 12%, rgba(246, 128, 72, 0.18), transparent 16%),
-    radial-gradient(circle at 88% 8%, rgba(84, 196, 255, 0.12), transparent 18%),
-    linear-gradient(180deg, var(--bg-main) 0%, #0a1117 100%);
+  background: var(--bg-main);
 }
 
 .game-shell > * {
@@ -191,33 +187,73 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 88px;
-  border-bottom: 1px solid var(--border-light);
+  max-width: none !important;
+  min-height: 78px;
+  border-bottom: 1px solid rgba(84, 48, 12, 0.35);
+  background: var(--accent-orange);
 }
 
 .game-nav .brand {
   font-size: 1rem;
 }
 
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.9rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 0.62rem;
+.game-nav .brand-logo {
+  display: block;
+  width: auto;
+  height: 48px;
+  object-fit: contain;
 }
 
-.back-link span {
-  color: var(--accent-gold);
+.game-nav-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #2b2113;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.68rem;
+}
+
+.game-nav-tab {
+  padding: 0.75rem 1.15rem;
+  border: 1px solid rgba(76, 48, 15, 0.35);
+  background: rgba(255, 214, 102, 0.34);
+  clip-path: var(--clip-soft);
+}
+
+.game-nav-tab.active {
+  background: #fff0bd;
+  font-weight: 700;
+}
+
+.game-nav-tab:hover,
+.game-nav-tab:focus-visible {
+  background: rgba(255, 236, 174, 0.58);
+}
+
+.game-nav .profile-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0.75rem 1.25rem;
+  border: 1px solid rgba(76, 48, 15, 0.42);
+  background: #2b2113;
+  color: #fff0bd;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.64rem;
+  clip-path: var(--clip-soft);
+}
+
+.game-nav .profile-link:hover,
+.game-nav .profile-link:focus-visible {
+  background: #473316;
 }
 
 .page-heading {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 24px;
+  display: block;
+  text-align: center;
   padding: 52px 0 26px;
 }
 
@@ -242,6 +278,9 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
 }
 
 .turn-status {
+  max-width: 360px;
+  margin: 22px auto 0;
+  text-align: left;
   min-width: 270px;
   padding: 14px 18px;
   border: 1px solid rgba(246, 128, 72, 0.6);
@@ -291,16 +330,14 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
 
 .construction-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(250px, 290px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(220px, 0.62fr);
   align-items: start;
   gap: 18px;
   padding-bottom: 72px;
 }
 
 .builds-column {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  display: contents;
 }
 
 .build-panel {
@@ -313,12 +350,12 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
 
 .build-panel.player-one {
   border-color: rgba(246, 128, 72, 0.35);
-  background: linear-gradient(180deg, rgba(38, 22, 18, 0.86), rgba(17, 20, 24, 0.9));
+  background: #353033;
 }
 
 .build-panel.player-two {
   border-color: rgba(84, 196, 255, 0.35);
-  background: linear-gradient(180deg, rgba(16, 27, 34, 0.9), rgba(17, 20, 24, 0.9));
+  background: #30363b;
 }
 
 .build-panel.is-active {
@@ -503,6 +540,7 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
 
 .draw-panel {
   position: sticky;
+  grid-column: 3;
   top: 16px;
   padding: 18px 18px 16px;
   border: 1px solid rgba(241, 212, 141, 0.5);
@@ -722,21 +760,39 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
 }
 
 @media (max-width: 960px) {
+  .game-nav {
+    padding-inline: max(20px, calc((100vw - 1360px) / 2)) !important;
+  }
+
+  .game-nav-links {
+    gap: 4px;
+  }
+
+  .game-nav-tab {
+    padding-inline: 0.75rem;
+  }
+}
+
+@media (max-width: 680px) {
   .construction-layout {
     grid-template-columns: 1fr;
   }
 
+  .builds-column {
+    display: grid;
+    gap: 14px;
+  }
+
   .draw-panel {
     position: static;
+    grid-column: auto;
   }
 
   .combat-builds,
   .result-builds {
     grid-template-columns: 1fr;
   }
-}
 
-@media (max-width: 680px) {
   .page-heading {
     display: block;
     padding-top: 38px;
@@ -744,10 +800,6 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
 
   .turn-status {
     margin-top: 22px;
-  }
-
-  .builds-column {
-    grid-template-columns: 1fr;
   }
 
   .category-grid {
@@ -766,6 +818,10 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
 @media (max-width: 480px) {
   .game-shell > * {
     padding-inline: 14px;
+  }
+
+  .game-nav .brand-logo {
+    height: 40px;
   }
 
   .category-grid {
