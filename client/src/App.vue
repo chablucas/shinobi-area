@@ -29,8 +29,8 @@ function markImageAsFailed(slug: string) {
     <div class="noise" aria-hidden="true"></div>
     <nav class="topbar" aria-label="Navigation principale">
       <a class="brand" href="#accueil" aria-label="Shinobi Area, accueil"><img class="brand-logo" src="/logo.png" alt="" aria-hidden="true" /></a>
-      <div class="nav-links"><a class="nav-tab active" href="/partie">Combat 2</a><a class="nav-tab" href="/partie">Combat 3</a></div>
-      <a class="profile-link" href="/partie">Profil</a>
+      <div class="nav-links"><a class="nav-tab active" href="/solo">Solo</a><a class="nav-tab" href="/partie">2 joueurs</a><a class="nav-tab" href="/3-joueurs">3 joueurs</a></div>
+      <a class="profile-link" href="/profil">Profil</a>
     </nav>
 
     <section id="accueil" class="hero">
@@ -38,14 +38,14 @@ function markImageAsFailed(slug: string) {
         <p class="kicker"><span class="kicker-dot"></span>La voie commence ici</p>
         <h1>Trace ta voie.<br /><span>Défie le monde.</span></h1>
         <p class="intro">Shinobi Area est un jeu de stratégie où chaque choix forge ta légende. Crée ton guerrier, maîtrise tes cartes et impose ton style.</p>
-        <div id="creer" class="hero-actions"><a class="button button-primary" href="/partie">Créer mon shinobi <span>→</span></a><a class="button button-quiet" href="/partie"><span class="play-icon">▶</span> Lancer un combat</a></div>
+        <div id="creer" class="hero-actions"><a class="button button-primary" href="/partie">Jouer à 2 <span>→</span></a><a class="button button-quiet" href="/solo">Jouer en solo <span>→</span></a></div>
         <div class="hero-meta"><div><strong>03</strong><span>voies à<br />explorer</span></div><div><strong>∞</strong><span>combats<br />possibles</span></div><div><strong>01</strong><span>légende<br />à écrire</span></div></div>
       </div>
       <div class="hero-art" aria-label="Logo Shinobi Area"><img src="/logo.png" alt="Logo Shinobi Area" /></div>
     </section>
 
     <section id="modes" class="modes-section"><div class="section-heading" id="univers"><p class="kicker"><span class="kicker-dot"></span>Choisis ton terrain</p><h2>Trois façons<br /><i>de devenir légende.</i></h2><span class="section-index">/ 03</span></div>
-      <div class="mode-grid"><a v-for="mode in modes" :id="mode.number === '02' ? 'combat' : undefined" :key="mode.number" class="mode-card" :class="`mode-${mode.accent}`" href="#creer"><div class="card-top"><span>{{ mode.number }}</span><span class="arrow">↗</span></div><div class="card-symbol" aria-hidden="true"><span v-if="mode.number === '01'">◈</span><span v-else-if="mode.number === '02'">✦</span><span v-else>⌘</span></div><p>{{ mode.eyebrow }}</p><h3>{{ mode.title }}</h3><span class="card-description">{{ mode.description }}</span></a></div>
+      <div class="mode-grid"><a v-for="mode in modes" :id="mode.number === '02' ? 'combat' : undefined" :key="mode.number" class="mode-card" :class="`mode-${mode.accent}`" :href="mode.number === '01' ? '/solo' : mode.number === '02' ? '/partie' : '/3-joueurs'"><div class="card-top"><span>{{ mode.number }}</span><span class="arrow">↗</span></div><div class="card-symbol" aria-hidden="true"><span v-if="mode.number === '01'">◈</span><span v-else-if="mode.number === '02'">✦</span><span v-else>⌘</span></div><p>{{ mode.eyebrow }}</p><h3>{{ mode.title }}</h3><span class="card-description">{{ mode.description }}</span></a></div>
     </section>
     <section v-if="cards.length" class="cards-section" aria-labelledby="cards-title">
       <div class="section-heading"><p class="kicker"><span class="kicker-dot"></span>Le catalogue</p><h2 id="cards-title">Les cartes<br /><i>de l’arène.</i></h2><span class="section-index">/ {{ cards.length }}</span></div>

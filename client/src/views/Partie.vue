@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import GameCard from '../components/GameCard.vue'
 import { fetchAllCards } from '../services/cardApi'
 import type { Card } from '../types/card'
 import {
   CATEGORY_DEFINITIONS,
-  createPlayerBuilds,
+  createPlayerBuildsForCount,
+  chooseComputerCategory,
   drawRandomCard,
   filledSlotCount,
   getNextPlayerId,
@@ -16,25 +17,31 @@ import {
   type CategorySlug,
   type LastPlacement,
   type PlayerBuild,
+  type PlayerId,
 } from '../game/gameEngine'
 
 type Phase = 'construction' | 'combat' | 'result'
+type GameMode = 'solo' | 'local2' | 'local3'
+
+const props = withDefaults(defineProps<{ mode?: GameMode }>(), { mode: 'local2' })
 
 const cards = ref<Card[]>([])
-const builds = ref<[PlayerBuild, PlayerBuild]>(createPlayerBuilds())
+const builds = ref<PlayerBuild[]>(createPlayerBuildsForCount(props.mode === 'local3' ? 3 : 2))
 const usedCardIds = ref(new Set<number>())
 const pendingCard = ref<Card | null>(null)
 const lastPlacement = ref<LastPlacement | null>(null)
-const activePlayerId = ref<1 | 2>(1)
+const activePlayerId = ref<PlayerId>(1)
 const phase = ref<Phase>('construction')
-const winnerId = ref<1 | 2 | null>(null)
+const winnerId = ref<PlayerId | null>(null)
 const loading = ref(true)
 const errorMessage = ref('')
 
-const activeBuild = computed(() => builds.value[activePlayerId.value === 1 ? 0 : 1]!)
+const activeBuild = computed(() => builds.value[activePlayerId.value - 1]!)
 const availableCardCount = computed(() => cards.value.length - usedCardIds.value.size)
 const allBuildsComplete = computed(() => builds.value.every(isBuildComplete))
 const winnerName = computed(() => winnerId.value ? `Joueur ${winnerId.value}` : '')
+const playerCount = computed<2 | 3>(() => props.mode === 'local3' ? 3 : 2)
+const isComputerTurn = computed(() => props.mode === 'solo' && activePlayerId.value === 2)
 
 onMounted(async () => {
   try {
@@ -45,6 +52,10 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+})
+
+watch([activePlayerId, phase, cards], () => {
+  if (isComputerTurn.value && !loading.value) playComputerTurn()
 })
 
 function drawCard() {
@@ -70,11 +81,23 @@ function placePendingCard(category: CategorySlug) {
     phase.value = 'combat'
     return
   }
-  activePlayerId.value = getNextPlayerId(activePlayerId.value)
+  activePlayerId.value = getNextPlayerId(activePlayerId.value, playerCount.value)
+}
+
+function playComputerTurn() {
+  if (!isComputerTurn.value || phase.value !== 'construction' || pendingCard.value) return
+  const card = drawRandomCard(cards.value, usedCardIds.value)
+  const category = chooseComputerCategory(activeBuild.value)
+  if (!card || !category) return
+  usedCardIds.value = new Set(usedCardIds.value).add(card.id)
+  builds.value[1] = placeCard(activeBuild.value, category, card)
+  lastPlacement.value = { playerId: 2, category, card }
+  if (allBuildsComplete.value) phase.value = 'combat'
+  else activePlayerId.value = 1
 }
 
 function undoLastPlacement() {
-  if (phase.value !== 'construction' || !lastPlacement.value || pendingCard.value) return
+  if (phase.value !== 'construction' || !lastPlacement.value || pendingCard.value || (props.mode === 'solo' && lastPlacement.value.playerId === 2)) return
   const placement = lastPlacement.value
   const playerIndex = placement.playerId - 1
   builds.value[playerIndex] = undoPlacement(builds.value[playerIndex]!, placement)
@@ -83,14 +106,14 @@ function undoLastPlacement() {
   lastPlacement.value = null
 }
 
-function chooseWinner(playerId: 1 | 2) {
+function chooseWinner(playerId: PlayerId) {
   if (phase.value !== 'combat') return
   winnerId.value = resolveManualCombat(playerId).winnerId
   phase.value = 'result'
 }
 
 function replay() {
-  builds.value = createPlayerBuilds()
+  builds.value = createPlayerBuildsForCount(playerCount.value)
   usedCardIds.value = new Set()
   pendingCard.value = null
   lastPlacement.value = null
@@ -109,13 +132,13 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
   <main class="game-shell">
     <nav class="game-nav">
       <a class="brand" href="/" aria-label="Shinobi Area, accueil"><img class="brand-logo" src="/logo.png" alt="" aria-hidden="true" /></a>
-      <div class="game-nav-links"><a class="game-nav-tab active" href="/partie">Combat 2</a><a class="game-nav-tab" href="/partie">Combat 3</a></div>
-      <a class="profile-link" href="/partie">Profil</a>
+      <div class="game-nav-links"><a class="game-nav-tab" :class="{ active: props.mode === 'solo' }" href="/solo">Solo</a><a class="game-nav-tab" :class="{ active: props.mode === 'local2' }" href="/partie">2 joueurs</a><a class="game-nav-tab" :class="{ active: props.mode === 'local3' }" href="/3-joueurs">3 joueurs</a></div>
+      <a class="profile-link" href="/profil">Profil</a>
     </nav>
 
     <header class="page-heading">
       <div>
-        <p class="eyebrow">Construction locale · 30 placements</p>
+        <p class="eyebrow">{{ props.mode === 'solo' ? 'Solo · joueur contre ordinateur' : props.mode === 'local3' ? 'Local · 3 joueurs' : 'Local · 2 joueurs' }}</p>
         <h1>Fight</h1>
       </div>
       <div v-if="phase === 'construction'" class="turn-status" :class="{ active: !pendingCard }">
@@ -131,13 +154,13 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
     <template v-if="phase === 'construction'">
       <section class="construction-layout">
         <div class="builds-column">
-          <article v-for="build in builds" :key="build.playerId" class="build-panel" :class="{ 'is-active': build.playerId === activePlayerId, 'player-one': build.playerId === 1, 'player-two': build.playerId === 2 }">
+          <article v-for="build in builds" :key="build.playerId" class="build-panel" :class="{ 'is-active': build.playerId === activePlayerId, 'player-one': build.playerId === 1, 'player-two': build.playerId === 2, 'player-three': build.playerId === 3 }">
             <header class="build-header">
               <div><p class="eyebrow">Composition</p><h2>Joueur {{ build.playerId }}</h2></div>
               <span class="build-count">{{ filledSlotCount(build) }} <small>/ 15</small></span>
             </header>
             <div class="category-grid">
-              <button v-for="[label, slug] in CATEGORY_DEFINITIONS" :key="slug" class="category-slot" :class="{ filled: slotCard(build, slug), selectable: build.playerId === activePlayerId && !!pendingCard && !slotCard(build, slug) }" type="button" :disabled="build.playerId !== activePlayerId || !pendingCard || !!slotCard(build, slug)" @click="placePendingCard(slug)">
+              <button v-for="[label, slug] in CATEGORY_DEFINITIONS" :key="slug" class="category-slot" :class="{ filled: slotCard(build, slug), selectable: build.playerId === activePlayerId && !!pendingCard && !slotCard(build, slug) }" type="button" :disabled="isComputerTurn || build.playerId !== activePlayerId || !pendingCard || !!slotCard(build, slug)" @click="placePendingCard(slug)">
                 <span class="slot-label">{{ label }}</span>
                 <template v-if="slotCard(build, slug)"><span class="slot-card-preview"><img v-if="slotCard(build, slug)?.imageUrl" :src="slotCard(build, slug)?.imageUrl ?? undefined" :alt="`Miniature de ${slotCard(build, slug)?.name}`" /><span v-else class="slot-card-fallback">{{ slotCard(build, slug)?.name.slice(0, 1) }}</span></span><span class="slot-card-details"><span class="slot-card-name">{{ slotCard(build, slug)?.name }}</span><span class="slot-state">Remplie</span></span></template>
                 <template v-else><span class="slot-empty">Libre</span><span class="slot-state">{{ build.playerId === activePlayerId && pendingCard ? 'Placer ici' : 'En attente' }}</span></template>
@@ -159,7 +182,7 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
 
     <section v-else-if="phase === 'combat'" class="combat-panel">
       <div class="combat-intro"><p class="eyebrow">Étape suivante</p><h2>Qui gagne le combat ?</h2><p>Les deux compositions sont complètes. Le résultat manuel est disponible pour cette version.</p></div>
-      <div class="combat-actions"><button type="button" @click="chooseWinner(1)">Joueur 1 gagne <span>→</span></button><button type="button" @click="chooseWinner(2)">Joueur 2 gagne <span>→</span></button></div>
+      <div class="combat-actions"><button v-for="build in builds" :key="build.playerId" type="button" @click="chooseWinner(build.playerId)">Joueur {{ build.playerId }} gagne <span>→</span></button></div>
       <div class="combat-builds"><article v-for="build in builds" :key="build.playerId" class="build-panel" :class="{ 'player-one': build.playerId === 1, 'player-two': build.playerId === 2 }"><header class="build-header"><h3>Joueur {{ build.playerId }}</h3><span class="build-count">15 <small>/ 15</small></span></header><div class="category-grid"><div v-for="[label, slug] in CATEGORY_DEFINITIONS" :key="slug" class="category-slot filled"><span class="slot-label">{{ label }}</span><span class="slot-card-preview"><img v-if="slotCard(build, slug)?.imageUrl" :src="slotCard(build, slug)?.imageUrl ?? undefined" :alt="`Miniature de ${slotCard(build, slug)?.name}`" /><span v-else class="slot-card-fallback">{{ slotCard(build, slug)?.name.slice(0, 1) }}</span></span><span class="slot-card-details"><span class="slot-card-name">{{ slotCard(build, slug)?.name }}</span><span class="slot-state">Remplie</span></span></div></div></article></div>
     </section>
 
@@ -356,6 +379,11 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
 .build-panel.player-two {
   border-color: rgba(84, 196, 255, 0.35);
   background: #30363b;
+}
+
+.build-panel.player-three {
+  border-color: rgba(138, 217, 184, 0.42);
+  background: #303936;
 }
 
 .build-panel.is-active {

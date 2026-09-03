@@ -22,31 +22,41 @@ export type CategorySlug = (typeof CATEGORY_DEFINITIONS)[number][1]
 
 export const CATEGORIES: Category[] = CATEGORY_DEFINITIONS.map(([label, slug]) => ({ label, slug }))
 
+export type PlayerId = 1 | 2 | 3
+
 export type PlayerBuild = {
-  playerId: 1 | 2
+  playerId: PlayerId
   slots: Record<CategorySlug, Card | null>
 }
 
 export type LastPlacement = {
-  playerId: 1 | 2
+  playerId: PlayerId
   category: CategorySlug
   card: Card
 }
 
 export type ManualCombatResult = {
-  winnerId: 1 | 2
+  winnerId: PlayerId
 }
 
 function emptySlots(): Record<CategorySlug, Card | null> {
   return Object.fromEntries(CATEGORY_DEFINITIONS.map(([, slug]) => [slug, null])) as Record<CategorySlug, Card | null>
 }
 
-export function createPlayerBuild(playerId: 1 | 2): PlayerBuild {
+export function createPlayerBuild(playerId: PlayerId): PlayerBuild {
   return { playerId, slots: emptySlots() }
 }
 
 export function createPlayerBuilds(): [PlayerBuild, PlayerBuild] {
   return [createPlayerBuild(1), createPlayerBuild(2)]
+}
+
+export function createPlayerBuildsForCount(playerCount: 2 | 3): PlayerBuild[] {
+  return Array.from({ length: playerCount }, (_, index) => createPlayerBuild((index + 1) as PlayerId))
+}
+
+export function chooseComputerCategory(build: PlayerBuild): CategorySlug | null {
+  return CATEGORY_DEFINITIONS.find(([, slug]) => !build.slots[slug])?.[1] ?? null
 }
 
 export function isBuildComplete(build: PlayerBuild): boolean {
@@ -79,11 +89,11 @@ export function undoPlacement(build: PlayerBuild, placement: LastPlacement): Pla
   return { ...build, slots: { ...build.slots, [placement.category]: null } }
 }
 
-export function getNextPlayerId(playerId: 1 | 2): 1 | 2 {
-  return playerId === 1 ? 2 : 1
+export function getNextPlayerId(playerId: PlayerId, playerCount: 2 | 3 = 2): PlayerId {
+  return playerId === playerCount ? 1 : ((playerId + 1) as PlayerId)
 }
 
-export function resolveManualCombat(winnerId: 1 | 2): ManualCombatResult {
+export function resolveManualCombat(winnerId: PlayerId): ManualCombatResult {
   return { winnerId }
 }
 
