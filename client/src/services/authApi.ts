@@ -1,6 +1,6 @@
 import { API_BASE_URL } from './cardApi'
 
-export type User = { id: number; email: string; displayName: string; wins: number; losses: number; createdAt: string; updatedAt: string }
+export type User = { id: number; email: string; displayName: string; wins: number; losses: number; role: 'USER' | 'ADMIN'; createdAt: string; updatedAt: string }
 
 type AuthResponse = { token: string; user: User }
 

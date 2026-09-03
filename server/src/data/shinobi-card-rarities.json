@@ -1,0 +1,1248 @@
+{
+  "schemaVersion": "1.0.0",
+  "generatedFor": "Shinobi Area",
+  "joinKey": "slug",
+  "relatedFiles": [
+    "shinobi-card-stats.json",
+    "shinobi-card-traits.json"
+  ],
+  "rarityOrder": [
+    {
+      "id": "UNCOMMON",
+      "label": "Peu commun",
+      "rank": 1,
+      "colorName": "Blanc",
+      "colorHex": "#FFFFFF",
+      "minScore": 0,
+      "maxScore": 45
+    },
+    {
+      "id": "COMMON",
+      "label": "Commun",
+      "rank": 2,
+      "colorName": "Vert",
+      "colorHex": "#27AE60",
+      "minScore": 46,
+      "maxScore": 55
+    },
+    {
+      "id": "RARE",
+      "label": "Rare",
+      "rank": 3,
+      "colorName": "Bleu",
+      "colorHex": "#2F80ED",
+      "minScore": 56,
+      "maxScore": 65
+    },
+    {
+      "id": "EPIC",
+      "label": "Épique",
+      "rank": 4,
+      "colorName": "Violet",
+      "colorHex": "#9B51E0",
+      "minScore": 66,
+      "maxScore": 75
+    },
+    {
+      "id": "MYTHIC",
+      "label": "Mythique",
+      "rank": 5,
+      "colorName": "Rose pâle",
+      "colorHex": "#F2B8D5",
+      "minScore": 76,
+      "maxScore": 85
+    },
+    {
+      "id": "LEGENDARY",
+      "label": "Légendaire",
+      "rank": 6,
+      "colorName": "Rouge",
+      "colorHex": "#D7263D",
+      "minScore": 86,
+      "maxScore": 94
+    },
+    {
+      "id": "SEMI_GOD",
+      "label": "Semi-god",
+      "rank": 7,
+      "colorName": "Orange",
+      "colorHex": "#F2994A",
+      "minScore": 95,
+      "maxScore": 98
+    },
+    {
+      "id": "DIVINE",
+      "label": "Divine",
+      "rank": 8,
+      "colorName": "Jaune",
+      "colorHex": "#F2C94C",
+      "minScore": 99,
+      "maxScore": 100
+    }
+  ],
+  "methodology": {
+    "status": "BALANCE_V1",
+    "formula": "round(overallPower * 0.70 + bestUsableCategoryScore * 0.30)",
+    "notes": [
+      "La version exacte de chaque carte est évaluée séparément.",
+      "La puissance générale pèse 70 % afin qu'un spécialiste ne devienne pas automatiquement Divine grâce à une seule statistique.",
+      "La meilleure catégorie exploitable pèse 30 % afin de valoriser l'utilité réelle d'une carte dans le jeu.",
+      "Clan est ignoré car sa valeur numérique reste toujours égale à 0.",
+      "Sensoriel est ignoré car il ne fait plus partie des 15 slots actuels.",
+      "Les raretés pourront être ajustées individuellement après les tests d'équilibrage sans modifier les stats ni les traits."
+    ]
+  },
+  "distribution": {
+    "UNCOMMON": 8,
+    "COMMON": 13,
+    "RARE": 34,
+    "EPIC": 33,
+    "MYTHIC": 27,
+    "LEGENDARY": 30,
+    "SEMI_GOD": 10,
+    "DIVINE": 8
+  },
+  "cards": [
+    {
+      "id": 1,
+      "slug": "hagoromo",
+      "name": "Hagoromo",
+      "rarity": "DIVINE",
+      "rarityScore": 99
+    },
+    {
+      "id": 2,
+      "slug": "hiruzen-vieux",
+      "name": "Hiruzen Vieux",
+      "rarity": "MYTHIC",
+      "rarityScore": 79
+    },
+    {
+      "id": 3,
+      "slug": "dan",
+      "name": "Dan",
+      "rarity": "COMMON",
+      "rarityScore": 52
+    },
+    {
+      "id": 4,
+      "slug": "kankuro",
+      "name": "Kankuro",
+      "rarity": "RARE",
+      "rarityScore": 63
+    },
+    {
+      "id": 5,
+      "slug": "juubidara",
+      "name": "Juubidara",
+      "rarity": "DIVINE",
+      "rarityScore": 100
+    },
+    {
+      "id": 6,
+      "slug": "sasuke-rikudo",
+      "name": "Sasuke Rikudo",
+      "rarity": "SEMI_GOD",
+      "rarityScore": 98
+    },
+    {
+      "id": 7,
+      "slug": "rock-lee",
+      "name": "Rock Lee",
+      "rarity": "EPIC",
+      "rarityScore": 72
+    },
+    {
+      "id": 8,
+      "slug": "samui",
+      "name": "Samui",
+      "rarity": "COMMON",
+      "rarityScore": 48
+    },
+    {
+      "id": 9,
+      "slug": "kinkaku",
+      "name": "Kinkaku",
+      "rarity": "EPIC",
+      "rarityScore": 71
+    },
+    {
+      "id": 10,
+      "slug": "tsunade-malade",
+      "name": "Tsunade Malade",
+      "rarity": "UNCOMMON",
+      "rarityScore": 32
+    },
+    {
+      "id": 11,
+      "slug": "fuka",
+      "name": "Fuka",
+      "rarity": "RARE",
+      "rarityScore": 62
+    },
+    {
+      "id": 12,
+      "slug": "kabuto",
+      "name": "Kabuto",
+      "rarity": "EPIC",
+      "rarityScore": 70
+    },
+    {
+      "id": 13,
+      "slug": "kimimaro",
+      "name": "Kimimaro",
+      "rarity": "EPIC",
+      "rarityScore": 75
+    },
+    {
+      "id": 14,
+      "slug": "fugaku",
+      "name": "Fugaku",
+      "rarity": "MYTHIC",
+      "rarityScore": 79
+    },
+    {
+      "id": 15,
+      "slug": "kakuzu",
+      "name": "Kakuzu",
+      "rarity": "MYTHIC",
+      "rarityScore": 80
+    },
+    {
+      "id": 16,
+      "slug": "sakura-prime",
+      "name": "Sakura Prime",
+      "rarity": "LEGENDARY",
+      "rarityScore": 91
+    },
+    {
+      "id": 17,
+      "slug": "asuma",
+      "name": "Asuma",
+      "rarity": "RARE",
+      "rarityScore": 65
+    },
+    {
+      "id": 18,
+      "slug": "naruto",
+      "name": "Naruto",
+      "rarity": "RARE",
+      "rarityScore": 56
+    },
+    {
+      "id": 19,
+      "slug": "mei",
+      "name": "Mei",
+      "rarity": "MYTHIC",
+      "rarityScore": 77
+    },
+    {
+      "id": 20,
+      "slug": "chiyo",
+      "name": "Chiyo",
+      "rarity": "EPIC",
+      "rarityScore": 73
+    },
+    {
+      "id": 21,
+      "slug": "ashura-prime",
+      "name": "Ashura Prime",
+      "rarity": "SEMI_GOD",
+      "rarityScore": 97
+    },
+    {
+      "id": 22,
+      "slug": "zetsu-noir",
+      "name": "Zetsu Noir",
+      "rarity": "LEGENDARY",
+      "rarityScore": 86
+    },
+    {
+      "id": 23,
+      "slug": "ino",
+      "name": "Ino",
+      "rarity": "COMMON",
+      "rarityScore": 55
+    },
+    {
+      "id": 24,
+      "slug": "shino",
+      "name": "Shino",
+      "rarity": "RARE",
+      "rarityScore": 59
+    },
+    {
+      "id": 25,
+      "slug": "sakumo",
+      "name": "Sakumo",
+      "rarity": "MYTHIC",
+      "rarityScore": 83
+    },
+    {
+      "id": 26,
+      "slug": "shisui",
+      "name": "Shisui",
+      "rarity": "LEGENDARY",
+      "rarityScore": 87
+    },
+    {
+      "id": 27,
+      "slug": "rin",
+      "name": "Rin",
+      "rarity": "UNCOMMON",
+      "rarityScore": 42
+    },
+    {
+      "id": 28,
+      "slug": "naruto-rikudo",
+      "name": "Naruto Rikudo",
+      "rarity": "DIVINE",
+      "rarityScore": 99
+    },
+    {
+      "id": 29,
+      "slug": "hizashi",
+      "name": "Hizashi",
+      "rarity": "EPIC",
+      "rarityScore": 71
+    },
+    {
+      "id": 30,
+      "slug": "kidomaru",
+      "name": "Kidomaru",
+      "rarity": "RARE",
+      "rarityScore": 59
+    },
+    {
+      "id": 31,
+      "slug": "hamura",
+      "name": "Hamura",
+      "rarity": "SEMI_GOD",
+      "rarityScore": 97
+    },
+    {
+      "id": 32,
+      "slug": "pakura",
+      "name": "Pakura",
+      "rarity": "EPIC",
+      "rarityScore": 69
+    },
+    {
+      "id": 33,
+      "slug": "kisame",
+      "name": "Kisame",
+      "rarity": "MYTHIC",
+      "rarityScore": 83
+    },
+    {
+      "id": 34,
+      "slug": "killer-bee",
+      "name": "Killer Bee",
+      "rarity": "LEGENDARY",
+      "rarityScore": 87
+    },
+    {
+      "id": 35,
+      "slug": "utakata",
+      "name": "Utakata",
+      "rarity": "EPIC",
+      "rarityScore": 71
+    },
+    {
+      "id": 36,
+      "slug": "ebisu",
+      "name": "Ebisu",
+      "rarity": "COMMON",
+      "rarityScore": 46
+    },
+    {
+      "id": 37,
+      "slug": "ukon-et-sakon",
+      "name": "Ukon & Sakon",
+      "rarity": "RARE",
+      "rarityScore": 59
+    },
+    {
+      "id": 38,
+      "slug": "tenten-rikudo",
+      "name": "Tenten Rikudo",
+      "rarity": "EPIC",
+      "rarityScore": 75
+    },
+    {
+      "id": 39,
+      "slug": "tsunade",
+      "name": "Tsunade",
+      "rarity": "LEGENDARY",
+      "rarityScore": 86
+    },
+    {
+      "id": 40,
+      "slug": "konohamaru-sj",
+      "name": "Konohamaru SJ",
+      "rarity": "UNCOMMON",
+      "rarityScore": 43
+    },
+    {
+      "id": 41,
+      "slug": "aoba",
+      "name": "Aoba",
+      "rarity": "COMMON",
+      "rarityScore": 51
+    },
+    {
+      "id": 42,
+      "slug": "tenten",
+      "name": "Tenten",
+      "rarity": "RARE",
+      "rarityScore": 58
+    },
+    {
+      "id": 43,
+      "slug": "guren",
+      "name": "Guren",
+      "rarity": "EPIC",
+      "rarityScore": 73
+    },
+    {
+      "id": 44,
+      "slug": "toneri-km",
+      "name": "Toneri KM",
+      "rarity": "SEMI_GOD",
+      "rarityScore": 98
+    },
+    {
+      "id": 45,
+      "slug": "kakashi-dms",
+      "name": "Kakashi DMS",
+      "rarity": "DIVINE",
+      "rarityScore": 100
+    },
+    {
+      "id": 46,
+      "slug": "obito",
+      "name": "Obito",
+      "rarity": "LEGENDARY",
+      "rarityScore": 88
+    },
+    {
+      "id": 47,
+      "slug": "duy",
+      "name": "Duy",
+      "rarity": "EPIC",
+      "rarityScore": 71
+    },
+    {
+      "id": 48,
+      "slug": "konohamaru",
+      "name": "Konohamaru",
+      "rarity": "RARE",
+      "rarityScore": 63
+    },
+    {
+      "id": 49,
+      "slug": "toneri",
+      "name": "Toneri",
+      "rarity": "SEMI_GOD",
+      "rarityScore": 96
+    },
+    {
+      "id": 50,
+      "slug": "baki",
+      "name": "Baki",
+      "rarity": "RARE",
+      "rarityScore": 59
+    },
+    {
+      "id": 51,
+      "slug": "naruto-sj",
+      "name": "Naruto SJ",
+      "rarity": "UNCOMMON",
+      "rarityScore": 41
+    },
+    {
+      "id": 52,
+      "slug": "hiashi",
+      "name": "Hiashi",
+      "rarity": "EPIC",
+      "rarityScore": 75
+    },
+    {
+      "id": 53,
+      "slug": "sasuke-ms",
+      "name": "Sasuke MS",
+      "rarity": "LEGENDARY",
+      "rarityScore": 86
+    },
+    {
+      "id": 54,
+      "slug": "kiba",
+      "name": "Kiba",
+      "rarity": "RARE",
+      "rarityScore": 56
+    },
+    {
+      "id": 55,
+      "slug": "kitsuchi",
+      "name": "Kitsuchi",
+      "rarity": "RARE",
+      "rarityScore": 65
+    },
+    {
+      "id": 56,
+      "slug": "ao",
+      "name": "Ao",
+      "rarity": "RARE",
+      "rarityScore": 58
+    },
+    {
+      "id": 57,
+      "slug": "naruto-kcm1",
+      "name": "Naruto Kcm1",
+      "rarity": "LEGENDARY",
+      "rarityScore": 90
+    },
+    {
+      "id": 58,
+      "slug": "kazekage-iii",
+      "name": "Kazekage III",
+      "rarity": "MYTHIC",
+      "rarityScore": 80
+    },
+    {
+      "id": 59,
+      "slug": "torune",
+      "name": "Torune",
+      "rarity": "EPIC",
+      "rarityScore": 70
+    },
+    {
+      "id": 60,
+      "slug": "indra",
+      "name": "Indra",
+      "rarity": "SEMI_GOD",
+      "rarityScore": 97
+    },
+    {
+      "id": 61,
+      "slug": "obito-orange",
+      "name": "Obito Orange",
+      "rarity": "MYTHIC",
+      "rarityScore": 83
+    },
+    {
+      "id": 62,
+      "slug": "kushina",
+      "name": "Kushina",
+      "rarity": "MYTHIC",
+      "rarityScore": 79
+    },
+    {
+      "id": 63,
+      "slug": "darui",
+      "name": "Darui",
+      "rarity": "EPIC",
+      "rarityScore": 72
+    },
+    {
+      "id": 64,
+      "slug": "nagato-prime",
+      "name": "Nagato Prime",
+      "rarity": "LEGENDARY",
+      "rarityScore": 94
+    },
+    {
+      "id": 65,
+      "slug": "mifune",
+      "name": "Mifune",
+      "rarity": "MYTHIC",
+      "rarityScore": 76
+    },
+    {
+      "id": 66,
+      "slug": "zetsu-blanc",
+      "name": "Zetsu Blanc",
+      "rarity": "UNCOMMON",
+      "rarityScore": 44
+    },
+    {
+      "id": 67,
+      "slug": "hinata",
+      "name": "Hinata",
+      "rarity": "RARE",
+      "rarityScore": 62
+    },
+    {
+      "id": 68,
+      "slug": "mangetsu",
+      "name": "Mangetsu",
+      "rarity": "MYTHIC",
+      "rarityScore": 78
+    },
+    {
+      "id": 69,
+      "slug": "naruto-ermite",
+      "name": "Naruto Ermite",
+      "rarity": "MYTHIC",
+      "rarityScore": 80
+    },
+    {
+      "id": 70,
+      "slug": "minato",
+      "name": "Minato",
+      "rarity": "LEGENDARY",
+      "rarityScore": 93
+    },
+    {
+      "id": 71,
+      "slug": "obito-blanc",
+      "name": "Obito Blanc",
+      "rarity": "LEGENDARY",
+      "rarityScore": 94
+    },
+    {
+      "id": 72,
+      "slug": "kakashi-ms",
+      "name": "Kakashi MS",
+      "rarity": "MYTHIC",
+      "rarityScore": 79
+    },
+    {
+      "id": 73,
+      "slug": "fuu",
+      "name": "Fuu",
+      "rarity": "EPIC",
+      "rarityScore": 72
+    },
+    {
+      "id": 74,
+      "slug": "zetsu",
+      "name": "Zetsu",
+      "rarity": "RARE",
+      "rarityScore": 57
+    },
+    {
+      "id": 75,
+      "slug": "kabuto-ermite",
+      "name": "Kabuto Ermite",
+      "rarity": "LEGENDARY",
+      "rarityScore": 90
+    },
+    {
+      "id": 76,
+      "slug": "jiraya",
+      "name": "Jiraya",
+      "rarity": "LEGENDARY",
+      "rarityScore": 86
+    },
+    {
+      "id": 77,
+      "slug": "temari",
+      "name": "Temari",
+      "rarity": "RARE",
+      "rarityScore": 64
+    },
+    {
+      "id": 78,
+      "slug": "yahiko",
+      "name": "Yahiko",
+      "rarity": "RARE",
+      "rarityScore": 57
+    },
+    {
+      "id": 79,
+      "slug": "guy",
+      "name": "Guy",
+      "rarity": "LEGENDARY",
+      "rarityScore": 87
+    },
+    {
+      "id": 80,
+      "slug": "madara",
+      "name": "Madara",
+      "rarity": "SEMI_GOD",
+      "rarityScore": 96
+    },
+    {
+      "id": 81,
+      "slug": "kurenai",
+      "name": "Kurenai",
+      "rarity": "EPIC",
+      "rarityScore": 66
+    },
+    {
+      "id": 82,
+      "slug": "chosa",
+      "name": "Chosa",
+      "rarity": "RARE",
+      "rarityScore": 57
+    },
+    {
+      "id": 83,
+      "slug": "kaguya",
+      "name": "Kaguya",
+      "rarity": "DIVINE",
+      "rarityScore": 100
+    },
+    {
+      "id": 84,
+      "slug": "tayuya",
+      "name": "Tayuya",
+      "rarity": "RARE",
+      "rarityScore": 61
+    },
+    {
+      "id": 85,
+      "slug": "jirobo",
+      "name": "Jirobo",
+      "rarity": "COMMON",
+      "rarityScore": 55
+    },
+    {
+      "id": 86,
+      "slug": "karin",
+      "name": "Karin",
+      "rarity": "RARE",
+      "rarityScore": 56
+    },
+    {
+      "id": 87,
+      "slug": "shikamaru",
+      "name": "Shikamaru",
+      "rarity": "EPIC",
+      "rarityScore": 72
+    },
+    {
+      "id": 88,
+      "slug": "ashura",
+      "name": "Ashura",
+      "rarity": "LEGENDARY",
+      "rarityScore": 90
+    },
+    {
+      "id": 89,
+      "slug": "genma",
+      "name": "Genma",
+      "rarity": "COMMON",
+      "rarityScore": 54
+    },
+    {
+      "id": 90,
+      "slug": "rasa",
+      "name": "Rasa",
+      "rarity": "MYTHIC",
+      "rarityScore": 77
+    },
+    {
+      "id": 91,
+      "slug": "inoichi",
+      "name": "Inoichi",
+      "rarity": "RARE",
+      "rarityScore": 59
+    },
+    {
+      "id": 92,
+      "slug": "kurotsochi",
+      "name": "Kurotsochi",
+      "rarity": "RARE",
+      "rarityScore": 65
+    },
+    {
+      "id": 93,
+      "slug": "hiruzen",
+      "name": "Hiruzen",
+      "rarity": "LEGENDARY",
+      "rarityScore": 90
+    },
+    {
+      "id": 94,
+      "slug": "a",
+      "name": "A",
+      "rarity": "LEGENDARY",
+      "rarityScore": 88
+    },
+    {
+      "id": 95,
+      "slug": "ooniki-vieux",
+      "name": "Ooniki Vieux",
+      "rarity": "MYTHIC",
+      "rarityScore": 81
+    },
+    {
+      "id": 96,
+      "slug": "shin",
+      "name": "Shin",
+      "rarity": "MYTHIC",
+      "rarityScore": 77
+    },
+    {
+      "id": 97,
+      "slug": "naruto-kcm-sen",
+      "name": "Naruto Kcm Sen",
+      "rarity": "LEGENDARY",
+      "rarityScore": 94
+    },
+    {
+      "id": 98,
+      "slug": "akatsuchi",
+      "name": "Akatsuchi",
+      "rarity": "RARE",
+      "rarityScore": 59
+    },
+    {
+      "id": 99,
+      "slug": "yagura",
+      "name": "Yagura",
+      "rarity": "MYTHIC",
+      "rarityScore": 77
+    },
+    {
+      "id": 100,
+      "slug": "choji-geant",
+      "name": "Choji Geant",
+      "rarity": "EPIC",
+      "rarityScore": 67
+    },
+    {
+      "id": 101,
+      "slug": "neji",
+      "name": "Neji",
+      "rarity": "EPIC",
+      "rarityScore": 71
+    },
+    {
+      "id": 102,
+      "slug": "sasori",
+      "name": "Sasori",
+      "rarity": "MYTHIC",
+      "rarityScore": 81
+    },
+    {
+      "id": 103,
+      "slug": "orochimaru",
+      "name": "Orochimaru",
+      "rarity": "LEGENDARY",
+      "rarityScore": 87
+    },
+    {
+      "id": 104,
+      "slug": "sasuke-ems",
+      "name": "Sasuke EMS",
+      "rarity": "LEGENDARY",
+      "rarityScore": 92
+    },
+    {
+      "id": 105,
+      "slug": "zabuza",
+      "name": "Zabuza",
+      "rarity": "RARE",
+      "rarityScore": 64
+    },
+    {
+      "id": 106,
+      "slug": "karui",
+      "name": "Karui",
+      "rarity": "COMMON",
+      "rarityScore": 51
+    },
+    {
+      "id": 107,
+      "slug": "gengetsu",
+      "name": "Gengetsu",
+      "rarity": "MYTHIC",
+      "rarityScore": 81
+    },
+    {
+      "id": 108,
+      "slug": "omoi",
+      "name": "Omoi",
+      "rarity": "COMMON",
+      "rarityScore": 55
+    },
+    {
+      "id": 109,
+      "slug": "sasuke",
+      "name": "Sasuke",
+      "rarity": "EPIC",
+      "rarityScore": 74
+    },
+    {
+      "id": 110,
+      "slug": "iruka",
+      "name": "Iruka",
+      "rarity": "UNCOMMON",
+      "rarityScore": 42
+    },
+    {
+      "id": 111,
+      "slug": "chojuro",
+      "name": "Chojuro",
+      "rarity": "RARE",
+      "rarityScore": 65
+    },
+    {
+      "id": 112,
+      "slug": "hanzo",
+      "name": "Hanzo",
+      "rarity": "MYTHIC",
+      "rarityScore": 83
+    },
+    {
+      "id": 113,
+      "slug": "tobirama",
+      "name": "Tobirama",
+      "rarity": "LEGENDARY",
+      "rarityScore": 93
+    },
+    {
+      "id": 114,
+      "slug": "konan",
+      "name": "Konan",
+      "rarity": "MYTHIC",
+      "rarityScore": 77
+    },
+    {
+      "id": 115,
+      "slug": "kushimaru",
+      "name": "Kushimaru",
+      "rarity": "EPIC",
+      "rarityScore": 71
+    },
+    {
+      "id": 116,
+      "slug": "kakashi-hokage",
+      "name": "Kakashi Hokage",
+      "rarity": "MYTHIC",
+      "rarityScore": 83
+    },
+    {
+      "id": 117,
+      "slug": "pain",
+      "name": "Pain",
+      "rarity": "LEGENDARY",
+      "rarityScore": 92
+    },
+    {
+      "id": 118,
+      "slug": "ibiki",
+      "name": "Ibiki",
+      "rarity": "COMMON",
+      "rarityScore": 49
+    },
+    {
+      "id": 119,
+      "slug": "ginkaku",
+      "name": "Ginkaku",
+      "rarity": "EPIC",
+      "rarityScore": 67
+    },
+    {
+      "id": 120,
+      "slug": "juubito",
+      "name": "Juubito",
+      "rarity": "DIVINE",
+      "rarityScore": 99
+    },
+    {
+      "id": 121,
+      "slug": "fu",
+      "name": "Fu",
+      "rarity": "EPIC",
+      "rarityScore": 66
+    },
+    {
+      "id": 122,
+      "slug": "haku",
+      "name": "Haku",
+      "rarity": "EPIC",
+      "rarityScore": 69
+    },
+    {
+      "id": 123,
+      "slug": "nagato-malade",
+      "name": "Nagato Malade",
+      "rarity": "RARE",
+      "rarityScore": 62
+    },
+    {
+      "id": 124,
+      "slug": "jugo",
+      "name": "Jugo",
+      "rarity": "EPIC",
+      "rarityScore": 74
+    },
+    {
+      "id": 125,
+      "slug": "madara-prime",
+      "name": "Madara Prime",
+      "rarity": "SEMI_GOD",
+      "rarityScore": 98
+    },
+    {
+      "id": 126,
+      "slug": "mu",
+      "name": "Mu",
+      "rarity": "LEGENDARY",
+      "rarityScore": 86
+    },
+    {
+      "id": 127,
+      "slug": "jinin",
+      "name": "Jinin",
+      "rarity": "RARE",
+      "rarityScore": 62
+    },
+    {
+      "id": 128,
+      "slug": "aa",
+      "name": "Aa",
+      "rarity": "MYTHIC",
+      "rarityScore": 84
+    },
+    {
+      "id": 129,
+      "slug": "indra-ms",
+      "name": "Indra MS",
+      "rarity": "LEGENDARY",
+      "rarityScore": 90
+    },
+    {
+      "id": 130,
+      "slug": "kakashi",
+      "name": "Kakashi",
+      "rarity": "EPIC",
+      "rarityScore": 72
+    },
+    {
+      "id": 131,
+      "slug": "minato-kcm",
+      "name": "Minato Kcm",
+      "rarity": "SEMI_GOD",
+      "rarityScore": 97
+    },
+    {
+      "id": 132,
+      "slug": "itachi-prime",
+      "name": "Itachi Prime",
+      "rarity": "LEGENDARY",
+      "rarityScore": 91
+    },
+    {
+      "id": 133,
+      "slug": "sai",
+      "name": "Sai",
+      "rarity": "RARE",
+      "rarityScore": 60
+    },
+    {
+      "id": 134,
+      "slug": "kimimaro-malade",
+      "name": "Kimimaro Malade",
+      "rarity": "UNCOMMON",
+      "rarityScore": 39
+    },
+    {
+      "id": 135,
+      "slug": "oonoki",
+      "name": "Oonoki",
+      "rarity": "LEGENDARY",
+      "rarityScore": 86
+    },
+    {
+      "id": 136,
+      "slug": "yamato",
+      "name": "Yamato",
+      "rarity": "EPIC",
+      "rarityScore": 71
+    },
+    {
+      "id": 137,
+      "slug": "suigetsu",
+      "name": "Suigetsu",
+      "rarity": "RARE",
+      "rarityScore": 65
+    },
+    {
+      "id": 138,
+      "slug": "danzo",
+      "name": "Danzo",
+      "rarity": "MYTHIC",
+      "rarityScore": 82
+    },
+    {
+      "id": 139,
+      "slug": "yugito",
+      "name": "Yugito",
+      "rarity": "EPIC",
+      "rarityScore": 72
+    },
+    {
+      "id": 140,
+      "slug": "gaara",
+      "name": "Gaara",
+      "rarity": "LEGENDARY",
+      "rarityScore": 86
+    },
+    {
+      "id": 141,
+      "slug": "madara-vieux",
+      "name": "Madara Vieux",
+      "rarity": "EPIC",
+      "rarityScore": 69
+    },
+    {
+      "id": 142,
+      "slug": "hayate",
+      "name": "Hayate",
+      "rarity": "COMMON",
+      "rarityScore": 52
+    },
+    {
+      "id": 143,
+      "slug": "itachi",
+      "name": "Itachi",
+      "rarity": "LEGENDARY",
+      "rarityScore": 88
+    },
+    {
+      "id": 144,
+      "slug": "ameyuri",
+      "name": "Ameyuri",
+      "rarity": "RARE",
+      "rarityScore": 64
+    },
+    {
+      "id": 145,
+      "slug": "gari",
+      "name": "Gari",
+      "rarity": "RARE",
+      "rarityScore": 61
+    },
+    {
+      "id": 146,
+      "slug": "orochimaru-malade",
+      "name": "Orochimaru Malade",
+      "rarity": "UNCOMMON",
+      "rarityScore": 34
+    },
+    {
+      "id": 147,
+      "slug": "anko",
+      "name": "Anko",
+      "rarity": "COMMON",
+      "rarityScore": 55
+    },
+    {
+      "id": 148,
+      "slug": "choji",
+      "name": "Choji",
+      "rarity": "RARE",
+      "rarityScore": 61
+    },
+    {
+      "id": 149,
+      "slug": "hidan",
+      "name": "Hidan",
+      "rarity": "EPIC",
+      "rarityScore": 73
+    },
+    {
+      "id": 150,
+      "slug": "izuna",
+      "name": "Izuna",
+      "rarity": "LEGENDARY",
+      "rarityScore": 86
+    },
+    {
+      "id": 151,
+      "slug": "guy-8-portes",
+      "name": "Guy 8 Portes",
+      "rarity": "DIVINE",
+      "rarityScore": 99
+    },
+    {
+      "id": 152,
+      "slug": "hashirama",
+      "name": "Hashirama",
+      "rarity": "SEMI_GOD",
+      "rarityScore": 95
+    },
+    {
+      "id": 153,
+      "slug": "roshi",
+      "name": "Roshi",
+      "rarity": "EPIC",
+      "rarityScore": 71
+    },
+    {
+      "id": 154,
+      "slug": "chosa-geant",
+      "name": "Chosa Geant",
+      "rarity": "RARE",
+      "rarityScore": 63
+    },
+    {
+      "id": 155,
+      "slug": "deidara",
+      "name": "Deidara",
+      "rarity": "MYTHIC",
+      "rarityScore": 80
+    },
+    {
+      "id": 156,
+      "slug": "shikaku",
+      "name": "Shikaku",
+      "rarity": "EPIC",
+      "rarityScore": 69
+    },
+    {
+      "id": 157,
+      "slug": "sakura",
+      "name": "Sakura",
+      "rarity": "EPIC",
+      "rarityScore": 70
+    },
+    {
+      "id": 158,
+      "slug": "mito",
+      "name": "Mito",
+      "rarity": "MYTHIC",
+      "rarityScore": 82
+    },
+    {
+      "id": 159,
+      "slug": "hashirama-prime",
+      "name": "Hashirama Prime",
+      "rarity": "DIVINE",
+      "rarityScore": 99
+    },
+    {
+      "id": 160,
+      "slug": "shizune",
+      "name": "Shizune",
+      "rarity": "COMMON",
+      "rarityScore": 53
+    },
+    {
+      "id": 161,
+      "slug": "han",
+      "name": "Han",
+      "rarity": "MYTHIC",
+      "rarityScore": 78
+    },
+    {
+      "id": 162,
+      "slug": "jinpachi",
+      "name": "Jinpachi",
+      "rarity": "RARE",
+      "rarityScore": 64
+    },
+    {
+      "id": 163,
+      "slug": "naruto-kcm",
+      "name": "Naruto Kcm",
+      "rarity": "LEGENDARY",
+      "rarityScore": 92
+    }
+  ]
+}

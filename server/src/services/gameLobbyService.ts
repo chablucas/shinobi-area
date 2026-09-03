@@ -21,6 +21,8 @@ function lobbyInclude() {
   return { creator: { select: userSelect }, invites: { include: { invitee: { select: userSelect } }, orderBy: { createdAt: 'asc' as const } } }
 }
 
+const AI_PLAYER = { id: null, displayName: 'IA Shinobi Area', avatarUrl: null, status: 'ACCEPTED', inviteId: null, isAi: true } as const
+
 function formatLobby(lobby: Awaited<ReturnType<typeof findLobby>>) {
   if (!lobby) return null
   return {
@@ -28,11 +30,13 @@ function formatLobby(lobby: Awaited<ReturnType<typeof findLobby>>) {
     mode: lobby.mode === GameMode.ONE_V_ONE ? '1v1' : '1v1v1',
     creatorId: lobby.creatorId,
     status: lobby.status,
+    includesAi: lobby.includesAi,
     createdAt: lobby.createdAt,
     updatedAt: lobby.updatedAt,
     players: [
-      { ...publicUser(lobby.creator), status: 'ACCEPTED', inviteId: null },
-      ...lobby.invites.map((invite) => ({ ...publicUser(invite.invitee), status: invite.status, inviteId: invite.id })),
+      { ...publicUser(lobby.creator), status: 'ACCEPTED', inviteId: null, isAi: false },
+      ...lobby.invites.map((invite) => ({ ...publicUser(invite.invitee), status: invite.status, inviteId: invite.id, isAi: false })),
+      ...(lobby.includesAi ? [AI_PLAYER] : []),
     ],
   }
 }
@@ -41,16 +45,19 @@ async function findLobby(id: string) {
   return prisma.gameLobby.findUnique({ where: { id }, include: lobbyInclude() })
 }
 
-export async function createGameLobby(creatorId: number, mode: unknown, opponentIds: unknown) {
+export async function createGameLobby(creatorId: number, mode: unknown, opponentIds: unknown, includesAi: unknown = false) {
   const gameMode = modeOf(mode)
-  if (!Array.isArray(opponentIds) || opponentIds.length !== (gameMode === GameMode.ONE_V_ONE ? 1 : 2)) throw invalid('Le nombre d’adversaires ne correspond pas au mode.')
+  const wantsAi = includesAi === true
+  if (wantsAi && gameMode !== GameMode.ONE_V_ONE_V_THREE) throw invalid('L’IA ne peut compléter que le mode 1v1v1.')
+  const requiredOpponents = gameMode === GameMode.ONE_V_ONE ? 1 : wantsAi ? 1 : 2
+  if (!Array.isArray(opponentIds) || opponentIds.length !== requiredOpponents) throw invalid('Le nombre d’adversaires ne correspond pas au mode.')
   const ids = opponentIds.map(Number)
   if (ids.some((id) => !Number.isInteger(id) || id <= 0) || new Set(ids).size !== ids.length || ids.includes(creatorId)) throw invalid('Les adversaires doivent être distincts et différents du créateur.')
   const users = await prisma.user.findMany({ where: { id: { in: ids } }, select: userSelect })
   if (users.length !== ids.length) throw invalid('Un adversaire est introuvable.', 404)
   const duplicate = await prisma.gameLobby.findFirst({ where: { creatorId, status: { in: [GameLobbyStatus.WAITING, GameLobbyStatus.READY] }, invites: { some: { inviteeId: { in: ids }, status: GameInviteStatus.PENDING } } } })
   if (duplicate) throw invalid('Une invitation est déjà en attente pour cet adversaire.', 409)
-  const lobby = await prisma.gameLobby.create({ data: { creatorId, mode: gameMode, invites: { create: ids.map((inviteeId) => ({ inviteeId })) } }, include: lobbyInclude() })
+  const lobby = await prisma.gameLobby.create({ data: { creatorId, mode: gameMode, includesAi: wantsAi, invites: { create: ids.map((inviteeId) => ({ inviteeId })) } }, include: lobbyInclude() })
   return formatLobby(lobby)
 }
 

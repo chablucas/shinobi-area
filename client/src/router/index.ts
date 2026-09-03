@@ -8,6 +8,8 @@ import Jouer from '../views/Jouer.vue'
 import ProfilPublic from '../views/ProfilPublic.vue'
 import CarteDetail from '../views/CarteDetail.vue'
 import Lobby from '../views/Lobby.vue'
+import Personnages from '../views/Personnages.vue'
+import Regles from '../views/Regles.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -24,6 +26,8 @@ const router = createRouter({
     { path: '/profil-public/:id', component: ProfilPublic },
     { path: '/cartes/:slug', component: CarteDetail },
     { path: '/lobby/:id', component: Lobby },
+    { path: '/personnages', component: Personnages },
+    { path: '/regles', component: Regles },
   ],
 })
 

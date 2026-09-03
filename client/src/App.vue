@@ -1,30 +1,64 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { fetchAllCards } from './services/cardApi'
+import { useRouter } from 'vue-router'
+import { createGameLobby, listFriends, type ChallengeMode, type Friend } from './services/socialApi'
 import { useAuthStore } from './stores/auth'
 import SocialHeader from './components/SocialHeader.vue'
 
-const modes = [
-  { number: '01', eyebrow: 'Forge ton identité', title: 'Création de personnage', description: 'Compose un shinobi qui te ressemble, de son clan à sa technique signature.', accent: 'coral' },
-  { number: '02', eyebrow: 'Lis le terrain', title: 'Combat 1v1', description: 'Affronte un rival en duel tactique et retourne la situation au bon moment.', accent: 'mint' },
-  { number: '03', eyebrow: 'Pense plusieurs coups', title: 'Défi de cartes', description: 'Mets ton deck à l’épreuve dans des défis courts, imprévisibles et nerveux.', accent: 'gold' },
+const modes: Array<{ number: string; eyebrow: string; title: string; description: string; accent: string; action: 'solo' | ChallengeMode }> = [
+  { number: '01', eyebrow: 'Forge ta légende', title: 'Défier l’IA', description: 'Construis ton shinobi et mesure-le à un rival stratégique.', accent: 'coral', action: 'solo' },
+  { number: '02', eyebrow: 'Combat social', title: 'Invite un ami', description: 'Lance un duel 1v1 avec un ami et retrouvez-vous dans le salon.', accent: 'mint', action: '1v1' },
+  { number: '03', eyebrow: 'Combat social', title: 'Envie d’un plaisir à 3 ?', description: 'Choisis deux amis distincts pour un combat 1v1v1.', accent: 'gold', action: '1v1v1' },
 ]
 
-const cards = ref<Awaited<ReturnType<typeof fetchAllCards>>>([])
-const failedImages = ref(new Set<string>())
 const auth = useAuthStore()
+const router = useRouter()
+const friends = ref<Friend[]>([])
+const inviteMode = ref<ChallengeMode | null>(null)
+const selectedFriendIds = ref<number[]>([])
+const completeWithAi = ref(false)
+const inviteError = ref('')
+const friendsLoading = ref(false)
+const sendingInvite = ref(false)
 
 onMounted(async () => {
   await auth.loadCurrentUser()
-  try {
-    cards.value = await fetchAllCards()
-  } catch {
-    cards.value = []
-  }
 })
 
-function markImageAsFailed(slug: string) {
-  failedImages.value = new Set(failedImages.value).add(slug)
+async function chooseMode(action: 'solo' | ChallengeMode) {
+  if (action === 'solo') { await router.push('/solo'); return }
+  await auth.loadCurrentUser()
+  if (!auth.token) { await router.push('/connexion'); return }
+  inviteMode.value = action
+  selectedFriendIds.value = []
+  completeWithAi.value = false
+  inviteError.value = ''
+  friendsLoading.value = true
+  try { friends.value = await listFriends(auth.token) } catch (exception) { inviteError.value = exception instanceof Error ? exception.message : 'Impossible de charger vos amis.' } finally { friendsLoading.value = false }
+}
+
+function requiredFriendCount() {
+  if (inviteMode.value === '1v1') return 1
+  return completeWithAi.value ? 1 : 2
+}
+
+function toggleFriend(id: number) {
+  const maximum = requiredFriendCount()
+  selectedFriendIds.value = selectedFriendIds.value.includes(id) ? selectedFriendIds.value.filter((friendId) => friendId !== id) : selectedFriendIds.value.length < maximum ? [...selectedFriendIds.value, id] : selectedFriendIds.value
+}
+
+function toggleCompleteWithAi() {
+  completeWithAi.value = !completeWithAi.value
+  if (completeWithAi.value && selectedFriendIds.value.length > 1) selectedFriendIds.value = selectedFriendIds.value.slice(0, 1)
+}
+
+async function createInvite() {
+  if (!auth.token || !inviteMode.value) return
+  const required = requiredFriendCount()
+  if (selectedFriendIds.value.length !== required) return
+  sendingInvite.value = true
+  inviteError.value = ''
+  try { const lobby = await createGameLobby(auth.token, inviteMode.value, selectedFriendIds.value, inviteMode.value === '1v1v1' && completeWithAi.value); inviteMode.value = null; await router.push(`/lobby/${lobby.id}`) } catch (exception) { inviteError.value = exception instanceof Error ? exception.message : 'Invitation impossible.' } finally { sendingInvite.value = false }
 }
 </script>
 
@@ -45,20 +79,20 @@ function markImageAsFailed(slug: string) {
     </section>
 
     <section id="modes" class="modes-section"><div class="section-heading" id="univers"><p class="kicker"><span class="kicker-dot"></span>Choisis ton terrain</p><h2>Trois façons<br /><i>de devenir légende.</i></h2><span class="section-index">/ 03</span></div>
-      <div class="mode-grid"><a v-for="mode in modes" :id="mode.number === '02' ? 'combat' : undefined" :key="mode.number" class="mode-card" :class="`mode-${mode.accent}`" :href="mode.number === '01' ? '/solo' : mode.number === '02' ? '/partie' : '/3-joueurs'"><div class="card-top"><span>{{ mode.number }}</span><span class="arrow">↗</span></div><div class="card-symbol" aria-hidden="true"><span v-if="mode.number === '01'">◈</span><span v-else-if="mode.number === '02'">✦</span><span v-else>⌘</span></div><p>{{ mode.eyebrow }}</p><h3>{{ mode.title }}</h3><span class="card-description">{{ mode.description }}</span></a></div>
+      <div class="mode-grid"><button v-for="mode in modes" :id="mode.number === '02' ? 'combat' : undefined" :key="mode.number" type="button" class="mode-card" :class="`mode-${mode.accent}`" @click="chooseMode(mode.action)"><div class="card-top"><span>{{ mode.number }}</span><span class="arrow">↗</span></div><div class="card-symbol" aria-hidden="true"><span v-if="mode.number === '01'">◈</span><span v-else-if="mode.number === '02'">✦</span><span v-else>⌘</span></div><p>{{ mode.eyebrow }}</p><h3>{{ mode.title }}</h3><span class="card-description">{{ mode.description }}</span></button></div>
     </section>
-    <section v-if="cards.length" class="cards-section" aria-labelledby="cards-title">
-      <div class="section-heading"><p class="kicker"><span class="kicker-dot"></span>Le catalogue</p><h2 id="cards-title">Les cartes<br /><i>de l’arène.</i></h2><span class="section-index">/ {{ cards.length }}</span></div>
-      <div class="cards-grid">
-        <article v-for="card in cards" :key="card.id" class="character-card">
-          <div class="card-image-surface character-card-media">
-            <div v-if="!card.imageUrl || failedImages.has(card.slug)" class="image-fallback card-image-fallback" aria-hidden="true">{{ card.name.slice(0, 1) }}</div>
-            <img v-else class="card-image-inner" :src="card.imageUrl" :alt="`Carte ${card.name}`" loading="lazy" @error="markImageAsFailed(card.slug)" />
-          </div>
-          <h3>{{ card.name }}</h3>
-        </article>
-      </div>
-    </section>
+    <div v-if="inviteMode" class="invite-overlay" role="presentation" @click.self="inviteMode = null">
+      <section class="invite-dialog" role="dialog" aria-modal="true" :aria-labelledby="'invite-title'">
+        <div class="invite-heading"><div><p class="kicker">Combat social</p><h2 id="invite-title">{{ inviteMode === '1v1' ? 'Invite un ami' : 'Envie d’un plaisir à 3 ?' }}</h2></div><button class="invite-close" type="button" aria-label="Fermer" @click="inviteMode = null">×</button></div>
+        <p class="invite-copy">{{ inviteMode === '1v1' ? 'Sélectionne un ami pour lancer le salon 1v1.' : completeWithAi ? 'Sélectionne un ami, l’IA complètera le combat.' : 'Sélectionne deux amis distincts pour lancer le salon 1v1v1.' }}</p>
+        <div v-if="inviteMode === '1v1v1'" class="invite-ai-toggle"><button type="button" class="friend-choice" :class="{ selected: completeWithAi }" @click="toggleCompleteWithAi">{{ completeWithAi ? '✓ Compléter avec l’IA' : 'Compléter avec l’IA' }}</button></div>
+        <p v-if="friendsLoading" class="invite-copy">Chargement des amis...</p>
+        <p v-else-if="inviteError" class="invite-error">{{ inviteError }}</p>
+        <div v-else class="friend-picker"><button v-for="friend in friends" :key="friend.id" class="friend-choice" :class="{ selected: selectedFriendIds.includes(friend.id) }" type="button" @click="toggleFriend(friend.id)"><span>{{ friend.displayName.slice(0, 1) }}</span>{{ friend.displayName }}</button><p v-if="!friends.length" class="invite-copy">Aucun ami disponible.</p></div>
+        <button class="invite-submit" type="button" :disabled="friendsLoading || sendingInvite || selectedFriendIds.length !== requiredFriendCount()" @click="createInvite">{{ sendingInvite ? 'Création...' : 'Créer le salon' }}</button>
+      </section>
+    </div>
+
     <footer><span>SHINOBI AREA</span><span>La nuit appartient à ceux qui osent.</span><span>© 2026</span></footer>
   </main>
 </template>
@@ -89,10 +123,8 @@ function markImageAsFailed(slug: string) {
   pointer-events: none;
 }
 
-.topbar,
 .hero,
 .modes-section,
-.cards-section,
 footer {
   position: relative;
   z-index: 1;
@@ -345,8 +377,7 @@ footer {
   object-fit: contain;
 }
 
-.modes-section,
-.cards-section {
+.modes-section {
   border-top: 1px solid var(--border-light);
   padding-top: 70px;
   padding-bottom: 78px;
@@ -389,10 +420,15 @@ footer {
 .mode-card {
   display: flex;
   flex-direction: column;
+  width: 100%;
   min-height: 310px;
   padding: 20px 22px 18px;
   background: rgba(18, 24, 31, 0.86);
   border: 1px solid var(--border-light);
+  color: var(--text-main);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
   clip-path: var(--clip-strong);
   transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
 }
@@ -466,6 +502,10 @@ footer {
   font-size: 0.68rem;
   line-height: 1.7;
 }
+
+.invite-overlay { position: fixed; z-index: 30; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(5, 9, 15, 0.72); }
+.invite-dialog { width: min(100%, 560px); padding: 28px; border: 1px solid var(--border-strong); background: var(--bg-panel); box-shadow: var(--shadow-dark); clip-path: var(--clip-soft); }
+.invite-heading { display: flex; justify-content: space-between; gap: 20px; }.invite-heading .kicker { margin-bottom: 8px; }.invite-heading h2 { font-size: clamp(1.7rem, 4vw, 2.8rem); line-height: 1; text-transform: uppercase; }.invite-close { width: 42px; height: 42px; border: 1px solid var(--border-light); background: transparent; color: var(--text-main); font-size: 1.8rem; cursor: pointer; }.invite-copy { margin: 22px 0 14px; color: var(--text-muted); font-size: .72rem; line-height: 1.6; }.friend-picker { display: grid; gap: 8px; max-height: 250px; overflow-y: auto; }.friend-choice { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 8px; border: 1px solid var(--border-light); background: var(--bg-panel-soft); color: var(--text-main); text-align: left; font: inherit; font-size: .72rem; cursor: pointer; }.friend-choice span { display: grid; place-items: center; flex: 0 0 30px; width: 30px; height: 30px; background: var(--accent-orange); color: #2b2113; font-weight: 700; }.friend-choice.selected { border-color: var(--accent-gold); background: rgba(241, 212, 141, .12); }.invite-error { margin: 22px 0 14px; color: var(--accent-red); font-size: .72rem; }.invite-submit { width: 100%; min-height: 46px; margin-top: 18px; border: 1px solid rgba(241, 212, 141, .8); background: var(--accent-gold); color: #151614; text-transform: uppercase; font: 700 .65rem 'DM Mono', monospace; letter-spacing: .08em; cursor: pointer; }.invite-submit:disabled { opacity: .5; cursor: not-allowed; }
 
 .cards-grid {
   display: grid;
@@ -615,6 +655,8 @@ footer span:first-child {
   .hero h1 {
     font-size: clamp(2.6rem, 14vw, 4rem);
   }
+
+  .invite-dialog { padding: 22px; }
 
   .hero-meta {
     gap: 18px 24px;

@@ -17,7 +17,7 @@ export function postSimulation(request: Request, response: Response) {
 function userId(request: Request) { return (request as AuthenticatedRequest).userId }
 function routeId(value: string | string[] | undefined) { return typeof value === 'string' ? value : '' }
 
-export async function postGameLobby(request: Request, response: Response) { response.status(201).json(await createGameLobby(userId(request), request.body?.mode, request.body?.opponentIds)) }
+export async function postGameLobby(request: Request, response: Response) { response.status(201).json(await createGameLobby(userId(request), request.body?.mode, request.body?.opponentIds, request.body?.includesAi)) }
 export async function getGameInvites(request: Request, response: Response) { response.json(await listGameInvites(userId(request))) }
 export async function acceptInvite(request: Request, response: Response) { response.json(await acceptGameInvite(userId(request), routeId(request.params.inviteId))) }
 export async function rejectInvite(request: Request, response: Response) { response.json(await rejectGameInvite(userId(request), routeId(request.params.inviteId))) }

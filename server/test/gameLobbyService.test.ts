@@ -39,3 +39,39 @@ test('les invitations et salons 1v1/1v1v1 appliquent les règles sociales', asyn
     await prisma.user.deleteMany({ where: { id: { in: users.map((user) => user.id) } } })
   }
 })
+
+test('le 1v1v1 humain + humain + IA ne crée aucune invitation ni utilisateur factice pour l’IA', async () => {
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const users = await prisma.user.createManyAndReturn({
+    data: [
+      { email: `lobby-ai-a-${suffix}@example.test`, passwordHash: 'test', displayName: `Lobby AI A ${suffix}` },
+      { email: `lobby-ai-b-${suffix}@example.test`, passwordHash: 'test', displayName: `Lobby AI B ${suffix}` },
+    ],
+    select: { id: true },
+  })
+  const [creator, friend] = users
+  const countUsersBefore = await prisma.user.count()
+
+  try {
+    await assert.rejects(() => createGameLobby(creator!.id, '1v1v1', [friend!.id, 999999], true), /correspond pas au mode/)
+    const lobby = await createGameLobby(creator!.id, '1v1v1', [friend!.id], true)
+    assert.equal(lobby?.includesAi, true)
+    assert.equal(lobby?.players.length, 3)
+    const aiPlayer = lobby!.players.find((player) => player.isAi)
+    assert.ok(aiPlayer)
+    assert.equal(aiPlayer!.id, null)
+    assert.equal(aiPlayer!.status, 'ACCEPTED')
+    assert.equal(aiPlayer!.inviteId, null)
+    const humanInvites = lobby!.players.filter((player) => !player.isAi && player.id !== creator!.id)
+    assert.equal(humanInvites.length, 1)
+    assert.equal(await prisma.user.count(), countUsersBefore)
+    assert.equal(lobby?.status, 'WAITING')
+    assert.equal((await getGameLobby(creator!.id, lobby!.id))?.status, 'WAITING')
+    await acceptGameInvite(friend!.id, humanInvites[0]!.inviteId!)
+    const ready = await getGameLobby(creator!.id, lobby!.id)
+    assert.equal(ready?.status, 'READY')
+    assert.ok(ready?.players.some((player) => player.isAi))
+  } finally {
+    await prisma.user.deleteMany({ where: { id: { in: users.map((user) => user.id) } } })
+  }
+})

@@ -9,6 +9,7 @@ import { buildRoutes } from './routes/buildRoutes.js'
 import { gameRoutes } from './routes/gameRoutes.js'
 import { friendshipRoutes } from './routes/friendshipRoutes.js'
 import { searchRoutes } from './routes/searchRoutes.js'
+import { cardAdminRoutes } from './routes/cardAdminRoutes.js'
 import { errorHandler, notFound } from './utils/errors.js'
 
 export const app = express()
@@ -17,6 +18,7 @@ app.use(express.json())
 app.get('/api/health', (_request, response) => response.json({ status: 'ok' }))
 app.use('/api/categories', categoryRoutes)
 app.use('/api/cards', cardRoutes)
+app.use('/api/admin/cards', cardAdminRoutes)
 app.use('/api/auth', authRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/builds', buildRoutes)

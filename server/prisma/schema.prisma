@@ -28,6 +28,7 @@ model User {
   losses      Int         @default(0)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+  role        UserRole    @default(USER)
   savedBuilds SavedBuild[]
   gameResults GameResult[]
   friendshipsAsA Friendship[] @relation("FriendshipUserA")
@@ -36,6 +37,39 @@ model User {
   receivedFriendships Friendship[] @relation("FriendshipReceiver")
   createdGameLobbies GameLobby[] @relation("GameLobbyCreator")
   gameInvites       GameInvite[] @relation("GameInviteInvitee")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum CardModifierDirection {
+  BONUS
+  MALUS
+}
+
+enum CardModifierOperation {
+  PERCENT
+  POINTS
+}
+
+enum CardModifierTarget {
+  chakra
+  invocation
+  iq
+  ninjutsuAttack
+  ninjutsuDefense
+  genjutsu
+  taijutsu
+  avatar
+  body
+  fuinjutsu
+  senjutsu
+  kenjutsu
+  speed
+  kekkeiGenkai
+  kekkeiMora
 }
 
 enum FriendshipStatus {
@@ -67,6 +101,7 @@ model GameLobby {
   mode      GameMode
   creatorId Int
   status    GameLobbyStatus @default(WAITING)
+  includesAi Boolean        @default(false)
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
   creator   User            @relation("GameLobbyCreator", fields: [creatorId], references: [id], onDelete: Cascade)
@@ -156,4 +191,39 @@ model CardStat {
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@unique([cardId, categoryId])
+}
+
+model CardStatOverride {
+  id        Int      @id @default(autoincrement())
+  cardSlug  String
+  statKey   String
+  value     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([cardSlug, statKey])
+  @@index([cardSlug])
+}
+
+model CardRarityOverride {
+  id        Int      @id @default(autoincrement())
+  cardSlug  String   @unique
+  rarity    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CardModifier {
+  id          Int                     @id @default(autoincrement())
+  cardSlug    String
+  name        String
+  description String
+  target      CardModifierTarget
+  direction   CardModifierDirection
+  operation   CardModifierOperation
+  value       Int
+  condition   String?
+  active      Boolean                 @default(true)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  @@index([cardSlug])
 }

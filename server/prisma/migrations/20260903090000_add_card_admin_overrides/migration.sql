@@ -1,0 +1,12 @@
+CREATE TYPE "UserRole" AS ENUM ('USER', 'ADMIN');
+CREATE TYPE "CardModifierDirection" AS ENUM ('BONUS', 'MALUS');
+CREATE TYPE "CardModifierOperation" AS ENUM ('PERCENT', 'POINTS');
+CREATE TYPE "CardModifierTarget" AS ENUM ('chakra', 'invocation', 'iq', 'ninjutsuAttack', 'ninjutsuDefense', 'genjutsu', 'taijutsu', 'avatar', 'body', 'fuinjutsu', 'senjutsu', 'kenjutsu', 'speed', 'kekkeiGenkai', 'kekkeiMora');
+ALTER TABLE "User" ADD COLUMN "role" "UserRole" NOT NULL DEFAULT 'USER';
+CREATE TABLE "CardStatOverride" ("id" SERIAL NOT NULL, "cardSlug" TEXT NOT NULL, "statKey" TEXT NOT NULL, "value" INTEGER NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "CardStatOverride_pkey" PRIMARY KEY ("id"));
+CREATE TABLE "CardRarityOverride" ("id" SERIAL NOT NULL, "cardSlug" TEXT NOT NULL, "rarity" TEXT NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "CardRarityOverride_pkey" PRIMARY KEY ("id"));
+CREATE TABLE "CardModifier" ("id" SERIAL NOT NULL, "cardSlug" TEXT NOT NULL, "name" TEXT NOT NULL, "description" TEXT NOT NULL, "target" "CardModifierTarget" NOT NULL, "direction" "CardModifierDirection" NOT NULL, "operation" "CardModifierOperation" NOT NULL, "value" INTEGER NOT NULL, "condition" TEXT, "active" BOOLEAN NOT NULL DEFAULT true, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "CardModifier_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "CardStatOverride_cardSlug_statKey_key" ON "CardStatOverride"("cardSlug", "statKey");
+CREATE INDEX "CardStatOverride_cardSlug_idx" ON "CardStatOverride"("cardSlug");
+CREATE UNIQUE INDEX "CardRarityOverride_cardSlug_key" ON "CardRarityOverride"("cardSlug");
+CREATE INDEX "CardModifier_cardSlug_idx" ON "CardModifier"("cardSlug");

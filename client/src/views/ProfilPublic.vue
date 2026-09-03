@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import SocialHeader from '../components/SocialHeader.vue'
-import { createGameLobby, getPublicUser, listFriends, type Friend, type PublicUser, type ChallengeMode } from '../services/socialApi'
+import { acceptFriendRequest, createGameLobby, getPublicUser, listFriends, sendFriendRequest, type Friend, type PublicUser, type ChallengeMode } from '../services/socialApi'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -13,6 +13,7 @@ const friends = ref<Friend[]>([])
 const selectedMode = ref<ChallengeMode | null>(null)
 const error = ref('')
 const sending = ref(false)
+const friendshipBusy = ref(false)
 
 onMounted(async () => {
   await auth.loadCurrentUser()
@@ -21,6 +22,22 @@ onMounted(async () => {
 })
 
 function chooseMode(mode: ChallengeMode) { selectedMode.value = mode; if (mode === '1v1') void challenge([profile.value!.id]) }
+async function updateFriendship() {
+  if (!auth.token || !profile.value || friendshipBusy.value) return
+  friendshipBusy.value = true
+  error.value = ''
+  try {
+    if (profile.value.friendshipDirection === 'received' && profile.value.friendshipRequestId) {
+      await acceptFriendRequest(auth.token, profile.value.friendshipRequestId)
+      profile.value.friendshipStatus = 'ACCEPTED'
+      profile.value.friendshipDirection = null
+    } else if (!profile.value.friendshipStatus) {
+      await sendFriendRequest(auth.token, profile.value.id)
+      profile.value.friendshipStatus = 'PENDING'
+      profile.value.friendshipDirection = 'sent'
+    }
+  } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Action impossible.' } finally { friendshipBusy.value = false }
+}
 async function challenge(opponentIds: number[]) { if (!auth.token || !profile.value) return; sending.value = true; error.value = ''; try { const lobby = await createGameLobby(auth.token, selectedMode.value!, opponentIds); await router.push(`/lobby/${lobby.id}`) } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Invitation impossible.' } finally { sending.value = false } }
 </script>
 
@@ -34,6 +51,7 @@ async function challenge(opponentIds: number[]) { if (!auth.token || !profile.va
         <div class="public-avatar">{{ profile.displayName.slice(0, 1) }}</div>
         <p class="eyebrow">Joueur</p><h1>{{ profile.displayName }}</h1>
         <p class="friendship-state">{{ profile.friendshipStatus === 'ACCEPTED' ? 'AMI' : profile.friendshipStatus === 'PENDING' ? 'DEMANDE EN COURS' : 'PAS ENCORE AMI' }}</p>
+        <button v-if="profile.id !== auth.user?.id" class="friend-button" type="button" :disabled="friendshipBusy || profile.friendshipStatus === 'ACCEPTED' || profile.friendshipDirection === 'sent'" @click="updateFriendship">{{ profile.friendshipStatus === 'ACCEPTED' ? 'DÉJÀ AMIS' : profile.friendshipDirection === 'received' ? 'ACCEPTER' : profile.friendshipDirection === 'sent' ? 'DEMANDE ENVOYÉE' : 'AJOUTER EN AMI' }}</button>
         <div v-if="profile.friendshipStatus === 'ACCEPTED'" class="challenge-area">
           <p class="eyebrow">Défi</p>
           <div v-if="!selectedMode" class="challenge-buttons"><button type="button" @click="chooseMode('1v1')">DÉFIER · 1V1</button><button type="button" @click="chooseMode('1v1v1')">DÉFIER · 1V1V1</button></div>

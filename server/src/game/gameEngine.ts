@@ -1,4 +1,4 @@
-import cardStatsData from '../data/shinobi-card-stats.json' with { type: 'json' }
+import { getCardKnowledgeBySlug, getCardKnowledgeById } from './cardKnowledge.js'
 import { applyRules } from './rules/applyRules.js'
 import type { AppliedRule, Card, CombatPermissions, ValidationError, RuleContext } from './rules/types.js'
 
@@ -11,17 +11,14 @@ export type ShinobiBuild = ShinobiSlots | { slots: ShinobiSlots }
 export type CombatResult = { baseStats: CombatStats; finalStats: CombatStats; appliedRules: AppliedRule[]; permissions: CombatPermissions; validationErrors: ValidationError[]; total: number }
 export type FightResult = { winner: 'player1' | 'player2' | 'draw'; player1: CombatResult; player2: CombatResult; player1Total: number; player2Total: number }
 
-type RawCard = { id: number; name: string; slug: string; clans: string[]; stats: Record<string, number> }
-const cards = cardStatsData as RawCard[]
-const bySlug = new Map(cards.map((card) => [card.slug, card]))
-const byId = new Map(cards.map((card) => [card.id, card]))
+// shinobi-card-stats.json reste la source des statistiques numériques utilisées ici (via cardKnowledge)
 const categoryStats: Record<string, StatKey[]> = { chakra: ['chakra'], invocation: ['invocation'], iq: ['iq'], ninjutsu: ['ninjutsuAttack', 'ninjutsuDefense'], genjutsu: ['genjutsu'], taijutsu: ['taijutsu'], avatar: ['avatar'], body: ['body'], fuinjutsu: ['fuinjutsu'], 'fūinjutsu': ['fuinjutsu'], senjutsu: ['senjutsu'], kenjutsu: ['kenjutsu'], vitesse: ['speed'], speed: ['speed'], 'kekkei-genkai': ['kekkeiGenkai'], kekkeigenkai: ['kekkeiGenkai'], 'kekkei-mora': [], kekkeimora: [] }
 
 function emptyStats(): CombatStats { return Object.fromEntries(STAT_KEYS.map((key) => [key, 0])) as CombatStats }
 function slotsOf(build: ShinobiBuild): ShinobiSlots { const slots = (build as { slots?: unknown }).slots; return slots && typeof slots === 'object' ? slots as ShinobiSlots : build as ShinobiSlots }
 function findCard(selection: CardSelection): Card | undefined {
   if (typeof selection !== 'string' && selection.stats) return { id: selection.id ?? -1, name: selection.name ?? '', slug: selection.slug ?? '', clans: selection.clans ?? [], stats: { ...emptyStats(), ...selection.stats } }
-  const raw = typeof selection === 'string' ? bySlug.get(selection) : (selection.slug ? bySlug.get(selection.slug) : undefined) ?? (selection.id ? byId.get(selection.id) : undefined)
+  const raw = typeof selection === 'string' ? getCardKnowledgeBySlug(selection) : (selection.slug ? getCardKnowledgeBySlug(selection.slug) : undefined) ?? (selection.id ? getCardKnowledgeById(selection.id) : undefined)
   return raw as Card | undefined
 }
 
