@@ -1,16 +1,20 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '../config/prisma.js'
+import cardStatsData from '../data/shinobi-card-stats.json' with { type: 'json' }
 
 const cardInclude = { stats: { include: { category: true }, orderBy: { category: { position: 'asc' as const } } } }
 type CardWithStats = Prisma.CardGetPayload<{ include: { stats: { include: { category: true } } } }>
+const canonicalStats = new Map(cardStatsData.map((card) => [card.slug, card.stats]))
 
-function serializeCard(card: CardWithStats | null) {
+export function serializeCard(card: CardWithStats | null) {
   if (!card) return null
   const { stats, ...details } = card
+  const sourceStats = canonicalStats.get(card.slug)
+  if (!sourceStats) throw new Error(`Statistiques canoniques absentes pour la carte ${card.slug}.`)
   return {
     ...details,
     imageUrl: card.imageUrl,
-    stats: Object.fromEntries(stats.map(({ category, value }) => [category.slug, value])),
+    stats: sourceStats,
   }
 }
 
