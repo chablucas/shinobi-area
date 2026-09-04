@@ -98,7 +98,7 @@ test('le démarrage exige un lobby READY et le créateur, puis autorise les part
     const started = await startGameLobby(creator!.id, lobby!.id)
     assert.equal(started?.status, 'PLAYING')
     await assert.doesNotReject(() => getGameLobby(opponent!.id, lobby!.id))
-    await assert.rejects(() => startGameLobby(creator!.id, lobby!.id), /déjà été démarré/)
+    assert.equal((await startGameLobby(creator!.id, lobby!.id))?.status, 'PLAYING')
   } finally {
     await prisma.user.deleteMany({ where: { id: { in: users.map((user) => user.id) } } })
   }

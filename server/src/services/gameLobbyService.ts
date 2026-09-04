@@ -1,5 +1,6 @@
 import { GameInviteStatus, GameLobbyStatus, GameMode } from '@prisma/client'
 import { prisma } from '../config/prisma.js'
+import { createOrGetGame } from './realtimeGameService.js'
 
 const userSelect = { id: true, displayName: true } as const
 
@@ -97,7 +98,13 @@ export async function getGameLobby(userId: number, lobbyId: string) {
 
 export async function startGameLobby(userId: number, lobbyId: string) {
   try {
-    return await prisma.$transaction(async (transaction) => {
+    const alreadyPlaying = await prisma.gameLobby.findUnique({ where: { id: lobbyId }, select: { creatorId: true, status: true } })
+    if (alreadyPlaying?.status === GameLobbyStatus.PLAYING) {
+      if (alreadyPlaying.creatorId !== userId) throw invalid('Seul le créateur peut démarrer ce salon.', 403)
+      await createOrGetGame(lobbyId)
+      return formatLobby(await findLobby(lobbyId))
+    }
+    const started = await prisma.$transaction(async (transaction) => {
       const lobby = await transaction.gameLobby.findUnique({ where: { id: lobbyId }, select: { creatorId: true, status: true } })
       if (!lobby) throw invalid('Salon introuvable.', 404)
       if (lobby.creatorId !== userId) throw invalid('Seul le créateur peut démarrer ce salon.', 403)
@@ -106,6 +113,8 @@ export async function startGameLobby(userId: number, lobbyId: string) {
       const updated = await transaction.gameLobby.update({ where: { id: lobbyId }, data: { status: GameLobbyStatus.PLAYING }, include: lobbyInclude() })
       return { ...formatLobby(updated), status: GameLobbyStatus.PLAYING }
     })
+    await createOrGetGame(lobbyId)
+    return started
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'P2025') throw invalid('Le salon a déjà été démarré.', 409)
     throw error

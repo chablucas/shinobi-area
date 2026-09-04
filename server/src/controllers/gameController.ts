@@ -2,6 +2,7 @@ import type { Request, Response } from 'express'
 import { simulateFight, type ShinobiBuild } from '../game/gameEngine.js'
 import type { AuthenticatedRequest } from '../middleware/auth.js'
 import { acceptGameInvite, createGameLobby, getGameLobby, listGameInvites, rejectGameInvite, startGameLobby } from '../services/gameLobbyService.js'
+import { getGameForLobby } from '../services/realtimeGameService.js'
 
 export function postSimulation(request: Request, response: Response) {
   const { player1, player2 } = request.body ?? {}
@@ -22,4 +23,5 @@ export async function getGameInvites(request: Request, response: Response) { res
 export async function acceptInvite(request: Request, response: Response) { response.json(await acceptGameInvite(userId(request), routeId(request.params.inviteId))) }
 export async function rejectInvite(request: Request, response: Response) { response.json(await rejectGameInvite(userId(request), routeId(request.params.inviteId))) }
 export async function getLobby(request: Request, response: Response) { response.json(await getGameLobby(userId(request), routeId(request.params.lobbyId))) }
+export async function getLobbyGame(request: Request, response: Response) { response.json(await getGameForLobby(userId(request), routeId(request.params.lobbyId))) }
 export async function startLobby(request: Request, response: Response) { response.json(await startGameLobby(userId(request), routeId(request.params.lobbyId))) }

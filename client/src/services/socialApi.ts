@@ -36,4 +36,9 @@ export function createGameLobby(token: string, mode: ChallengeMode, opponentIds:
 export function acceptGameInvite(token: string, inviteId: string) { return request<GameLobby>(token, `/game/invites/${inviteId}/accept`, { method: 'POST' }) }
 export function rejectGameInvite(token: string, inviteId: string) { return request<GameLobby>(token, `/game/invites/${inviteId}/reject`, { method: 'POST' }) }
 export function getGameLobby(token: string, lobbyId: string) { return request<GameLobby>(token, `/game/lobbies/${lobbyId}`) }
+export function getLobbyGame(token: string, lobbyId: string) { return request<RealtimeGameState>(token, `/game/lobbies/${lobbyId}/game`) }
 export function startGameLobby(token: string, lobbyId: string) { return request<GameLobby>(token, `/game/lobbies/${lobbyId}/start`, { method: 'POST' }) }
+
+export type RealtimeCard = { id: number; slug: string; name: string; clans: string[]; stats: Record<string, number> }
+export type RealtimePlayer = { userId: number | null; displayName: string; playerNumber: number; cardsRemaining: number; pendingCard: RealtimeCard | null; slots: Record<string, RealtimeCard | null> }
+export type RealtimeGameState = { id: string; lobbyId: string; mode: ChallengeMode; status: 'PLAYING' | 'FINISHED'; currentPlayerNumber: number; turnNumber: number; players: RealtimePlayer[]; result: unknown }

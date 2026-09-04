@@ -102,9 +102,11 @@ function traitList(value?: string[]) {
   return value?.length ? value.join(', ') : 'Aucun'
 }
 function compactStats(card: Card) {
+  const kekkeiMora = card.traits?.abilities?.kekkeiMora
   return [
     ...Object.entries(statLabels).map(([key, label]) => ({ label, value: card.effectiveStats[key as keyof Card['effectiveStats']] ?? 0 })),
     { label: 'Ninjutsu', value: `${card.effectiveStats.ninjutsuAttack ?? 0} / ${card.effectiveStats.ninjutsuDefense ?? 0}` },
+    { label: 'Kekkei Mōra', value: kekkeiMora?.length ? kekkeiMora.join(' · ') : '—' },
   ]
 }
 async function openAdmin(card: Card) {
@@ -254,10 +256,12 @@ function modifierText(modifier: CardModifier) {
               <h2>{{ card.name }}</h2>
               <div class="card-facts">
                 <div class="stats-section"><b>Stats</b><div class="stats-grid"><span v-for="stat in compactStats(card)" :key="stat.label"><span>{{ stat.label }}</span><strong>{{ stat.value }}</strong></span></div></div>
-                <span><b>Clans</b>{{ traitList(card.clans) }}</span>
-                <span><b>Capacités</b>{{ traitList([...(card.traits?.abilities?.ninjutsu ?? []), ...(card.traits?.abilities?.genjutsu ?? []), ...(card.traits?.abilities?.kekkeiGenkai ?? [])].slice(0, 4)) }}</span>
-                <span><b>Avatars / powerUps</b>{{ traitList((card.traits?.avatars ?? []).map((avatar) => avatar.id).concat(card.traits?.powerUps ?? [])) }}</span>
-                <span><b>Conditions</b>{{ traitList([...(card.traits?.requirements?.ninjutsu ?? []), ...(card.traits?.requirements?.genjutsu ?? []), ...(card.traits?.requirements?.avatar ?? [])]) }}</span>
+                <span><b>{{ (card.clans?.length ?? 0) > 1 ? 'Clans' : 'Clan' }}</b>{{ traitList(card.clans) }}</span>
+                <span v-if="card.traits?.powerUps?.length"><b>Power Ups</b>{{ traitList(card.traits?.powerUps) }}</span>
+                <span v-if="[...(card.traits?.abilities?.ninjutsu ?? []), ...(card.traits?.abilities?.genjutsu ?? []), ...(card.traits?.abilities?.kekkeiGenkai ?? [])].length"><b>Abilities</b>{{ traitList([...(card.traits?.abilities?.ninjutsu ?? []), ...(card.traits?.abilities?.genjutsu ?? []), ...(card.traits?.abilities?.kekkeiGenkai ?? [])]) }}</span>
+                <span v-if="card.traits?.dojutsu?.length"><b>Dojutsu</b>{{ traitList(card.traits?.dojutsu) }}</span>
+                <span v-if="card.traits?.avatars?.length"><b>Avatars</b>{{ traitList(card.traits?.avatars.map((avatar) => avatar.id)) }}</span>
+                <span v-if="[...(card.traits?.requirements?.ninjutsu ?? []), ...(card.traits?.requirements?.genjutsu ?? []), ...(card.traits?.requirements?.avatar ?? [])].length"><b>Restrictions</b>{{ traitList([...(card.traits?.requirements?.ninjutsu ?? []), ...(card.traits?.requirements?.genjutsu ?? []), ...(card.traits?.requirements?.avatar ?? [])]) }}</span>
                 <span v-if="card.modifiers.some((modifier) => modifier.active)"><b>Modificateurs</b>{{ card.modifiers.filter((modifier) => modifier.active).map(modifierText).join(' · ') }}</span>
               </div>
             </div>
@@ -433,10 +437,14 @@ function modifierText(modifier: CardModifier) {
 .card-front h2,
 .card-back h2 {
   margin: 8px 0 2px;
-  font:
-    700 1.05rem 'Syne',
-    sans-serif;
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: clamp(0.85rem, 2.4vw, 1.25rem);
+  line-height: 1.15;
   text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .card-slug {
   color: var(--text-muted);
@@ -453,23 +461,39 @@ function modifierText(modifier: CardModifier) {
 .card-facts {
   display: grid;
   gap: 9px;
+  min-width: 0;
   margin-top: 9px;
+  overflow: hidden;
   color: var(--text-muted);
-  font-size: 0.62rem;
+  font-size: clamp(0.56rem, 1.5vw, 0.7rem);
   line-height: 1.3;
+  word-break: break-word;
+}
+.card-facts > span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
 }
 .card-facts b {
   display: block;
   margin-bottom: 4px;
   color: var(--text-soft);
   text-transform: uppercase;
-  font-size: 0.54rem;
+  font-size: clamp(0.5rem, 1.2vw, 0.62rem);
+  letter-spacing: 0.08em;
+}
+.stats-section > b {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  font-size: clamp(0.5rem, 1.2vw, 0.62rem);
   letter-spacing: 0.08em;
 }
 .stats-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2px 12px;
+  gap: 2px 10px;
   padding: 5px 0;
   border-top: 1px solid var(--border-light);
   border-bottom: 1px solid var(--border-light);
@@ -477,15 +501,23 @@ function modifierText(modifier: CardModifier) {
 .stats-grid > span {
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
   gap: 5px;
   min-width: 0;
   color: var(--text-muted);
-  font-size: 0.62rem;
+  font-size: clamp(0.56rem, 1.4vw, 0.68rem);
+}
+.stats-grid > span > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .stats-grid strong {
+  flex: 0 0 auto;
   color: var(--text-main);
-  font-size: 0.66rem;
+  font-size: clamp(0.56rem, 1.4vw, 0.68rem);
   font-weight: 700;
+  white-space: nowrap;
 }
 .edit-button,
 .admin-panel button {

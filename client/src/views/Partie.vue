@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import GameCard from '../components/GameCard.vue'
 import { fetchAllCards } from '../services/cardApi'
 import { useAuthStore } from '../stores/auth'
 import { saveBuild } from '../services/buildApi'
 import { CombatApiError, simulateFight } from '../services/gameApi'
-import { getGameLobby, SocialApiError } from '../services/socialApi'
+import { getGameLobby, getLobbyGame, SocialApiError, type RealtimeGameState } from '../services/socialApi'
+import { connectGameSocket, type GameSocket } from '../services/realtimeApi'
 import type { Card } from '../types/card'
 import type { CombatResult } from '../types/combat'
 import {
@@ -46,6 +47,9 @@ const errorMessage = ref('')
 const lobbyAccessError = ref('')
 const saved = ref(false)
 const gameId = ref(crypto.randomUUID())
+const realtimeState = ref<RealtimeGameState | null>(null)
+const realtimePlayerNumber = ref<number | null>(null)
+const realtimeSocket = ref<GameSocket | null>(null)
 
 const activeBuild = computed(() => builds.value[activePlayerId.value - 1]!)
 const availableCardCount = computed(() => cards.value.length - usedCardIds.value.size)
@@ -63,6 +67,14 @@ onMounted(async () => {
     try {
       const lobby = await getGameLobby(auth.token, props.lobbyId)
       if (lobby.status !== 'PLAYING') { lobbyAccessError.value = lobby.status === 'READY' ? 'Le combat n’a pas encore commencé.' : 'Le salon attend encore les participants.'; loading.value = false; return }
+      realtimeState.value = await getLobbyGame(auth.token, props.lobbyId)
+      realtimePlayerNumber.value = realtimeState.value.players.find((player) => player.userId === auth.user?.id)?.playerNumber ?? null
+      const socket = connectGameSocket(auth.token)
+      realtimeSocket.value = socket
+      const join = () => socket.emit('game:join', realtimeState.value?.id ?? '')
+      socket.on('connect', join)
+      socket.on('game:state', (state) => { realtimeState.value = state })
+      socket.on('game:error', (socketError) => { errorMessage.value = socketError.message })
     } catch (error) {
       lobbyAccessError.value = error instanceof SocialApiError
         ? error.status === 404 ? 'Salon introuvable' : error.status === 401 || error.status === 403 ? 'Vous n’avez pas accès à ce combat.' : error.message
@@ -80,6 +92,13 @@ onMounted(async () => {
     loading.value = false
   }
 })
+onUnmounted(() => { realtimeSocket.value?.disconnect() })
+
+const realtimeCurrentPlayer = computed(() => realtimeState.value?.players.find((player) => player.playerNumber === realtimeState.value?.currentPlayerNumber) ?? null)
+const realtimeMyPlayer = computed(() => realtimeState.value?.players.find((player) => player.playerNumber === realtimePlayerNumber.value) ?? null)
+const realtimeMyTurn = computed(() => Boolean(realtimeState.value && realtimePlayerNumber.value === realtimeState.value.currentPlayerNumber))
+function realtimeDraw() { if (realtimeState.value && realtimeMyTurn.value) realtimeSocket.value?.emit('game:draw', realtimeState.value.id) }
+function realtimePlace(category: string) { if (realtimeState.value && realtimeMyTurn.value && realtimeMyPlayer.value?.pendingCard) realtimeSocket.value?.emit('game:place-card', { gameId: realtimeState.value.id, category }) }
 
 watch([activePlayerId, phase, cards], () => {
   if (isComputerTurn.value && !loading.value) playComputerTurn()
@@ -223,7 +242,22 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
     <p v-if="loading" class="loading-message">Chargement des 163 cartes...</p>
     <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
 
-    <template v-if="phase === 'construction'">
+    <section v-if="props.lobbyId && realtimeState" class="realtime-game">
+      <div class="realtime-turn" :class="{ active: realtimeMyTurn }">
+        <strong>{{ realtimeMyTurn ? 'À TON TOUR' : `AU TOUR DE JOUEUR ${realtimeState.currentPlayerNumber}` }}</strong>
+        <span>Tour {{ realtimeState.turnNumber }}</span>
+      </div>
+      <div class="realtime-boards">
+          <article v-for="player in realtimeState.players" :key="player.playerNumber" class="realtime-board" :class="{ 'is-current': player.playerNumber === realtimeState.currentPlayerNumber }">
+          <header><div><p class="eyebrow">Joueur {{ player.playerNumber }}</p><h2>{{ player.userId === auth.user?.id ? 'Toi' : player.displayName }}</h2></div><span>{{ player.cardsRemaining }} cartes</span></header>
+          <div class="realtime-slots"><button v-for="[label, category] in CATEGORY_DEFINITIONS" :key="category" type="button" :disabled="player.playerNumber !== realtimePlayerNumber || !realtimeMyTurn || !realtimeMyPlayer?.pendingCard || !!player.slots[category]" :class="{ filled: player.slots[category], selectable: player.playerNumber === realtimePlayerNumber && realtimeMyTurn && !!realtimeMyPlayer?.pendingCard && !player.slots[category] }" @click="realtimePlace(category)"><span>{{ label }}</span><template v-if="player.slots[category]"><strong>{{ player.slots[category]?.name }}</strong><small v-if="category === 'ninjutsu'">{{ player.slots[category]?.stats.ninjutsuAttack }} / {{ player.slots[category]?.stats.ninjutsuDefense }}</small><small v-else-if="category === 'clan'">{{ player.slots[category]?.clans.join(' · ') || 'Aucun' }}</small><small v-else>{{ player.slots[category]?.stats[category] ?? 'Présente' }}</small></template><small v-else>VIDE</small></button></div>
+        </article>
+      </div>
+      <div class="realtime-draw-zone"><div><p class="eyebrow">Pioche joueur {{ realtimePlayerNumber }}</p><div v-if="realtimeMyPlayer?.pendingCard" class="realtime-drawn-card"><strong>{{ realtimeMyPlayer.pendingCard.name }}</strong><span>Carte piochée</span></div><div v-else class="realtime-empty-draw">{{ realtimeMyTurn ? 'PIOCHER' : 'EN ATTENTE' }}</div><button type="button" :disabled="!realtimeMyTurn || !!realtimeMyPlayer?.pendingCard || !realtimeMyPlayer?.cardsRemaining" @click="realtimeDraw">PIOCHER</button></div><p v-if="realtimeCurrentPlayer" class="realtime-current">{{ realtimeMyTurn ? 'Choisis une catégorie pour poser ta carte.' : `Joueur ${realtimeState.currentPlayerNumber} prépare son action.` }}</p></div>
+      <section v-if="realtimeState.status === 'FINISHED' && realtimeState.result" class="realtime-result"><h2>Combat terminé</h2><p>Le moteur serveur a calculé le résultat officiel.</p></section>
+    </section>
+
+    <template v-if="!props.lobbyId && phase === 'construction'">
       <section class="construction-layout">
         <div class="builds-column">
           <article v-for="build in builds" :key="build.playerId" class="build-panel" :class="{ 'is-active': build.playerId === activePlayerId, 'player-one': build.playerId === 1, 'player-two': build.playerId === 2, 'player-three': build.playerId === 3 }">
@@ -252,13 +286,13 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
       </section>
     </template>
 
-    <section v-else-if="phase === 'combat'" class="combat-panel">
+    <section v-else-if="!props.lobbyId && phase === 'combat'" class="combat-panel">
       <div class="combat-intro"><p class="eyebrow">Étape suivante</p><h2>Simuler le combat</h2><p>Les deux compositions sont complètes. Le serveur calcule le résultat.</p></div>
       <div class="combat-actions"><button type="button" :disabled="simulating" @click="runSimulation">{{ simulating ? 'Simulation en cours...' : 'Simuler le combat' }} <span>→</span></button><button type="button" :disabled="simulating" @click="chooseManualWinner('player1')">Joueur 1 gagne</button><button type="button" :disabled="simulating" @click="chooseManualWinner('player2')">Joueur 2 gagne</button><button type="button" :disabled="simulating" @click="chooseManualWinner('draw')">Égalité</button></div>
       <div class="combat-builds"><article v-for="build in builds" :key="build.playerId" class="build-panel" :class="{ 'player-one': build.playerId === 1, 'player-two': build.playerId === 2 }"><header class="build-header"><h3>Joueur {{ build.playerId }}</h3><span class="build-count">15 <small>/ 15</small></span></header><div class="category-grid"><div v-for="[label, slug] in CATEGORY_DEFINITIONS" :key="slug" class="category-slot filled"><span class="slot-label">{{ label }}</span><span class="slot-card-preview"><img v-if="slotCard(build, slug)?.imageUrl" :src="slotCard(build, slug)?.imageUrl ?? undefined" :alt="`Miniature de ${slotCard(build, slug)?.name}`" /><span v-else class="slot-card-fallback">{{ slotCard(build, slug)?.name.slice(0, 1) }}</span></span><span class="slot-card-details"><span class="slot-card-name">{{ slotCard(build, slug)?.name }}</span><span class="slot-state">Remplie</span></span></div></div></article></div>
     </section>
 
-    <section v-else class="result-panel">
+    <section v-else-if="!props.lobbyId" class="result-panel">
       <p class="eyebrow">Combat terminé</p>
       <template v-if="combatResult && combatBlocked">
         <h2>Composition invalide</h2>
@@ -1005,6 +1039,53 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
   min-width: 180px;
 }
 
+.realtime-game {
+  display: grid;
+  gap: 18px;
+  padding-bottom: 76px;
+}
+.realtime-turn,
+.realtime-draw-zone {
+  border: 1px solid rgba(241, 212, 141, 0.45);
+  background: rgba(30, 27, 20, 0.92);
+  box-shadow: var(--shadow-dark);
+}
+.realtime-turn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+}
+.realtime-turn.active { border-color: rgba(84, 196, 255, 0.7); }
+.realtime-turn strong { color: var(--accent-gold); font-size: clamp(.9rem, 2vw, 1.2rem); letter-spacing: .1em; }
+.realtime-turn span { color: var(--text-muted); font-size: .65rem; text-transform: uppercase; }
+.realtime-boards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.realtime-board { min-width: 0; padding: 16px; border: 1px solid rgba(246, 128, 72, .35); background: #353033; }
+.realtime-board:nth-child(2) { border-color: rgba(84, 196, 255, .35); background: #30363b; }
+.realtime-board.is-current { box-shadow: 0 0 0 2px rgba(241, 212, 141, .55); }
+.realtime-board > header { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.realtime-board h2 { margin-top: 6px; font-size: clamp(1.1rem, 2vw, 1.6rem); text-transform: uppercase; }
+.realtime-board > header > span { color: var(--text-muted); font-size: .62rem; text-transform: uppercase; }
+.realtime-slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.realtime-slots button { display: flex; min-width: 0; min-height: 66px; flex-direction: column; justify-content: space-between; gap: 4px; padding: 8px; border: 1px solid rgba(157, 173, 170, .25); background: rgba(11, 14, 18, .72); color: var(--text-muted); text-align: left; }
+.realtime-slots button.selectable { border-color: var(--accent-gold); cursor: pointer; }
+.realtime-slots button > span { overflow: hidden; color: var(--accent-gold); font-size: .5rem; letter-spacing: .08em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.realtime-slots button strong { overflow: hidden; color: var(--text-main); font-size: .62rem; text-overflow: ellipsis; white-space: nowrap; }
+.realtime-slots button small { overflow: hidden; color: var(--text-muted); font-size: .56rem; text-overflow: ellipsis; white-space: nowrap; }
+.realtime-slots button.filled { border-color: rgba(246, 128, 72, .5); }
+.realtime-draw-zone { display: grid; grid-template-columns: minmax(180px, 280px) 1fr; align-items: center; gap: 24px; padding: 18px; }
+.realtime-drawn-card, .realtime-empty-draw { display: grid; min-height: 84px; place-items: center; margin: 10px 0; border: 1px dashed rgba(241, 212, 141, .5); background: rgba(17, 20, 24, .7); text-align: center; }
+.realtime-drawn-card strong { color: var(--text-main); font-size: .75rem; }
+.realtime-drawn-card span { color: var(--accent-gold); font-size: .55rem; text-transform: uppercase; }
+.realtime-empty-draw { color: var(--accent-gold); font-size: .7rem; letter-spacing: .1em; }
+.realtime-draw-zone button { width: 100%; min-height: 44px; padding: .75rem; border: 0; background: linear-gradient(135deg, var(--accent-gold), var(--accent-orange)); color: #181a1b; font-size: .65rem; font-weight: 700; letter-spacing: .12em; }
+.realtime-draw-zone button:disabled { cursor: not-allowed; opacity: .4; }
+.realtime-current { color: var(--text-muted); font-size: .7rem; line-height: 1.7; }
+.realtime-result { padding: 20px; border: 1px solid var(--accent-gold); }
+.realtime-result h2 { margin-bottom: 8px; font-size: 1.5rem; text-transform: uppercase; }
+.realtime-result p { color: var(--text-muted); font-size: .7rem; }
+
 @media (max-width: 960px) {
   .game-nav {
     padding-inline: max(20px, calc((100vw - 1360px) / 2)) !important;
@@ -1020,6 +1101,11 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
 }
 
 @media (max-width: 680px) {
+  .realtime-boards,
+  .realtime-draw-zone { grid-template-columns: 1fr; }
+
+  .realtime-slots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
   .construction-layout {
     grid-template-columns: 1fr;
   }

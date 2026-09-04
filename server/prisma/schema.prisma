@@ -107,8 +107,31 @@ model GameLobby {
   updatedAt DateTime        @updatedAt
   creator   User            @relation("GameLobbyCreator", fields: [creatorId], references: [id], onDelete: Cascade)
   invites   GameInvite[]
+  game      Game?
 
   @@index([creatorId, status])
+}
+
+enum GameStatus {
+  PLAYING
+  FINISHED
+}
+
+model Game {
+  id                 String     @id @default(cuid())
+  lobbyId            String     @unique
+  mode               GameMode
+  status             GameStatus @default(PLAYING)
+  currentPlayerNumber Int       @default(1)
+  turnNumber         Int        @default(1)
+  state              Json
+  winnerNumber       Int?
+  createdAt          DateTime   @default(now())
+  startedAt          DateTime   @default(now())
+  finishedAt         DateTime?
+  lobby              GameLobby  @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
+
+  @@index([status])
 }
 
 model GameInvite {
