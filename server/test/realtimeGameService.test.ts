@@ -115,3 +115,28 @@ test('un double-clic POSER ne place qu’une seule fois la carte', async () => {
     await prisma.user.deleteMany({ where: { id: { in: users.map((user) => user.id) } } })
   }
 })
+
+test('le DTO public expose l’image et les catégories éligibles de la carte active', async () => {
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const users = await prisma.user.createManyAndReturn({ data: [
+    { email: `realtime-dto-a-${suffix}@example.test`, passwordHash: 'test', displayName: `DTO A ${suffix}` },
+    { email: `realtime-dto-b-${suffix}@example.test`, passwordHash: 'test', displayName: `DTO B ${suffix}` },
+  ], select: { id: true } })
+  const [creator, opponent] = users
+  try {
+    const lobby = await createGameLobby(creator!.id, '1v1', [opponent!.id])
+    await acceptGameInvite(opponent!.id, lobby!.players[1]!.inviteId!)
+    await startGameLobby(creator!.id, lobby!.id)
+    const game = await getGameForLobby(creator!.id, lobby!.id)
+    const drawn = await drawCard(creator!.id, game!.id)
+    const pending = drawn!.players.find((player) => player.userId === creator!.id)!.pendingCard!
+    assert.ok(typeof pending.imageUrl === 'string' || pending.imageUrl === null)
+    assert.ok(Array.isArray(pending.eligibleSlots))
+    assert.ok(pending.eligibleSlots.length > 0)
+    const category = pending.eligibleSlots[0]!
+    const placed = await placeCard(creator!.id, game!.id, category)
+    assert.ok(placed!.players.find((player) => player.userId === creator!.id)?.slots[category]?.imageUrl)
+  } finally {
+    await prisma.user.deleteMany({ where: { id: { in: users.map((user) => user.id) } } })
+  }
+})

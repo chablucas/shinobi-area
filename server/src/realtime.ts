@@ -24,7 +24,7 @@ export function attachRealtime(io: Server) {
     if (!game) return
     for (const socket of sockets) {
       const userId = (socket.data as SocketData).userId
-      if (userId) socket.emit('game:state', publicGameState(game, userId))
+      if (userId) socket.emit('game:state', await publicGameState(game, userId))
     }
   }
 

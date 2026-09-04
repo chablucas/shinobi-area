@@ -252,17 +252,24 @@ function modifierText(modifier: CardModifier) {
               <span class="card-slug">{{ card.slug }}</span>
             </div>
             <div class="card-face card-back">
-              <p class="rarity-label">{{ card.rarityMetadata.label }}</p>
-              <h2>{{ card.name }}</h2>
+              <div class="card-back-header">
+                <p class="rarity-label">{{ card.rarityMetadata.label }}</p>
+                <div class="card-back-name">{{ card.name }}</div>
+              </div>
               <div class="card-facts">
-                <div class="stats-section"><b>Stats</b><div class="stats-grid"><span v-for="stat in compactStats(card)" :key="stat.label"><span>{{ stat.label }}</span><strong>{{ stat.value }}</strong></span></div></div>
-                <span><b>{{ (card.clans?.length ?? 0) > 1 ? 'Clans' : 'Clan' }}</b>{{ traitList(card.clans) }}</span>
-                <span v-if="card.traits?.powerUps?.length"><b>Power Ups</b>{{ traitList(card.traits?.powerUps) }}</span>
-                <span v-if="[...(card.traits?.abilities?.ninjutsu ?? []), ...(card.traits?.abilities?.genjutsu ?? []), ...(card.traits?.abilities?.kekkeiGenkai ?? [])].length"><b>Abilities</b>{{ traitList([...(card.traits?.abilities?.ninjutsu ?? []), ...(card.traits?.abilities?.genjutsu ?? []), ...(card.traits?.abilities?.kekkeiGenkai ?? [])]) }}</span>
-                <span v-if="card.traits?.dojutsu?.length"><b>Dojutsu</b>{{ traitList(card.traits?.dojutsu) }}</span>
-                <span v-if="card.traits?.avatars?.length"><b>Avatars</b>{{ traitList(card.traits?.avatars.map((avatar) => avatar.id)) }}</span>
-                <span v-if="[...(card.traits?.requirements?.ninjutsu ?? []), ...(card.traits?.requirements?.genjutsu ?? []), ...(card.traits?.requirements?.avatar ?? [])].length"><b>Restrictions</b>{{ traitList([...(card.traits?.requirements?.ninjutsu ?? []), ...(card.traits?.requirements?.genjutsu ?? []), ...(card.traits?.requirements?.avatar ?? [])]) }}</span>
-                <span v-if="card.modifiers.some((modifier) => modifier.active)"><b>Modificateurs</b>{{ card.modifiers.filter((modifier) => modifier.active).map(modifierText).join(' · ') }}</span>
+                <div class="stats-section">
+                  <span class="card-fact-label">Stats</span>
+                  <div class="stats-grid">
+                    <span v-for="stat in compactStats(card)" :key="stat.label"><span>{{ stat.label }}</span><strong>{{ stat.value }}</strong></span>
+                  </div>
+                </div>
+                <div class="card-fact-row"><span class="card-fact-label">{{ (card.clans?.length ?? 0) > 1 ? 'Clans' : 'Clan' }}</span><span>{{ traitList(card.clans) }}</span></div>
+                <div v-if="card.traits?.powerUps?.length" class="card-fact-row"><span class="card-fact-label">Power Ups</span><span>{{ traitList(card.traits?.powerUps) }}</span></div>
+                <div v-if="[...(card.traits?.abilities?.ninjutsu ?? []), ...(card.traits?.abilities?.genjutsu ?? []), ...(card.traits?.abilities?.kekkeiGenkai ?? [])].length" class="card-fact-row"><span class="card-fact-label">Abilities</span><span>{{ traitList([...(card.traits?.abilities?.ninjutsu ?? []), ...(card.traits?.abilities?.genjutsu ?? []), ...(card.traits?.abilities?.kekkeiGenkai ?? [])]) }}</span></div>
+                <div v-if="card.traits?.dojutsu?.length" class="card-fact-row"><span class="card-fact-label">Dojutsu</span><span>{{ traitList(card.traits?.dojutsu) }}</span></div>
+                <div v-if="card.traits?.avatars?.length" class="card-fact-row"><span class="card-fact-label">Avatars</span><span>{{ traitList(card.traits?.avatars.map((avatar) => avatar.id)) }}</span></div>
+                <div v-if="[...(card.traits?.requirements?.ninjutsu ?? []), ...(card.traits?.requirements?.genjutsu ?? []), ...(card.traits?.requirements?.avatar ?? [])].length" class="card-fact-row"><span class="card-fact-label">Restrictions</span><span>{{ traitList([...(card.traits?.requirements?.ninjutsu ?? []), ...(card.traits?.requirements?.genjutsu ?? []), ...(card.traits?.requirements?.avatar ?? [])]) }}</span></div>
+                <div v-if="card.modifiers.some((modifier) => modifier.active)" class="card-fact-row"><span class="card-fact-label">Modificateurs</span><span>{{ card.modifiers.filter((modifier) => modifier.active).map(modifierText).join(' · ') }}</span></div>
               </div>
             </div>
           </div>
@@ -458,37 +465,46 @@ function modifierText(modifier: CardModifier) {
   overflow-y: auto;
   scrollbar-width: thin;
 }
+.card-back-header {
+  display: grid;
+  gap: 6px;
+}
+.card-back-name {
+  margin: 0;
+  color: var(--text-main);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+}
 .card-facts {
   display: grid;
-  gap: 9px;
+  gap: 8px;
   min-width: 0;
-  margin-top: 9px;
-  overflow: hidden;
+  margin-top: 10px;
   color: var(--text-muted);
-  font-size: 10px;
-  line-height: 1.3;
+  font-size: 9px;
+  line-height: 1.35;
   word-break: break-word;
 }
+.card-fact-row,
 .card-facts > span {
-  display: block;
+  display: grid;
+  gap: 4px;
   min-width: 0;
   overflow: hidden;
 }
-.card-facts b {
+.card-fact-label {
   display: block;
-  margin-bottom: 4px;
   color: var(--text-soft);
   text-transform: uppercase;
-  font-size: 9px;
+  font-size: 8px;
   letter-spacing: 0.08em;
 }
-.stats-section > b {
-  display: block;
-  margin-bottom: 4px;
-  color: var(--text-soft);
-  text-transform: uppercase;
-  font-size: 9px;
-  letter-spacing: 0.08em;
+.stats-section {
+  display: grid;
+  gap: 5px;
 }
 .stats-grid {
   display: grid;
@@ -505,7 +521,7 @@ function modifierText(modifier: CardModifier) {
   gap: 6px;
   min-width: 0;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 9px;
   line-height: 1.2;
 }
 .stats-grid > span > span {
@@ -517,7 +533,7 @@ function modifierText(modifier: CardModifier) {
 .stats-grid strong {
   flex: 0 0 auto;
   color: var(--text-main);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   white-space: nowrap;
 }

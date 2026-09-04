@@ -17,15 +17,46 @@ function playerFor(state: StoredState, userId: number) { return state.players.fi
 const lobbyInclude = { creator: { select: { id: true, displayName: true } }, invites: { include: { invitee: { select: { id: true, displayName: true } } } } }
 function gameInclude() { return { lobby: { include: lobbyInclude } } }
 
-function cardView(id: number) {
+async function cardView(id: number, imageById: Map<number, string | null>) {
   const card = getCardKnowledgeById(id)
   if (!card) return null
-  return { id: card.id, slug: card.slug, name: card.name, clans: card.clans, stats: card.stats }
+  return {
+    id: card.id,
+    slug: card.slug,
+    name: card.name,
+    clans: card.clans,
+    stats: card.stats,
+    imageUrl: imageById.get(id) ?? null,
+    eligibleSlots: card.traits.eligibleSlots,
+  }
 }
 
-export function publicGameState(game: Awaited<ReturnType<typeof findGame>>, userId: number) {
+export async function publicGameState(game: Awaited<ReturnType<typeof findGame>>, userId: number) {
   if (!game) return null
   const state = stateOf(game.state)
+  const cardIds = new Set<number>()
+  for (const player of state.players) {
+    if (player.pendingCardId) cardIds.add(player.pendingCardId)
+    for (const cardId of Object.values(player.slots)) if (cardId) cardIds.add(cardId)
+  }
+  const imageById = new Map<number, string | null>(
+    (await prisma.card.findMany({ where: { id: { in: [...cardIds] } }, select: { id: true, imageUrl: true } })).map((card) => [card.id, card.imageUrl]),
+  )
+  const players = [] as Array<{ userId: number | null; displayName: string; playerNumber: number; cardsRemaining: number; pendingCard: Awaited<ReturnType<typeof cardView>> | null; slots: Record<string, Awaited<ReturnType<typeof cardView>> | null> }>
+  for (const player of state.players) {
+    const slots: Record<string, Awaited<ReturnType<typeof cardView>> | null> = {}
+    for (const [category, cardId] of Object.entries(player.slots)) {
+      slots[category] = cardId ? await cardView(cardId, imageById) : null
+    }
+    players.push({
+      userId: player.userId,
+      displayName: player.displayName,
+      playerNumber: player.playerNumber,
+      cardsRemaining: player.pile.length,
+      pendingCard: player.userId === userId && player.pendingCardId ? await cardView(player.pendingCardId, imageById) : null,
+      slots,
+    })
+  }
   return {
     id: game.id,
     lobbyId: game.lobbyId,
@@ -33,14 +64,7 @@ export function publicGameState(game: Awaited<ReturnType<typeof findGame>>, user
     status: game.status,
     currentPlayerNumber: game.currentPlayerNumber,
     turnNumber: game.turnNumber,
-    players: state.players.map((player) => ({
-      userId: player.userId,
-      displayName: player.displayName,
-      playerNumber: player.playerNumber,
-      cardsRemaining: player.pile.length,
-      pendingCard: player.userId === userId && player.pendingCardId ? cardView(player.pendingCardId) : null,
-      slots: Object.fromEntries(Object.entries(player.slots).map(([category, cardId]) => [category, cardId ? cardView(cardId) : null])),
-    })),
+    players,
     result: state.result ?? null,
   }
 }
@@ -73,14 +97,14 @@ export async function getGameForUser(userId: number, gameId: string) {
   const game = await findGame(gameId)
   if (!game) throw invalid('Partie introuvable.', 404)
   if (!playerFor(stateOf(game.state), userId)) throw invalid('Vous n’avez pas accès à cette partie.', 403)
-  return publicGameState(game, userId)
+  return await publicGameState(game, userId)
 }
 
 export async function getGameForLobby(userId: number, lobbyId: string) {
   const game = await findGameForLobby(lobbyId)
   if (!game) throw invalid('Partie introuvable.', 404)
   if (!playerFor(stateOf(game.state), userId)) throw invalid('Vous n’avez pas accès à cette partie.', 403)
-  return publicGameState(game, userId)
+  return await publicGameState(game, userId)
 }
 
 async function mutate(userId: number, gameId: string, mutation: (game: NonNullable<Awaited<ReturnType<typeof findGame>>>, state: StoredState, player: StoredPlayer) => boolean | void) {
@@ -94,7 +118,7 @@ async function mutate(userId: number, gameId: string, mutation: (game: NonNullab
       const advanceTurn = mutation(current, state, player) !== false
       return transaction.game.update({ where: { id: gameId }, data: { state: state as unknown as Prisma.InputJsonValue, status: state.result ? GameStatus.FINISHED : current.status, winnerNumber: state.result?.winner === 'player1' ? 1 : state.result?.winner === 'player2' ? 2 : null, finishedAt: state.result ? new Date() : undefined, currentPlayerNumber: advanceTurn && !state.result ? state.players[(player.playerNumber % state.players.length)]!.playerNumber : current.currentPlayerNumber, turnNumber: advanceTurn && !state.result ? current.turnNumber + 1 : current.turnNumber }, include: gameInclude() })
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
-    return publicGameState(game, userId)
+    return await publicGameState(game, userId)
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') throw invalid('Action concurrent refusée, réessaie.', 409)
     throw error
