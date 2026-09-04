@@ -9,7 +9,7 @@ import { requireJwtSecret } from '../src/config/env.js'
 import { prisma } from '../src/config/prisma.js'
 import { attachRealtime } from '../src/realtime.js'
 import { acceptGameInvite, createGameLobby, startGameLobby } from '../src/services/gameLobbyService.js'
-import { getGameForLobby } from '../src/services/realtimeGameService.js'
+import { GAME_CATEGORIES, getGameForLobby } from '../src/services/realtimeGameService.js'
 
 type State = Awaited<ReturnType<typeof getGameForLobby>>
 
@@ -74,7 +74,8 @@ test('le transport socket couvre join, draw privé, place et changement de tour'
       assert.ok(pending)
       assert.equal(drawnA.currentPlayerNumber, turnBefore)
       assert.equal(drawnB.players.find((player) => player.userId === creator!.id)?.pendingCard, null)
-      const category = pending.eligibleSlots[0]!
+      const category = GAME_CATEGORIES.find((slot) => !pending.eligibleSlots.includes(slot))!
+      assert.ok(category)
       const placedState = nextState(socketA, (state) => state.currentPlayerNumber !== turnBefore && !state.players.find((player) => player.userId === creator!.id)?.pendingCard)
       socketA.emit('game:place-card', { gameId: initial.id, category })
       const placed = await placedState

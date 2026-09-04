@@ -3,7 +3,7 @@ import test from 'node:test'
 import { prisma } from '../src/config/prisma.js'
 import { getCardKnowledgeById, listCardKnowledge } from '../src/game/cardKnowledge.js'
 import { acceptGameInvite, createGameLobby, startGameLobby } from '../src/services/gameLobbyService.js'
-import { drawCard, findGame, getGameForLobby, getGameForUser, placeCard } from '../src/services/realtimeGameService.js'
+import { drawCard, findGame, GAME_CATEGORIES, getGameForLobby, getGameForUser, placeCard } from '../src/services/realtimeGameService.js'
 
 type StoredPlayer = { userId: number | null; pile: number[]; pendingCardId: number | null }
 type StoredState = { players: StoredPlayer[] }
@@ -30,7 +30,8 @@ test('une partie persistante sécurise le tour, le tirage et le placement', asyn
     assert.equal(drawn?.players[1]?.pendingCard, null)
     await assert.rejects(() => drawCard(opponent!.id, game!.id), /tour/)
     const card = getCardKnowledgeById(drawn!.players[0]!.pendingCard!.id)!
-    const category = card.traits.eligibleSlots.find((slot) => slot === 'chakra' || slot === 'ninjutsu' || slot === 'clan' || slot === 'kekkeiGenkai')!
+    const category = GAME_CATEGORIES.find((slot) => !card.traits.eligibleSlots.includes(slot))!
+    assert.ok(category)
     const placed = await placeCard(creator!.id, game!.id, category)
     assert.equal(placed?.currentPlayerNumber, 2)
     assert.ok(placed?.players[0]?.slots[category])

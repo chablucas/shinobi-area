@@ -109,12 +109,10 @@ const canDraw = computed(() => Boolean(
   && (realtimeMyPlayer.value?.cardsRemaining ?? 0) > 0
   && !drawLoading.value
 ))
-function normalizeRealtimeCategory(value: string) { return value.toLowerCase().replaceAll('-', '').replaceAll('ō', 'o').replaceAll('ū', 'u') }
 function realtimeCanPlaceCategory(category: string) {
   const player = realtimeMyPlayer.value
-  const pendingCard = player?.pendingCard
-  if (!realtimeState.value || !realtimeMyTurn.value || !pendingCard || player.playerNumber !== realtimePlayerNumber.value || player.slots[category]) return false
-  return pendingCard.eligibleSlots.some((slot) => normalizeRealtimeCategory(slot) === normalizeRealtimeCategory(category))
+  if (!realtimeState.value || !realtimeMyTurn.value || !player?.pendingCard || player.playerNumber !== realtimePlayerNumber.value || player.slots[category]) return false
+  return true
 }
 function realtimeDraw() {
   if (!realtimeState.value || !canDraw.value) return

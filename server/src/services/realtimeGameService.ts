@@ -11,7 +11,6 @@ type StoredState = { players: StoredPlayer[]; result?: ReturnType<typeof simulat
 function invalid(message: string, statusCode = 400) { return Object.assign(new Error(message), { statusCode }) }
 function emptySlots() { return Object.fromEntries(GAME_CATEGORIES.map((category) => [category, null])) as Record<Category, number | null> }
 function normalizeCategory(category: unknown): Category | null { return typeof category === 'string' && (GAME_CATEGORIES as readonly string[]).includes(category) ? category as Category : null }
-function slotKey(value: string) { return value.toLowerCase().replaceAll('-', '').replaceAll('ō', 'o').replaceAll('ū', 'u') }
 function stateOf(value: Prisma.JsonValue): StoredState { return value as unknown as StoredState }
 function playerFor(state: StoredState, userId: number) { return state.players.find((player) => player.userId === userId) }
 const lobbyInclude = { creator: { select: { id: true, displayName: true } }, invites: { include: { invitee: { select: { id: true, displayName: true } } } } }
@@ -145,8 +144,6 @@ export function placeCard(userId: number, gameId: string, rawCategory: unknown) 
     if (!category) throw invalid('Catégorie invalide.')
     if (!player.pendingCardId) throw invalid('Aucune carte en attente.', 409)
     if (player.slots[category]) throw invalid('Cette catégorie est déjà remplie.', 409)
-    const card = getCardKnowledgeById(player.pendingCardId)
-    if (!card || !card.traits.eligibleSlots.some((slot) => slotKey(slot) === slotKey(category))) throw invalid('Cette carte ne peut pas être placée dans cette catégorie.', 409)
     player.slots[category] = player.pendingCardId
     player.pendingCardId = null
     if (state.players.every((candidate) => GAME_CATEGORIES.every((slot) => candidate.slots[slot] !== null))) {
