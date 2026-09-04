@@ -51,7 +51,10 @@ export function attachRealtime(io: Server) {
     })
     socket.on('game:draw', async (gameId: unknown) => {
       if (typeof gameId !== 'string' || socket.data.gameId !== gameId) return socket.emit('game:error', { message: 'Rejoins la partie avant de jouer.' })
-      try { await drawCard(userId, gameId); await emitState(gameId) } catch (error) { socket.emit('game:error', { message: error instanceof Error ? error.message : 'Tirage refusé.' }) }
+      try {
+        await drawCard(userId, gameId)
+        await emitState(gameId)
+      } catch (error) { socket.emit('game:error', { message: error instanceof Error ? error.message : 'Tirage refusé.' }) }
     })
     socket.on('game:place-card', async (payload: { gameId?: unknown; category?: unknown }) => {
       const gameId = payload?.gameId

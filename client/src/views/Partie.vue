@@ -50,6 +50,8 @@ const gameId = ref(crypto.randomUUID())
 const realtimeState = ref<RealtimeGameState | null>(null)
 const realtimePlayerNumber = ref<number | null>(null)
 const realtimeSocket = ref<GameSocket | null>(null)
+const socketConnected = ref(false)
+const drawLoading = ref(false)
 
 const activeBuild = computed(() => builds.value[activePlayerId.value - 1]!)
 const availableCardCount = computed(() => cards.value.length - usedCardIds.value.size)
@@ -71,10 +73,12 @@ onMounted(async () => {
       realtimePlayerNumber.value = realtimeState.value.players.find((player) => player.userId === auth.user?.id)?.playerNumber ?? null
       const socket = connectGameSocket(auth.token)
       realtimeSocket.value = socket
-      const join = () => socket.emit('game:join', realtimeState.value?.id ?? '')
+      const join = () => { socketConnected.value = true; errorMessage.value = ''; socket.emit('game:join', realtimeState.value?.id ?? '') }
       socket.on('connect', join)
-      socket.on('game:state', (state) => { realtimeState.value = state })
-      socket.on('game:error', (socketError) => { errorMessage.value = socketError.message })
+      socket.on('disconnect', () => { socketConnected.value = false; drawLoading.value = false })
+      socket.on('connect_error', () => { socketConnected.value = false; errorMessage.value = 'Connexion au combat impossible. Reconnexion...' })
+      socket.on('game:state', (state) => { realtimeState.value = state; drawLoading.value = false })
+      socket.on('game:error', (socketError) => { errorMessage.value = socketError.message; drawLoading.value = false })
     } catch (error) {
       lobbyAccessError.value = error instanceof SocialApiError
         ? error.status === 404 ? 'Salon introuvable' : error.status === 401 || error.status === 403 ? 'Vous n’avez pas accès à ce combat.' : error.message
@@ -97,6 +101,14 @@ onUnmounted(() => { realtimeSocket.value?.disconnect() })
 const realtimeCurrentPlayer = computed(() => realtimeState.value?.players.find((player) => player.playerNumber === realtimeState.value?.currentPlayerNumber) ?? null)
 const realtimeMyPlayer = computed(() => realtimeState.value?.players.find((player) => player.playerNumber === realtimePlayerNumber.value) ?? null)
 const realtimeMyTurn = computed(() => Boolean(realtimeState.value && realtimePlayerNumber.value === realtimeState.value.currentPlayerNumber))
+const canDraw = computed(() => Boolean(
+  socketConnected.value
+  && realtimeState.value?.status === 'PLAYING'
+  && realtimeMyTurn.value
+  && !realtimeMyPlayer.value?.pendingCard
+  && (realtimeMyPlayer.value?.cardsRemaining ?? 0) > 0
+  && !drawLoading.value
+))
 function normalizeRealtimeCategory(value: string) { return value.toLowerCase().replaceAll('-', '').replaceAll('ō', 'o').replaceAll('ū', 'u') }
 function realtimeCanPlaceCategory(category: string) {
   const player = realtimeMyPlayer.value
@@ -104,7 +116,11 @@ function realtimeCanPlaceCategory(category: string) {
   if (!realtimeState.value || !realtimeMyTurn.value || !pendingCard || player.playerNumber !== realtimePlayerNumber.value || player.slots[category]) return false
   return pendingCard.eligibleSlots.some((slot) => normalizeRealtimeCategory(slot) === normalizeRealtimeCategory(category))
 }
-function realtimeDraw() { if (realtimeState.value && realtimeMyTurn.value) realtimeSocket.value?.emit('game:draw', realtimeState.value.id) }
+function realtimeDraw() {
+  if (!realtimeState.value || !canDraw.value) return
+  drawLoading.value = true
+  realtimeSocket.value?.emit('game:draw', realtimeState.value.id)
+}
 function realtimePlace(category: string) { if (realtimeState.value && realtimeCanPlaceCategory(category)) realtimeSocket.value?.emit('game:place-card', { gameId: realtimeState.value.id, category }) }
 
 watch([activePlayerId, phase, cards], () => {
@@ -260,7 +276,7 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
           <div class="realtime-slots"><button v-for="[label, category] in CATEGORY_DEFINITIONS" :key="category" type="button" :disabled="!realtimeCanPlaceCategory(category) && !(player.playerNumber === realtimePlayerNumber && player.slots[category] === null && !realtimeMyTurn)" :class="{ filled: !!player.slots[category], selectable: player.playerNumber === realtimePlayerNumber && realtimeCanPlaceCategory(category) && !player.slots[category] }" @click="realtimePlace(category)"><span>{{ label }}</span><template v-if="player.slots[category]"><div class="realtime-slot-art"><img v-if="player.slots[category]?.imageUrl" :src="player.slots[category]?.imageUrl ?? undefined" :alt="`Carte ${player.slots[category]?.name}`" /><span v-else>{{ player.slots[category]?.name.slice(0, 1) }}</span></div><strong>{{ player.slots[category]?.name }}</strong><small v-if="category === 'ninjutsu'">{{ player.slots[category]?.stats.ninjutsuAttack }} / {{ player.slots[category]?.stats.ninjutsuDefense }}</small><small v-else-if="category === 'clan'">{{ player.slots[category]?.clans.join(' · ') || 'Aucun' }}</small><small v-else>{{ player.slots[category]?.stats[category] ?? 'Présente' }}</small></template><small v-else>VIDE</small></button></div>
         </article>
       </div>
-      <div class="realtime-draw-zone"><div><p class="eyebrow">Pioche joueur {{ realtimePlayerNumber }}</p><div v-if="realtimeMyPlayer?.pendingCard" class="realtime-drawn-card"><div class="realtime-drawn-card-art"><img v-if="realtimeMyPlayer.pendingCard.imageUrl" :src="realtimeMyPlayer.pendingCard.imageUrl" :alt="`Carte ${realtimeMyPlayer.pendingCard.name}`" /><span v-else>{{ realtimeMyPlayer.pendingCard.name.slice(0, 1) }}</span></div><div class="realtime-drawn-card-copy"><strong>{{ realtimeMyPlayer.pendingCard.name }}</strong><span>Carte piochée</span></div></div><div v-else class="realtime-empty-draw">{{ realtimeMyTurn ? 'PIOCHER' : 'EN ATTENTE' }}</div><button type="button" :disabled="!realtimeMyTurn || !!realtimeMyPlayer?.pendingCard || !realtimeMyPlayer?.cardsRemaining" @click="realtimeDraw">PIOCHER</button></div><p v-if="realtimeCurrentPlayer" class="realtime-current">{{ realtimeMyTurn ? 'Choisis une catégorie pour poser ta carte.' : `Joueur ${realtimeState.currentPlayerNumber} prépare son action.` }}</p></div>
+      <div class="realtime-draw-zone"><div><p class="eyebrow">Pioche joueur {{ realtimePlayerNumber }}</p><div v-if="realtimeMyPlayer?.pendingCard" class="realtime-drawn-card"><div class="realtime-drawn-card-art"><img v-if="realtimeMyPlayer.pendingCard.imageUrl" :src="realtimeMyPlayer.pendingCard.imageUrl" :alt="`Carte ${realtimeMyPlayer.pendingCard.name}`" /><span v-else>{{ realtimeMyPlayer.pendingCard.name.slice(0, 1) }}</span></div><div class="realtime-drawn-card-copy"><strong>{{ realtimeMyPlayer.pendingCard.name }}</strong><span>Carte piochée</span></div></div><div v-else class="realtime-empty-draw">{{ realtimeMyTurn ? 'PIOCHER' : 'EN ATTENTE' }}</div><button type="button" :disabled="!canDraw" @click="realtimeDraw">PIOCHER</button></div><p v-if="realtimeCurrentPlayer" class="realtime-current">{{ realtimeMyTurn ? 'Choisis une catégorie pour poser ta carte.' : `Joueur ${realtimeState.currentPlayerNumber} prépare son action.` }}</p></div>
       <section v-if="realtimeState.status === 'FINISHED' && realtimeState.result" class="realtime-result"><h2>Combat terminé</h2><p>Le moteur serveur a calculé le résultat officiel.</p></section>
     </section>
 

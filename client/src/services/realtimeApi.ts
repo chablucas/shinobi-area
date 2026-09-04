@@ -3,12 +3,12 @@ import { API_BASE_URL } from './cardApi'
 import type { RealtimeGameState } from './socialApi'
 
 function socketUrl() {
-  if (API_BASE_URL.startsWith('/')) return window.location.origin
-  return API_BASE_URL.replace(/\/api\/?$/, '')
+  if (API_BASE_URL.startsWith('http')) return new URL(API_BASE_URL).origin
+  return window.location.origin
 }
 
 export function connectGameSocket(token: string): GameSocket {
-  return io(socketUrl(), { auth: { token }, transports: ['websocket', 'polling'], autoConnect: true })
+  return io(socketUrl(), { auth: { token }, autoConnect: true })
 }
 
 export type GameSocket = Socket<
