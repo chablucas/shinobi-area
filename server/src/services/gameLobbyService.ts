@@ -101,9 +101,11 @@ export async function startGameLobby(userId: number, lobbyId: string) {
     const alreadyPlaying = await prisma.gameLobby.findUnique({ where: { id: lobbyId }, select: { creatorId: true, status: true } })
     if (alreadyPlaying?.status === GameLobbyStatus.PLAYING) {
       if (alreadyPlaying.creatorId !== userId) throw invalid('Seul le créateur peut démarrer ce salon.', 403)
-      await createOrGetGame(lobbyId)
-      return formatLobby(await findLobby(lobbyId))
+      const game = await createOrGetGame(lobbyId)
+      const lobby = await findLobby(lobbyId)
+      return { lobby: formatLobby(lobby)!, game: { id: game.id, lobbyId: game.lobbyId, mode: game.mode === GameMode.ONE_V_ONE ? '1v1' : '1v1v1', status: game.status } }
     }
+
     const started = await prisma.$transaction(async (transaction) => {
       const lobby = await transaction.gameLobby.findUnique({ where: { id: lobbyId }, select: { creatorId: true, status: true } })
       if (!lobby) throw invalid('Salon introuvable.', 404)
@@ -111,10 +113,11 @@ export async function startGameLobby(userId: number, lobbyId: string) {
       if (lobby.status === GameLobbyStatus.PLAYING) throw invalid('Le salon a déjà été démarré.', 409)
       if (lobby.status !== GameLobbyStatus.READY) throw invalid('Le salon n’est pas prêt.', 409)
       const updated = await transaction.gameLobby.update({ where: { id: lobbyId }, data: { status: GameLobbyStatus.PLAYING }, include: lobbyInclude() })
-      return { ...formatLobby(updated), status: GameLobbyStatus.PLAYING }
+      return { lobby: { ...formatLobby(updated), status: GameLobbyStatus.PLAYING } }
     })
-    await createOrGetGame(lobbyId)
-    return started
+
+    const game = await createOrGetGame(lobbyId)
+    return { lobby: started.lobby, game: { id: game.id, lobbyId: game.lobbyId, mode: game.mode === GameMode.ONE_V_ONE ? '1v1' : '1v1v1', status: game.status } }
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'P2025') throw invalid('Le salon a déjà été démarré.', 409)
     throw error

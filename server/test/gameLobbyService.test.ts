@@ -96,9 +96,44 @@ test('le démarrage exige un lobby READY et le créateur, puis autorise les part
     assert.equal((await getGameLobby(creator!.id, lobby!.id))?.status, 'READY')
     await assert.rejects(() => startGameLobby(999999, lobby!.id), /créateur/)
     const started = await startGameLobby(creator!.id, lobby!.id)
-    assert.equal(started?.status, 'PLAYING')
+    assert.equal(started?.lobby.status, 'PLAYING')
+    assert.ok(started?.game.id)
+    assert.equal(started?.game.lobbyId, lobby!.id)
     await assert.doesNotReject(() => getGameLobby(opponent!.id, lobby!.id))
-    assert.equal((await startGameLobby(creator!.id, lobby!.id))?.status, 'PLAYING')
+    const sameGame = await prisma.game.findUnique({ where: { lobbyId: lobby!.id }, select: { id: true, lobbyId: true } })
+    assert.equal(started?.game.id, sameGame?.id)
+    assert.equal((await startGameLobby(creator!.id, lobby!.id))?.game.id, sameGame?.id)
+    assert.ok(outsider)
+  } finally {
+    await prisma.user.deleteMany({ where: { id: { in: users.map((user) => user.id) } } })
+  }
+})
+
+test('start READY crée une Game unique liée au salon et autorise l’invité à la récupérer', async () => {
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const users = await prisma.user.createManyAndReturn({
+    data: [
+      { email: `lobby-game-a-${suffix}@example.test`, passwordHash: 'test', displayName: `Lobby Game A ${suffix}` },
+      { email: `lobby-game-b-${suffix}@example.test`, passwordHash: 'test', displayName: `Lobby Game B ${suffix}` },
+      { email: `lobby-game-c-${suffix}@example.test`, passwordHash: 'test', displayName: `Lobby Game C ${suffix}` },
+    ],
+    select: { id: true },
+  })
+  const [creator, opponent, outsider] = users
+
+  try {
+    const lobby = await createGameLobby(creator!.id, '1v1', [opponent!.id])
+    await acceptGameInvite(opponent!.id, lobby!.players[1]!.inviteId!)
+    const started = await startGameLobby(creator!.id, lobby!.id)
+    assert.equal(started?.lobby.id, lobby!.id)
+    assert.equal(started?.game.lobbyId, lobby!.id)
+    assert.equal(started?.game.id, started?.game.id)
+    assert.ok(await prisma.game.findUnique({ where: { lobbyId: lobby!.id } }))
+    const byCreator = await prisma.game.findUnique({ where: { lobbyId: lobby!.id }, select: { id: true } })
+    const byOpponent = await prisma.game.findUnique({ where: { lobbyId: lobby!.id }, select: { id: true } })
+    assert.equal(byCreator?.id, byOpponent?.id)
+    assert.equal(await prisma.game.findUnique({ where: { lobbyId: 'missing-lobby-id' }, select: { id: true } }), null)
+    assert.ok(outsider)
   } finally {
     await prisma.user.deleteMany({ where: { id: { in: users.map((user) => user.id) } } })
   }

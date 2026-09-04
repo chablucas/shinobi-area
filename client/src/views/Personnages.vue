@@ -64,7 +64,7 @@ const statKeys = [
 const statLabels: Record<string, string> = {
   chakra: 'Chakra', invocation: 'Invocation', iq: 'IQ', genjutsu: 'Genjutsu', taijutsu: 'Taijutsu',
   avatar: 'Avatar', body: 'Body', fuinjutsu: 'Fûinjutsu', senjutsu: 'Senjutsu', kenjutsu: 'Kenjutsu',
-  speed: 'Vitesse', kekkeiGenkai: 'KG',
+  speed: 'Vitesse', kekkeiGenkai: 'Kekkei Genkai',
 }
 const editValues = ref<Record<string, number>>({})
 const selectedRarity = ref('')
@@ -105,7 +105,7 @@ function compactStats(card: Card) {
   const kekkeiMora = card.traits?.abilities?.kekkeiMora
   return [
     ...Object.entries(statLabels).map(([key, label]) => ({ label, value: card.effectiveStats[key as keyof Card['effectiveStats']] ?? 0 })),
-    { label: 'Ninjutsu', value: `${card.effectiveStats.ninjutsuAttack ?? 0} / ${card.effectiveStats.ninjutsuDefense ?? 0}` },
+    { label: 'Ninjutsu', value: `ATQ ${card.effectiveStats.ninjutsuAttack ?? 0} · DEF ${card.effectiveStats.ninjutsuDefense ?? 0}` },
     { label: 'Kekkei Mōra', value: kekkeiMora?.length ? kekkeiMora.join(' · ') : '—' },
   ]
 }
@@ -381,7 +381,7 @@ function modifierText(modifier: CardModifier) {
 }
 .characters-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
 }
 .flip-card {
@@ -430,7 +430,7 @@ function modifierText(modifier: CardModifier) {
 }
 .rarity-label {
   color: var(--rarity, var(--accent-gold));
-  font-size: 0.58rem;
+  font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
@@ -439,7 +439,7 @@ function modifierText(modifier: CardModifier) {
   margin: 8px 0 2px;
   font-family: 'Syne', sans-serif;
   font-weight: 700;
-  font-size: clamp(0.85rem, 2.4vw, 1.25rem);
+  font-size: clamp(0.75rem, 1.7vw, 1.12rem);
   line-height: 1.15;
   text-transform: uppercase;
   overflow: hidden;
@@ -465,7 +465,7 @@ function modifierText(modifier: CardModifier) {
   margin-top: 9px;
   overflow: hidden;
   color: var(--text-muted);
-  font-size: clamp(0.56rem, 1.5vw, 0.7rem);
+  font-size: 10px;
   line-height: 1.3;
   word-break: break-word;
 }
@@ -479,7 +479,7 @@ function modifierText(modifier: CardModifier) {
   margin-bottom: 4px;
   color: var(--text-soft);
   text-transform: uppercase;
-  font-size: clamp(0.5rem, 1.2vw, 0.62rem);
+  font-size: 9px;
   letter-spacing: 0.08em;
 }
 .stats-section > b {
@@ -487,27 +487,29 @@ function modifierText(modifier: CardModifier) {
   margin-bottom: 4px;
   color: var(--text-soft);
   text-transform: uppercase;
-  font-size: clamp(0.5rem, 1.2vw, 0.62rem);
+  font-size: 9px;
   letter-spacing: 0.08em;
 }
 .stats-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2px 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
   padding: 5px 0;
   border-top: 1px solid var(--border-light);
   border-bottom: 1px solid var(--border-light);
 }
 .stats-grid > span {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: baseline;
-  gap: 5px;
+  gap: 6px;
   min-width: 0;
   color: var(--text-muted);
-  font-size: clamp(0.56rem, 1.4vw, 0.68rem);
+  font-size: 10px;
+  line-height: 1.2;
 }
 .stats-grid > span > span {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -515,7 +517,7 @@ function modifierText(modifier: CardModifier) {
 .stats-grid strong {
   flex: 0 0 auto;
   color: var(--text-main);
-  font-size: clamp(0.56rem, 1.4vw, 0.68rem);
+  font-size: 10px;
   font-weight: 700;
   white-space: nowrap;
 }

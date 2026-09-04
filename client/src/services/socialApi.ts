@@ -9,6 +9,7 @@ export type ChallengeMode = '1v1' | '1v1v1'
 export type GameInvite = { id: string; lobbyId: string; mode: ChallengeMode; status: 'PENDING'; createdAt: string; creator: Friend }
 export type LobbyPlayer = Partial<PublicUser> & { id: number | null; displayName: string; avatarUrl: string | null; status: 'ACCEPTED' | 'PENDING' | 'REJECTED' | 'CANCELLED'; inviteId: string | null; isAi: boolean }
 export type GameLobby = { id: string; mode: ChallengeMode; creatorId: number; includesAi: boolean; players: LobbyPlayer[]; status: 'WAITING' | 'READY' | 'PLAYING'; createdAt: string; updatedAt: string }
+export type StartGameResult = { lobby: GameLobby; game: { id: string; lobbyId: string; mode: ChallengeMode; status: 'PLAYING' | 'FINISHED' } }
 
 export class SocialApiError extends Error {
   constructor(message: string, readonly status: number) {
@@ -37,7 +38,7 @@ export function acceptGameInvite(token: string, inviteId: string) { return reque
 export function rejectGameInvite(token: string, inviteId: string) { return request<GameLobby>(token, `/game/invites/${inviteId}/reject`, { method: 'POST' }) }
 export function getGameLobby(token: string, lobbyId: string) { return request<GameLobby>(token, `/game/lobbies/${lobbyId}`) }
 export function getLobbyGame(token: string, lobbyId: string) { return request<RealtimeGameState>(token, `/game/lobbies/${lobbyId}/game`) }
-export function startGameLobby(token: string, lobbyId: string) { return request<GameLobby>(token, `/game/lobbies/${lobbyId}/start`, { method: 'POST' }) }
+export function startGameLobby(token: string, lobbyId: string) { return request<StartGameResult>(token, `/game/lobbies/${lobbyId}/start`, { method: 'POST' }) }
 
 export type RealtimeCard = { id: number; slug: string; name: string; clans: string[]; stats: Record<string, number> }
 export type RealtimePlayer = { userId: number | null; displayName: string; playerNumber: number; cardsRemaining: number; pendingCard: RealtimeCard | null; slots: Record<string, RealtimeCard | null> }

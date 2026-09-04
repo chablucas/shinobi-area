@@ -97,5 +97,30 @@ function categoryLabel(slug: string) { return CATEGORY_DEFINITIONS.find(([, item
 .stat-grid span { margin-top: 6px; color: var(--text-muted); font-size: .55rem; text-transform: uppercase; letter-spacing: .08em; }
 .profile-history { min-height: 150px; }
 .profile-history h2 { color: var(--text-muted); font-size: 1.2rem; }
-@media (max-width: 680px) { .profile-nav-links { gap: 3px; font-size: .55rem; } .profile-nav-links a, .profile-link { padding: .6rem .45rem; } .profile-nav .brand-logo { height: 44px; } .profile-grid { grid-template-columns: 1fr; } .profile-identity { grid-row: auto; } .stat-grid { grid-template-columns: repeat(2, 1fr); } .detail-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } .saved-build { display: grid; } }
+.friends-list { display: grid; gap: 12px; }
+.friend-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-panel-strong);
+}
+.friend-row strong {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.profile-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0.65rem 0.9rem;
+}
+@media (max-width: 680px) { .profile-nav-links { gap: 3px; font-size: .55rem; } .profile-nav-links a, .profile-link { padding: .6rem .45rem; } .profile-nav .brand-logo { height: 44px; } .profile-grid { grid-template-columns: 1fr; } .profile-identity { grid-row: auto; } .stat-grid { grid-template-columns: repeat(2, 1fr); } .detail-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } .saved-build { display: grid; } .friend-row { flex-wrap: wrap; } }
 </style>
