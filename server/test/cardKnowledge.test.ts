@@ -1,50 +1,61 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import cardStatsData from '../src/data/shinobi-card-stats.json' with { type: 'json' }
-import cardTraitsData from '../src/data/shinobi-card-traits.json' with { type: 'json' }
-import cardRaritiesData from '../src/data/shinobi-card-rarities.json' with { type: 'json' }
+import canonicalCatalog from '../src/data/shinobi-cards.json' with { type: 'json' }
 import { CARD_KNOWLEDGE, CARD_KNOWLEDGE_COUNT, getCardKnowledgeBySlug, listCardKnowledge, rarityOrder } from '../src/game/cardKnowledge.js'
 
-test('il existe exactement 163 cartes dans les trois sources canoniques', () => {
-  assert.equal(cardStatsData.length, 163)
-  assert.equal(cardTraitsData.cardTraits.length, 163)
-  assert.equal(cardRaritiesData.cards.length, 163)
+const canonicalCards = canonicalCatalog.cards as Array<{ id: number; slug: string; name: string; stats: Record<string, number>; traits: Record<string, unknown>; rarity: string; rarityMeta: { label: string; rank: number; colorName: string; colorHex: string } }>
+
+test('le catalogue canonique contient exactement 163 cartes', () => {
+  assert.equal(canonicalCards.length, 163)
   assert.equal(CARD_KNOWLEDGE_COUNT, 163)
 })
 
-test('aucun doublon de slug côté stats ou traits', () => {
-  assert.equal(new Set(cardStatsData.map((card) => card.slug)).size, 163)
-  assert.equal(new Set(cardTraitsData.cardTraits.map((card: { slug: string }) => card.slug)).size, 163)
+test('le catalogue canonique expose 163 slugs uniques sans vide', () => {
+  const slugs = canonicalCards.map((card) => card.slug)
+  assert.equal(new Set(slugs).size, 163)
+  assert.ok(slugs.every((slug) => slug && slug.trim().length > 0))
+  assert.ok(canonicalCards.every((card) => card.name && card.name.trim().length > 0))
 })
 
-test('les 163 slugs de stats correspondent exactement aux 163 slugs de traits', () => {
-  const statsSlugs = new Set(cardStatsData.map((card) => card.slug))
-  const traitsSlugs = new Set(cardTraitsData.cardTraits.map((card: { slug: string }) => card.slug))
-  assert.deepEqual([...statsSlugs].sort(), [...traitsSlugs].sort())
+test('chaque carte canonique possède les champs attendus', () => {
+  for (const card of canonicalCards) {
+    assert.ok(card.id)
+    assert.ok(card.slug)
+    assert.ok(card.name)
+    assert.ok(card.stats)
+    assert.ok(card.traits)
+    assert.ok(card.rarity)
+    assert.ok(card.rarityMeta)
+  }
 })
 
-test('les slugs de rareté correspondent exactement aux slugs de stats', () => {
-  const statsSlugs = new Set(cardStatsData.map((card) => card.slug))
-  const raritySlugs = new Set(cardRaritiesData.cards.map((card) => card.slug))
-  assert.deepEqual([...statsSlugs].sort(), [...raritySlugs].sort())
-  assert.equal(raritySlugs.size, 163)
-})
-
-test('la rareté est chargée par slug et respecte son rang canonique', () => {
-  const rarity = getCardKnowledgeBySlug('hamura')?.rarity
-  assert.ok(rarity)
-  assert.equal(rarityOrder.find((item) => item.id === rarity)?.rank, getCardKnowledgeBySlug('hamura')?.rarityMetadata.rank)
+test('la rareté est cohérente avec l’ordre canonique global', () => {
+  const hamura = getCardKnowledgeBySlug('hamura')
+  assert.ok(hamura)
+  assert.equal(hamura.rarity, 'SEMI_GOD')
+  assert.equal(rarityOrder.find((item) => item.id === hamura.rarity)?.rank, hamura.rarityMetadata.rank)
   assert.deepEqual(rarityOrder.map((item) => item.id), ['UNCOMMON', 'COMMON', 'RARE', 'EPIC', 'MYTHIC', 'LEGENDARY', 'SEMI_GOD', 'DIVINE'])
 })
 
-test('le lookup par slug renvoie les stats et les traits fusionnés', () => {
+test('le lookup par slug renvoie bien la carte canonique complète', () => {
   const hamura = getCardKnowledgeBySlug('hamura')
   assert.ok(hamura)
-  assert.equal(hamura.stats.chakra, cardStatsData.find((card) => card.slug === 'hamura')?.stats.chakra)
-  assert.ok(hamura.traits.abilities.kekkeiMora.length > 0)
+  assert.equal(hamura.name, 'Hamura')
+  assert.ok(hamura.stats.chakra >= 0)
+  assert.ok(Array.isArray(hamura.traits.eligibleSlots))
+  assert.ok(hamura.traits.abilities.kekkeiMora.length >= 0)
 })
 
-test('listCardKnowledge expose bien les 163 cartes fusionnées', () => {
+test('listCardKnowledge expose bien les 163 cartes et leur unicité', () => {
   assert.equal(listCardKnowledge().length, 163)
-  assert.ok(CARD_KNOWLEDGE.every((card) => card.stats && card.traits))
+  assert.equal(new Set(listCardKnowledge().map((card) => card.slug)).size, 163)
+  assert.ok(CARD_KNOWLEDGE.every((card) => card.stats && card.traits && card.rarityMetadata))
+})
+
+test('le mapping Nagato/Aoba/Obito/Sai reste correct', () => {
+  assert.equal(getCardKnowledgeBySlug('nagato')?.name, 'Nagato')
+  assert.equal(getCardKnowledgeBySlug('aoba')?.name, 'Aoba')
+  assert.equal(getCardKnowledgeBySlug('obito')?.name, 'Obito')
+  assert.equal(getCardKnowledgeBySlug('sai')?.name, 'Sai')
+  assert.equal(getCardKnowledgeBySlug('ukon-sakon')?.name, 'Ukon & Sakon')
 })

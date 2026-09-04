@@ -6,7 +6,7 @@ test('GET /api/cards peut sérialiser les 163 cartes avec leurs statistiques IA'
   const firstPage = await listCards(1, 100)
   const secondPage = await listCards(2, 100)
   const cards = [...firstPage.data, ...secondPage.data]
-  const ukonSakon = cards.find((card) => card.slug === 'ukon-sakon')
+  const ukonSakon = cards.find((card) => card.slug === 'ukon-et-sakon')
 
   assert.equal(firstPage.pagination.total, 163)
   assert.equal(cards.length, 163)

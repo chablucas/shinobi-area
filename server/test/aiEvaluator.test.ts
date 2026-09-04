@@ -3,8 +3,10 @@ import test from 'node:test'
 import { chooseBestCategory } from '../../client/src/game/ai/categoryEvaluator.js'
 import { createPlayerBuild } from '../../client/src/game/gameEngine.js'
 import type { Card } from '../../client/src/types/card.js'
-import cardStatsData from '../src/data/shinobi-card-stats.json' with { type: 'json' }
+import canonicalCatalog from '../src/data/shinobi-cards.json' with { type: 'json' }
 import { listCardKnowledge } from '../src/game/cardKnowledge.js'
+
+const catalogCards = canonicalCatalog.cards as Array<{ id: number; slug: string; name: string; clans: string[]; stats: Record<string, number> }>
 
 function card(stats: Record<string, number>, options: Partial<Pick<Card, 'slug' | 'clans' | 'traits'>> = {}): Card { return { id: 1, name: 'Fixture', slug: 'fixture', imageUrl: null, stats, ...options } }
 
@@ -35,16 +37,16 @@ function comparableValues(stats: Record<string, number | null>) {
   }
 }
 
-function realCard(entry: (typeof cardStatsData)[number]): Card {
+function realCard(entry: (typeof catalogCards)[number]): Card {
   const knowledge = knowledgeBySlug.get(entry.slug)
   return { id: entry.id, name: entry.name, slug: entry.slug, imageUrl: null, clans: entry.clans, stats: entry.stats, traits: knowledge?.traits ?? null }
 }
 
-function legacyCategory(build: ReturnType<typeof createPlayerBuild>, entry: (typeof cardStatsData)[number]) {
+function legacyCategory(build: ReturnType<typeof createPlayerBuild>, entry: (typeof catalogCards)[number]) {
   return categoryOrder.filter((category) => !build.slots[category]).reduce((best, category) => comparableValues(entry.stats)[category] > comparableValues(entry.stats)[best] ? category : best)
 }
 
-function simulate(entries: readonly (typeof cardStatsData)[number][], strategy: (build: ReturnType<typeof createPlayerBuild>, entry: (typeof cardStatsData)[number]) => typeof categoryOrder[number]) {
+function simulate(entries: readonly (typeof catalogCards)[number][], strategy: (build: ReturnType<typeof createPlayerBuild>, entry: (typeof catalogCards)[number]) => typeof categoryOrder[number]) {
   let build = createPlayerBuild(2)
   for (const entry of entries) build = { ...build, slots: { ...build.slots, [strategy(build, entry)]: realCard(entry) } }
   return build
@@ -69,11 +71,11 @@ test('une valeur excellente dans une catégorie prioritaire est choisie immédia
 })
 test('Clan et Kekkei Mōra exigent une compatibilité réelle', () => {
   assert.notEqual(chooseBestCategory(createPlayerBuild(2), card({ chakra: 72, invocation: 75 })), 'clan')
-  const otsutsukiCard = cardStatsData.find((entry) => entry.clans.includes('OTSUTSUKI'))
+  const otsutsukiCard = catalogCards.find((entry) => entry.clans.includes('OTSUTSUKI'))
   assert.ok(otsutsukiCard)
   assert.equal(chooseBestCategory(createPlayerBuild(2), realCard(otsutsukiCard)), 'clan')
   assert.notEqual(chooseBestCategory(createPlayerBuild(2), card({ chakra: 72, invocation: 75, kekkeiMora: 100 })), 'kekkei-mora')
-  const hamura = cardStatsData.find((entry) => entry.slug === 'hamura')
+  const hamura = catalogCards.find((entry) => entry.slug === 'hamura')
   assert.ok(hamura)
   const buildWithClanTaken = createPlayerBuild(2)
   buildWithClanTaken.slots.clan = card({ chakra: 1 })
@@ -95,7 +97,7 @@ test('IA utilise un tie-break déterministe', () => {
   assert.equal(chooseBestCategory(build, card({ chakra: 100, iq: 100 })), 'chakra')
 })
 test('les 163 cartes sont évaluables sans erreur et sensory est ignoré', () => {
-  for (const entry of cardStatsData) {
+  for (const entry of catalogCards) {
     assert.doesNotThrow(() => chooseBestCategory(createPlayerBuild(2), realCard(entry)), entry.slug)
   }
   assert.notEqual(chooseBestCategory(createPlayerBuild(2), card({ sensory: 100, chakra: 0 })), 'sensory')
@@ -115,7 +117,7 @@ test('une catégorie prioritaire déjà occupée est ignorée', () => {
 test('les séquences complètes conservent différemment les slots stratégiques', () => {
   const sequences = [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30], [31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45]]
   for (const ids of sequences) {
-    const entries = ids.map((id) => cardStatsData.find((entry) => entry.id === id)!)
+    const entries = ids.map((id) => catalogCards.find((entry) => entry.id === id)!)
     const legacy = simulate(entries, legacyCategory)
     const strategic = simulate(entries, (build, entry) => chooseBestCategory(build, realCard(entry))!)
     assert.ok(Object.values(strategic.slots).every(Boolean))
@@ -126,7 +128,7 @@ test('une carte sans statistiques est rejetée explicitement', () => {
   assert.throws(() => chooseBestCategory(createPlayerBuild(2), { id: 999, name: 'Sans stats', slug: 'sans-stats', imageUrl: null, stats: {} }), /statistiques absentes/)
 })
 test('les traits Kekkei Mōra étendent la compatibilité au-delà de Hamura/Toneri', () => {
-  const kaguya = cardStatsData.find((entry) => entry.slug === 'kaguya')
+  const kaguya = catalogCards.find((entry) => entry.slug === 'kaguya')
   assert.ok(kaguya)
   assert.ok((knowledgeBySlug.get('kaguya')?.traits.kekkeiMoraStrategicScore ?? 0) > 0)
   const withKekkeiMoraAbility = card({ chakra: 40, invocation: 40 }, { slug: 'unknown-six-paths', traits: { kekkeiMoraStrategicScore: 1 } as unknown as Card['traits'] })
@@ -139,10 +141,10 @@ test('le Clan stratégique est dérivé de clanRules (bonus + permissions), pas 
   assert.notEqual(chooseBestCategory(createPlayerBuild(2), withoutClanBonus), 'clan')
   const withClanBonus = card({ chakra: 60 }, { traits: { clanStrategicScore: 0.55 } as unknown as Card['traits'] })
   assert.equal(chooseBestCategory(createPlayerBuild(2), withClanBonus), 'clan')
-  const yamanaka = cardStatsData.find((entry) => entry.clans.includes('YAMANAKA'))
+  const yamanaka = catalogCards.find((entry) => entry.clans.includes('YAMANAKA'))
   assert.ok(yamanaka)
   assert.equal(knowledgeBySlug.get(yamanaka.slug)?.traits.clanStrategicScore, 0)
-  const uzumaki = cardStatsData.find((entry) => entry.clans.includes('UZUMAKI'))
+  const uzumaki = catalogCards.find((entry) => entry.clans.includes('UZUMAKI'))
   assert.ok(uzumaki)
   assert.ok((knowledgeBySlug.get(uzumaki.slug)?.traits.clanStrategicScore ?? 0) > 0)
 })
@@ -153,7 +155,7 @@ test('Avatar ignore la statistique si les traits ne confirment aucun avatar expl
   assert.equal(chooseBestCategory(createPlayerBuild(2), withAvatarTrait), 'avatar')
 })
 test('une carte avec un avatar réellement reconnu dans les traits n’est jamais bloquée', () => {
-  const kakashiDms = cardStatsData.find((entry) => entry.slug === 'kakashi-dms')
+  const kakashiDms = catalogCards.find((entry) => entry.slug === 'kakashi-dms')
   assert.ok(kakashiDms)
   assert.ok((knowledgeBySlug.get('kakashi-dms')?.traits.avatars.length ?? 0) > 0)
   const buildWithNinjutsuTaken = createPlayerBuild(2)

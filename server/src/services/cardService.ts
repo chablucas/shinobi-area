@@ -1,15 +1,10 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '../config/prisma.js'
-import { listCardKnowledge, getCardKnowledgeBySlug, rarityOrder } from '../game/cardKnowledge.js'
+import { getCardKnowledgeBySlug, rarityOrder } from '../game/cardKnowledge.js'
+import { resolveCanonicalSlug } from '../game/cardCatalog.js'
 
 const cardInclude = { stats: { include: { category: true }, orderBy: { category: { position: 'asc' as const } } } }
 type CardWithStats = Prisma.CardGetPayload<{ include: { stats: { include: { category: true } } } }>
-const knowledgeBySlug = new Map(listCardKnowledge().map((card) => [card.slug, card]))
-const knowledgeByName = new Map(listCardKnowledge().map((card) => [normalizeCardName(card.name), card]))
-
-function normalizeCardName(name: string): string {
-  return name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-')
-}
 
 type CardDto = {
   id: number
@@ -23,7 +18,15 @@ type CardDto = {
   traits: unknown
   baseRarity: string
   effectiveRarity: string
-  rarityMetadata: ReturnType<typeof listCardKnowledge>[number]['rarityMetadata']
+  rarityMetadata: {
+    id: string
+    label: string
+    rank: number
+    colorName: string
+    colorHex: string
+    minScore: number
+    maxScore: number
+  }
   modifiers: unknown[]
   hasStatOverrides: boolean
   hasRarityOverride: boolean
@@ -32,13 +35,14 @@ type CardDto = {
 export function serializeCard(card: CardWithStats | null): CardDto | null {
   if (!card) return null
   const { stats, ...details } = card
-  const knowledge = getCardKnowledgeBySlug(card.slug) ?? knowledgeBySlug.get(card.slug) ?? knowledgeByName.get(normalizeCardName(card.name))
+  const canonicalSlug = resolveCanonicalSlug(card.slug)
+  const knowledge = getCardKnowledgeBySlug(canonicalSlug)
   if (!knowledge) {
-    console.warn(`Statistiques canoniques absentes pour la carte ${card.slug}.`)
-    return { ...details, imageUrl: card.imageUrl, clans: [], baseStats: {}, effectiveStats: {}, stats: {}, traits: null, baseRarity: 'UNCOMMON', effectiveRarity: 'UNCOMMON', rarityMetadata: rarityOrder[0], modifiers: [], hasStatOverrides: false, hasRarityOverride: false }
+    throw new Error(`Carte canonique absente pour le slug Prisma ${card.slug}.`)
   }
   return {
     ...details,
+    slug: canonicalSlug,
     imageUrl: card.imageUrl,
     clans: knowledge.clans,
     baseStats: knowledge.stats,
@@ -65,18 +69,20 @@ export async function listCards(page: number, limit: number) {
 
 export async function getCard(idOrSlug: string) {
   const id = Number(idOrSlug)
-  const card = await prisma.card.findFirst({ where: Number.isInteger(id) && id > 0 ? { OR: [{ id }, { slug: idOrSlug }] } : { slug: idOrSlug }, include: cardInclude })
+  const canonicalSlug = resolveCanonicalSlug(idOrSlug)
+  const card = await prisma.card.findFirst({ where: Number.isInteger(id) && id > 0 ? { OR: [{ id }, { slug: idOrSlug }, { slug: canonicalSlug }] } : { OR: [{ slug: idOrSlug }, { slug: canonicalSlug }] }, include: cardInclude })
   return card ? getEffectiveCard(card.slug, card) : null
 }
 
 export async function getEffectiveCard(slug: string, card?: CardWithStats | null) {
-  const source = card ?? await prisma.card.findUnique({ where: { slug }, include: cardInclude })
+  const canonicalSlug = resolveCanonicalSlug(slug)
+  const source = card ?? await prisma.card.findFirst({ where: { OR: [{ slug }, { slug: canonicalSlug }] }, include: cardInclude })
   const serialized = serializeCard(source)
   if (!serialized) return null
   const [statOverrides, rarityOverride, modifiers] = await Promise.all([
-    prisma.cardStatOverride.findMany({ where: { cardSlug: slug } }),
-    prisma.cardRarityOverride.findUnique({ where: { cardSlug: slug } }),
-    prisma.cardModifier.findMany({ where: { cardSlug: slug }, orderBy: { createdAt: 'asc' } }),
+    prisma.cardStatOverride.findMany({ where: { cardSlug: canonicalSlug } }),
+    prisma.cardRarityOverride.findUnique({ where: { cardSlug: canonicalSlug } }),
+    prisma.cardModifier.findMany({ where: { cardSlug: canonicalSlug }, orderBy: { createdAt: 'asc' } }),
   ])
   const effectiveStats = { ...serialized.baseStats }
   for (const override of statOverrides) effectiveStats[override.statKey] = override.value
