@@ -13,6 +13,7 @@ import Regles from '../views/Regles.vue'
 import AdminDashboard from '../views/AdminDashboard.vue'
 import AdminCardEdit from '../views/AdminCardEdit.vue'
 import Simulation from '../views/Simulation.vue'
+import TeamAuction from '../views/TeamAuction.vue'
 import { useAuthStore } from '../stores/auth'
 
 const router = createRouter({
@@ -34,6 +35,7 @@ const router = createRouter({
     { path: '/personnages', component: Personnages },
     { path: '/regles', component: Regles },
     { path: '/simulation', component: Simulation },
+    { path: '/team-game', component: TeamAuction },
     {
       path: '/admin',
       component: AdminDashboard,

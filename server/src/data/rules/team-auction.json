@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0.0",
+  "gameName": "TEAM_AUCTION",
+  "minBid": 10,
+  "bidUnit": 10,
+  "openingBid": 10,
+  "allowAllIn": true,
+  "allowPass": true,
+  "passIsFinalForCurrentCard": true,
+  "rotation": {
+    "1v1": ["player1", "player2"],
+    "1v1v1": ["player1", "player2", "player3"]
+  },
+  "scoring": {
+    "character": {
+      "method": "average of numerical stats excluding clan and sensory",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "team": {
+      "method": "average of character scores in the team"
+    },
+    "victory": {
+      "method": "count team wins per player"
+    },
+    "tiebreak": {
+      "method": "sum of all team scores, then exact draw if still tied"
+    }
+  },
+  "ai": {
+    "topCardThreshold": 90,
+    "weakCardThreshold": 40,
+    "budgetAverageWeight": 0.9,
+    "rankWeight": 0.8,
+    "placementValueWeight": 1.1,
+    "strategicNeedWeight": 1.5,
+    "passOnWeakCardWhenBidExceeds": 0.85,
+    "allInTriggerScore": 96,
+    "allInTriggerRemainingSlots": 2,
+    "neverBidAboveBudgetRatio": 0.98,
+    "minimumBidFactor": 0.75
+  }
+}

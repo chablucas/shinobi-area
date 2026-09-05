@@ -137,9 +137,9 @@ test('AWAITING_RESULT puis résultat AUTO sont diffusés aux deux joueurs, et la
       socketB.emit('game:join', initial.id)
       await Promise.all([nextState(socketA, (state) => state.id === initial.id), nextState(socketB, (state) => state.id === initial.id)])
 
+      await fillBoards(initial.id, [creator!.id, opponent!.id], GAME_CATEGORIES.length * 2)
       const awaitingA = nextState(socketA, (state) => state.status === 'AWAITING_RESULT')
       const awaitingB = nextState(socketB, (state) => state.status === 'AWAITING_RESULT')
-      await fillBoards(initial.id, [creator!.id, opponent!.id], GAME_CATEGORIES.length * 2)
       await emitGameState(initial.id)
       const [reachedA, reachedB] = await Promise.all([awaitingA, awaitingB])
       assert.equal(reachedA.status, 'AWAITING_RESULT')

@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { createGameLobby, listFriends, type ChallengeMode, type Friend } from './services/socialApi'
 import { useAuthStore } from './stores/auth'
 import SocialHeader from './components/SocialHeader.vue'
+import type { TeamAuctionMode } from './services/realtimeApi'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -80,6 +81,15 @@ async function createInvite() {
   } finally {
     sendingInvite.value = false
   }
+}
+
+async function goTeamAuction(mode: TeamAuctionMode) {
+  await auth.loadCurrentUser()
+  if (!auth.token) {
+    await router.push('/connexion')
+    return
+  }
+  await router.push({ path: '/team-game', query: { mode } })
 }
 </script>
 
@@ -192,6 +202,73 @@ async function createInvite() {
       </div>
 
       <div class="hero-art" aria-label="Emblème Shinobi Area">
+        <img src="/logo.png" alt="Logo Shinobi Area" />
+      </div>
+    </section>
+
+    <section id="jeu-equipe" class="hero">
+      <div class="hero-copy">
+        <p class="kicker"><span class="kicker-dot"></span>Nouveau mode</p>
+        <h1>Jeu d’équipe<br /><span>Team Auction.</span></h1>
+        <p class="intro">
+          Enchéris carte par carte pour bâtir tes équipes de shinobis et affronte l'IA ou de vrais joueurs dans une bataille de gestion et de stratégie.
+        </p>
+
+        <div class="main-cta-group" aria-label="Modes Jeu d’équipe">
+          <button type="button" class="cta-card cta-solo" @click="goTeamAuction('1v1-ai')">
+            <div class="cta-card-header">
+              <span class="cta-badge">MODE 01</span>
+              <span class="cta-arrow" aria-hidden="true">→</span>
+            </div>
+            <div class="cta-card-body">
+              <span class="cta-icon">◈</span>
+              <div class="cta-text">
+                <h2>1v1 IA</h2>
+                <p>Enchéris seul contre une intelligence artificielle stratégique pour bâtir la meilleure équipe.</p>
+              </div>
+            </div>
+            <div class="cta-card-footer">
+              <span class="cta-action-label">Jouer <span>→</span></span>
+            </div>
+          </button>
+
+          <div class="cta-card cta-duel">
+            <div class="cta-card-header">
+              <span class="cta-badge">MODE 02</span>
+              <span class="cta-arrow" aria-hidden="true">⚔</span>
+            </div>
+            <div class="cta-card-body">
+              <span class="cta-icon">✦</span>
+              <div class="cta-text">
+                <h2>1v1 joueur réel</h2>
+                <p>Défie un adversaire réel en salon Team Auction et emporte les cartes les plus fortes.</p>
+              </div>
+            </div>
+            <div class="cta-actions-dual">
+              <button type="button" class="cta-sub-btn primary" @click="goTeamAuction('1v1-real')">JOUER</button>
+            </div>
+          </div>
+
+          <div class="cta-card cta-triple">
+            <div class="cta-card-header">
+              <span class="cta-badge">MODE 03</span>
+              <span class="cta-arrow" aria-hidden="true">⌘</span>
+            </div>
+            <div class="cta-card-body">
+              <span class="cta-icon">⌘</span>
+              <div class="cta-text">
+                <h2>1v1v1 joueurs réels</h2>
+                <p>Trois joueurs, une seule pioche : enchéris et compose l’équipe qui dominera les deux autres.</p>
+              </div>
+            </div>
+            <div class="cta-actions-dual">
+              <button type="button" class="cta-sub-btn primary" @click="goTeamAuction('1v1v1-real')">JOUER</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-art" aria-label="Illustration Jeu d’équipe">
         <img src="/logo.png" alt="Logo Shinobi Area" />
       </div>
     </section>
