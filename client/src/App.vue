@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { createGameLobby, listFriends, type ChallengeMode, type Friend } from './services/socialApi'
+import { teamAuctionGameRoute } from './services/teamAuctionMode'
 import { useAuthStore } from './stores/auth'
 import SocialHeader from './components/SocialHeader.vue'
 import type { TeamAuctionMode } from './services/realtimeApi'
@@ -85,8 +86,7 @@ async function createInvite() {
     )
     inviteMode.value = null
     if (isTeam) {
-      const taMode = currentMode === 'team-1v1' ? '1v1-real' : '1v1v1-real'
-      await router.push({ path: '/team-game', query: { mode: taMode, gameId: lobby.id } })
+      await router.push(teamAuctionGameRoute(lobby.mode, lobby.id))
     } else {
       await router.push(`/lobby/${lobby.id}`)
     }

@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import SocialHeader from '../components/SocialHeader.vue'
 import { getGameLobby, startGameLobby, type GameLobby } from '../services/socialApi'
+import { isTeamAuctionMode, teamAuctionGameRoute } from '../services/teamAuctionMode'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -16,22 +17,26 @@ let pollTimer: ReturnType<typeof setTimeout> | undefined
 let pollInFlight = false
 let isMounted = false
 
-const isTeamAuctionLobby = computed(() => lobby.value?.mode === 'team-1v1' || lobby.value?.mode === 'team-1v1v1')
+const isTeamAuctionLobby = computed(() => isTeamAuctionMode(lobby.value?.mode))
 const isHost = computed(() => Boolean(lobby.value && auth.user && lobby.value.creatorId === auth.user.id))
 const isAcceptedParticipant = computed(() => Boolean(lobby.value && auth.user && lobby.value.players.some((player) => player.id === auth.user!.id && player.status === 'ACCEPTED')))
 const guestCanJoin = computed(() => Boolean(isTeamAuctionLobby.value && !isHost.value && isAcceptedParticipant.value && (lobby.value!.status === 'READY' || lobby.value!.status === 'PLAYING')))
 
 type TeamGameQuery = { path: string; query: { mode: string; gameId: string } }
 function teamAuctionRoute(mode: string, gameId: string): TeamGameQuery {
-  return { path: '/team-game', query: { mode: mode === 'team-1v1' ? '1v1-real' : '1v1v1-real', gameId } }
+  return teamAuctionGameRoute(mode as 'team-1v1' | 'team-1v1v1', gameId)
 }
 
 onMounted(async () => {
   isMounted = true
   await auth.loadCurrentUser()
   if (!auth.token) { await router.replace('/connexion'); return }
-  try { await refreshLobby(); schedulePoll() } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Salon introuvable.' }
+  try { await refreshLobby(); schedulePoll(); debugLobbyState() } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Salon introuvable.' }
 })
+function debugLobbyState() {
+  if (!lobby.value) return
+  console.debug('[Lobby] état rendu', { route: route.fullPath, lobbyId: lobby.value.id, mode: lobby.value.mode, status: lobby.value.status, canStart: lobby.value.canStart, isHost: isHost.value, isAcceptedParticipant: isAcceptedParticipant.value, guestCanJoin: guestCanJoin.value, userId: auth.user?.id })
+}
 onUnmounted(() => { isMounted = false; if (pollTimer) clearTimeout(pollTimer) })
 async function refreshLobby() { if (!auth.token || pollInFlight) return; pollInFlight = true; try { lobby.value = await getGameLobby(auth.token, String(route.params.id)); error.value = '' } finally { pollInFlight = false } }
 function schedulePoll() { if (!isMounted || !auth.token || lobby.value?.status === 'PLAYING') return; pollTimer = setTimeout(async () => { try { await refreshLobby() } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Salon indisponible.' } if (isMounted && lobby.value?.status !== 'PLAYING') schedulePoll() }, 2000) }
@@ -55,10 +60,13 @@ async function joinTeamAuction() {
   if (!auth.token || !lobby.value || joining.value) return
   joining.value = true
   error.value = ''
+  console.debug('[Lobby] clic REJOINDRE LA PARTIE', { lobbyId: lobby.value.id, mode: lobby.value.mode })
   try {
     const currentLobby = await getGameLobby(auth.token, lobby.value.id)
     lobby.value = currentLobby
-    await router.push(teamAuctionRoute(currentLobby.mode, currentLobby.id))
+    const target = teamAuctionRoute(currentLobby.mode, currentLobby.id)
+    console.debug('[Lobby] navigation vers', target)
+    await router.push(target)
   } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Impossible de rejoindre le salon.' } finally { joining.value = false }
 }
 </script>
@@ -69,4 +77,7 @@ async function joinTeamAuction() {
 
 <style scoped>
 .lobby-page { min-height: 100vh; background: var(--bg-main); }.lobby-content { max-width: 860px; margin: 0 auto; padding: 72px 20px; }.lobby-content h1 { margin: 14px 0; font-size: clamp(3rem, 8vw, 6rem); text-transform: uppercase; }.lobby-state { color: var(--accent-gold); text-transform: uppercase; }.lobby-players { display: grid; gap: 10px; max-width: 520px; margin-top: 28px; }.lobby-players article { display: flex; justify-content: space-between; gap: 16px; padding: 16px; border: 1px solid var(--border-light); background: var(--bg-panel); }.lobby-players span, .lobby-empty { color: var(--text-muted); font-size: .72rem; }.ai-badge { margin-left: 8px; padding: 2px 6px; border: 1px solid var(--border-light); color: var(--accent-gold); font-size: .6rem; }.social-error { color: var(--accent-red); }
+.start-button { display: inline-block; margin-top: 28px; padding: 16px 28px; background: var(--accent-orange); color: #1a1207; border: 0; font-weight: 800; font-size: .9rem; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
+.start-button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(245, 166, 35, 0.35); }
+.start-button:disabled { opacity: .55; cursor: wait; }
 </style>

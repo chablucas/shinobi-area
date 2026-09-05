@@ -15,6 +15,7 @@ import {
   type GameInvite,
   type SearchResult,
 } from '../services/socialApi'
+import { isTeamAuctionMode, teamAuctionGameRoute } from '../services/teamAuctionMode'
 import MobileSidebar from './MobileSidebar.vue'
 
 const auth = useAuthStore()
@@ -105,11 +106,7 @@ function publicProfile(id: number) { open.value = false; void router.push(`/prof
 async function addFriend(id: number) { if (!auth.token) return; await sendFriendRequest(auth.token, id); const player = results.value.players.find((item) => item.id === id); if (player) { player.friendshipStatus = 'PENDING'; player.friendshipDirection = 'sent' } }
 async function acceptSearchRequest(player: SearchResult['players'][number]) { if (!auth.token || !player.friendshipRequestId) return; await acceptFriendRequest(auth.token, player.friendshipRequestId); player.friendshipStatus = 'ACCEPTED'; player.friendshipDirection = null }
 async function answer(request: FriendRequest, accepted: boolean) { if (!auth.token) return; requests.value = requests.value.filter((item) => item.id !== request.id); try { if (accepted) await acceptFriendRequest(auth.token, request.id); else await rejectFriendRequest(auth.token, request.id) } finally { await refreshNotifications() } }
-function isTeamInvite(invite: GameInvite) { return invite.mode === 'team-1v1' || invite.mode === 'team-1v1v1' }
-function teamAuctionRoute(lobbyMode: string, lobbyId: string) {
-  const taMode = lobbyMode === 'team-1v1' ? '1v1-real' : '1v1v1-real'
-  return { path: '/team-game', query: { mode: taMode, gameId: lobbyId } }
-}
+function isTeamInvite(invite: GameInvite) { return isTeamAuctionMode(invite.mode) }
 async function joinGameInvite(invite: GameInvite) {
   if (!auth.token || joiningInviteIds.value.includes(invite.id)) return
   joiningInviteIds.value = [...joiningInviteIds.value, invite.id]
@@ -118,7 +115,7 @@ async function joinGameInvite(invite: GameInvite) {
     const lobby = await acceptGameInvite(auth.token, invite.id)
     gameInvites.value = gameInvites.value.filter((item) => item.id !== invite.id)
     if (isTeamInvite(invite)) {
-      await router.push(teamAuctionRoute(lobby.mode, lobby.id))
+      await router.push(teamAuctionGameRoute(lobby.mode, lobby.id))
     } else {
       await router.push(`/lobby/${lobby.id}`)
     }
