@@ -6,13 +6,19 @@ import { simulateFight } from '../game/gameEngine.js'
 export const GAME_CATEGORIES = ['chakra', 'invocation', 'iq', 'ninjutsu', 'genjutsu', 'taijutsu', 'avatar', 'body', 'fuinjutsu', 'senjutsu', 'kenjutsu', 'clan', 'vitesse', 'kekkei-genkai', 'kekkei-mora'] as const
 type Category = typeof GAME_CATEGORIES[number]
 type StoredPlayer = { userId: number | null; displayName: string; playerNumber: number; pile: number[]; pendingCardId: number | null; slots: Record<Category, number | null> }
-type StoredState = { players: StoredPlayer[]; result?: ReturnType<typeof simulateFight> }
+type AutoGameResult = ReturnType<typeof simulateFight> & { resultMode: 'AUTO'; winnerNumber: 1 | 2 | null; isDraw: boolean }
+type ManualGameResult = { resultMode: 'MANUAL'; winnerNumber: 1 | 2 | null; isDraw: boolean }
+type StoredState = { players: StoredPlayer[]; result?: AutoGameResult | ManualGameResult | ReturnType<typeof simulateFight>; stateVersion?: number }
 
 function invalid(message: string, statusCode = 400) { return Object.assign(new Error(message), { statusCode }) }
 function emptySlots() { return Object.fromEntries(GAME_CATEGORIES.map((category) => [category, null])) as Record<Category, number | null> }
 function normalizeCategory(category: unknown): Category | null { return typeof category === 'string' && (GAME_CATEGORIES as readonly string[]).includes(category) ? category as Category : null }
 function stateOf(value: Prisma.JsonValue): StoredState { return value as unknown as StoredState }
 function playerFor(state: StoredState, userId: number) { return state.players.find((player) => player.userId === userId) }
+function playersAreComplete(state: StoredState) { return state.players.length === 2 && state.players.every((player) => GAME_CATEGORIES.every((category) => player.slots[category] !== null)) }
+function buildFor(player: StoredPlayer) {
+  return { slots: Object.fromEntries(Object.entries(player.slots).map(([slot, id]) => [slot, getCardKnowledgeById(id!)?.slug ?? ''])) }
+}
 const lobbyInclude = { creator: { select: { id: true, displayName: true } }, invites: { include: { invitee: { select: { id: true, displayName: true } } } } }
 function gameInclude() { return { lobby: { include: lobbyInclude } } }
 
@@ -33,6 +39,7 @@ async function cardView(id: number, imageById: Map<number, string | null>) {
 export async function publicGameState(game: Awaited<ReturnType<typeof findGame>>, userId: number) {
   if (!game) return null
   const state = stateOf(game.state)
+  const stateVersion = Number.isFinite(state.stateVersion) ? Number(state.stateVersion) : (game.turnNumber ?? 0)
   const cardIds = new Set<number>()
   for (const player of state.players) {
     if (player.pendingCardId) cardIds.add(player.pendingCardId)
@@ -63,6 +70,7 @@ export async function publicGameState(game: Awaited<ReturnType<typeof findGame>>
     status: game.status,
     currentPlayerNumber: game.currentPlayerNumber,
     turnNumber: game.turnNumber,
+    stateVersion,
     players,
     result: state.result ?? null,
   }
@@ -115,7 +123,10 @@ async function mutate(userId: number, gameId: string, mutation: (game: NonNullab
       const player = playerFor(state, userId)
       if (!player) throw invalid('Vous n’avez pas accès à cette partie.', 403)
       const advanceTurn = mutation(current, state, player) !== false
-      return transaction.game.update({ where: { id: gameId }, data: { state: state as unknown as Prisma.InputJsonValue, status: state.result ? GameStatus.FINISHED : current.status, winnerNumber: state.result?.winner === 'player1' ? 1 : state.result?.winner === 'player2' ? 2 : null, finishedAt: state.result ? new Date() : undefined, currentPlayerNumber: advanceTurn && !state.result ? state.players[(player.playerNumber % state.players.length)]!.playerNumber : current.currentPlayerNumber, turnNumber: advanceTurn && !state.result ? current.turnNumber + 1 : current.turnNumber }, include: gameInclude() })
+      const nextStateVersion = (Number(state.stateVersion ?? current.turnNumber) || 0) + 1
+      state.stateVersion = nextStateVersion
+      const awaitingResult = current.status === GameStatus.PLAYING && playersAreComplete(state)
+      return transaction.game.update({ where: { id: gameId }, data: { state: state as unknown as Prisma.InputJsonValue, status: awaitingResult ? GameStatus.AWAITING_RESULT : current.status, currentPlayerNumber: advanceTurn && !awaitingResult ? state.players[(player.playerNumber % state.players.length)]!.playerNumber : current.currentPlayerNumber, turnNumber: advanceTurn && !awaitingResult ? current.turnNumber + 1 : current.turnNumber }, include: gameInclude() })
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
     return await publicGameState(game, userId)
   } catch (error) {
@@ -146,10 +157,43 @@ export function placeCard(userId: number, gameId: string, rawCategory: unknown) 
     if (player.slots[category]) throw invalid('Cette catégorie est déjà remplie.', 409)
     player.slots[category] = player.pendingCardId
     player.pendingCardId = null
-    if (state.players.every((candidate) => GAME_CATEGORIES.every((slot) => candidate.slots[slot] !== null))) {
-      state.result = simulateFight(...state.players.slice(0, 2).map((candidate) => ({ slots: Object.fromEntries(Object.entries(candidate.slots).map(([slot, id]) => [slot, getCardKnowledgeById(id!)!.slug])) })) as [{ slots: Record<string, string> }, { slots: Record<string, string> }])
-    }
   })
+}
+
+async function finalizeGame(userId: number, gameId: string, mode: 'AUTO' | 'MANUAL', winnerNumber?: 1 | 2 | null, isDraw?: boolean) {
+  try {
+    const game = await prisma.$transaction(async (transaction) => {
+      const current = await transaction.game.findUnique({ where: { id: gameId }, include: gameInclude() })
+      if (!current) throw invalid('Partie introuvable.', 404)
+      const state = stateOf(current.state)
+      if (!playerFor(state, userId)) throw invalid('Vous n’avez pas accès à cette partie.', 403)
+      if (current.status === GameStatus.FINISHED) return current
+      if (current.status !== GameStatus.AWAITING_RESULT || !playersAreComplete(state)) throw invalid('La partie n’attend pas de résultat.', 409)
+      if (mode === 'MANUAL' && current.lobby.creatorId !== userId) throw invalid('Seul l’hôte peut choisir le vainqueur.', 403)
+      const result: AutoGameResult | ManualGameResult = mode === 'AUTO'
+        ? (() => {
+            const fight = simulateFight(buildFor(state.players[0]!), buildFor(state.players[1]!))
+            const resolvedWinner = fight.winner === 'player1' ? 1 : fight.winner === 'player2' ? 2 : null
+            return { ...fight, resultMode: 'AUTO', winnerNumber: resolvedWinner, isDraw: resolvedWinner === null }
+          })()
+        : { resultMode: 'MANUAL', winnerNumber: isDraw ? null : winnerNumber ?? null, isDraw: Boolean(isDraw) }
+      if (mode === 'MANUAL' && !result.isDraw && result.winnerNumber === null) throw invalid('Choisis un vainqueur ou une égalité.')
+      state.result = result
+      state.stateVersion = (Number(state.stateVersion ?? current.turnNumber) || 0) + 1
+      return transaction.game.update({ where: { id: gameId }, data: { state: state as unknown as Prisma.InputJsonValue, status: GameStatus.FINISHED, winnerNumber: result.winnerNumber, finishedAt: new Date() }, include: gameInclude() })
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+    return await publicGameState(game, userId)
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') throw invalid('Action concurrent refusée, réessaie.', 409)
+    throw error
+  }
+}
+
+export function calculateGameResult(userId: number, gameId: string) { return finalizeGame(userId, gameId, 'AUTO') }
+export function chooseGameResult(userId: number, gameId: string, winnerNumber: unknown, isDraw: unknown) {
+  const validWinner = winnerNumber === 1 || winnerNumber === 2 ? winnerNumber : null
+  if (isDraw !== true && validWinner === null) throw invalid('Choisis le joueur 1, le joueur 2 ou une égalité.')
+  return finalizeGame(userId, gameId, 'MANUAL', validWinner, isDraw === true)
 }
 
 export function playerNumberFor(state: Prisma.JsonValue, userId: number) { return playerFor(stateOf(state), userId)?.playerNumber ?? null }

@@ -13,7 +13,8 @@
     "categories:seed": "tsx src/scripts/seedCategories.ts",
     "cards:check": "tsx src/scripts/checkCards.ts",
     "cards:check-cloudinary": "tsx src/scripts/checkCloudinaryCards.ts",
-    "cards:import": "tsx src/scripts/importCards.ts"
+    "cards:import": "tsx src/scripts/importCards.ts",
+    "cards:rebuild-images": "tsx src/scripts/rebuildCardImageMapping.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",

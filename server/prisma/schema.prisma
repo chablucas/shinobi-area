@@ -114,6 +114,7 @@ model GameLobby {
 
 enum GameStatus {
   PLAYING
+  AWAITING_RESULT
   FINISHED
 }
 

@@ -34,14 +34,14 @@ type CardDto = {
 
 export function serializeCard(card: CardWithStats | null): CardDto | null {
   if (!card) return null
-  const { stats, ...details } = card
   const canonicalSlug = resolveCanonicalSlug(card.slug)
   const knowledge = getCardKnowledgeBySlug(canonicalSlug)
   if (!knowledge) {
     throw new Error(`Carte canonique absente pour le slug Prisma ${card.slug}.`)
   }
   return {
-    ...details,
+    id: card.id,
+    name: knowledge.name,
     slug: canonicalSlug,
     imageUrl: card.imageUrl,
     clans: knowledge.clans,

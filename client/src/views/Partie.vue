@@ -5,7 +5,7 @@ import { fetchAllCards } from '../services/cardApi'
 import { useAuthStore } from '../stores/auth'
 import { saveBuild } from '../services/buildApi'
 import { CombatApiError, simulateFight } from '../services/gameApi'
-import { getGameLobby, getLobbyGame, SocialApiError, type RealtimeGameState } from '../services/socialApi'
+import { calculateRealtimeGameResult, chooseRealtimeGameResult, getGameLobby, getLobbyGame, SocialApiError, type AutoRealtimeResult, type RealtimeGameState } from '../services/socialApi'
 import { connectGameSocket, type GameSocket } from '../services/realtimeApi'
 import type { Card } from '../types/card'
 import type { CombatResult } from '../types/combat'
@@ -52,6 +52,10 @@ const realtimePlayerNumber = ref<number | null>(null)
 const realtimeSocket = ref<GameSocket | null>(null)
 const socketConnected = ref(false)
 const drawLoading = ref(false)
+const currentStateVersion = ref(0)
+const realtimeHostId = ref<number | null>(null)
+const resultLoading = ref(false)
+const manualResultOpen = ref(false)
 
 const activeBuild = computed(() => builds.value[activePlayerId.value - 1]!)
 const availableCardCount = computed(() => cards.value.length - usedCardIds.value.size)
@@ -68,6 +72,7 @@ onMounted(async () => {
     if (!auth.token) { lobbyAccessError.value = 'Connecte-toi pour rejoindre ce combat.'; loading.value = false; return }
     try {
       const lobby = await getGameLobby(auth.token, props.lobbyId)
+      realtimeHostId.value = lobby.creatorId
       if (lobby.status !== 'PLAYING') { lobbyAccessError.value = lobby.status === 'READY' ? 'Le combat n’a pas encore commencé.' : 'Le salon attend encore les participants.'; loading.value = false; return }
       realtimeState.value = await getLobbyGame(auth.token, props.lobbyId)
       realtimePlayerNumber.value = realtimeState.value.players.find((player) => player.userId === auth.user?.id)?.playerNumber ?? null
@@ -77,7 +82,16 @@ onMounted(async () => {
       socket.on('connect', join)
       socket.on('disconnect', () => { socketConnected.value = false; drawLoading.value = false })
       socket.on('connect_error', () => { socketConnected.value = false; errorMessage.value = 'Connexion au combat impossible. Reconnexion...' })
-      socket.on('game:state', (state) => { realtimeState.value = state; drawLoading.value = false })
+      socket.on('game:state', (state) => {
+        const incomingVersion = Number(state.stateVersion ?? state.turnNumber ?? 0)
+        if (incomingVersion < currentStateVersion.value) {
+          return
+        }
+        currentStateVersion.value = incomingVersion
+        realtimeState.value = state
+        drawLoading.value = false
+        errorMessage.value = ''
+      })
       socket.on('game:error', (socketError) => { errorMessage.value = socketError.message; drawLoading.value = false })
     } catch (error) {
       lobbyAccessError.value = error instanceof SocialApiError
@@ -101,6 +115,20 @@ onUnmounted(() => { realtimeSocket.value?.disconnect() })
 const realtimeCurrentPlayer = computed(() => realtimeState.value?.players.find((player) => player.playerNumber === realtimeState.value?.currentPlayerNumber) ?? null)
 const realtimeMyPlayer = computed(() => realtimeState.value?.players.find((player) => player.playerNumber === realtimePlayerNumber.value) ?? null)
 const realtimeMyTurn = computed(() => Boolean(realtimeState.value && realtimePlayerNumber.value === realtimeState.value.currentPlayerNumber))
+const isRealtimeHost = computed(() => auth.user?.id === realtimeHostId.value)
+const autoRealtimeResult = computed(() => {
+  const result = realtimeState.value?.result
+  return result && 'resultMode' in result && result.resultMode === 'AUTO' ? result as AutoRealtimeResult : null
+})
+const realtimeWinnerName = computed(() => {
+  const result = realtimeState.value?.result
+  const winnerNumber = result && 'winnerNumber' in result ? result.winnerNumber : result?.winner === 'player1' ? 1 : result?.winner === 'player2' ? 2 : null
+  return winnerNumber ? realtimeState.value?.players.find((player) => player.playerNumber === winnerNumber)?.displayName ?? `Joueur ${winnerNumber}` : ''
+})
+const realtimeResultIsDraw = computed(() => {
+  const result = realtimeState.value?.result
+  return result && 'isDraw' in result ? result.isDraw : result?.winner === 'draw'
+})
 const canDraw = computed(() => Boolean(
   socketConnected.value
   && realtimeState.value?.status === 'PLAYING'
@@ -120,6 +148,18 @@ function realtimeDraw() {
   realtimeSocket.value?.emit('game:draw', realtimeState.value.id)
 }
 function realtimePlace(category: string) { if (realtimeState.value && realtimeCanPlaceCategory(category)) realtimeSocket.value?.emit('game:place-card', { gameId: realtimeState.value.id, category }) }
+async function calculateRealtimeWinner() {
+  if (!auth.token || !realtimeState.value || resultLoading.value) return
+  resultLoading.value = true
+  errorMessage.value = ''
+  try { realtimeState.value = await calculateRealtimeGameResult(auth.token, realtimeState.value.id) } catch (error) { errorMessage.value = error instanceof Error ? error.message : 'Calcul du résultat impossible.' } finally { resultLoading.value = false }
+}
+async function submitManualRealtimeWinner(winnerNumber: 1 | 2 | null, isDraw = false) {
+  if (!auth.token || !realtimeState.value || resultLoading.value) return
+  resultLoading.value = true
+  errorMessage.value = ''
+  try { realtimeState.value = await chooseRealtimeGameResult(auth.token, realtimeState.value.id, winnerNumber, isDraw); manualResultOpen.value = false } catch (error) { errorMessage.value = error instanceof Error ? error.message : 'Choix du résultat impossible.' } finally { resultLoading.value = false }
+}
 
 watch([activePlayerId, phase, cards], () => {
   if (isComputerTurn.value && !loading.value) playComputerTurn()
@@ -275,7 +315,9 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
         </article>
       </div>
       <div class="realtime-draw-zone"><div><p class="eyebrow">Pioche joueur {{ realtimePlayerNumber }}</p><div v-if="realtimeMyPlayer?.pendingCard" class="realtime-drawn-card"><div class="realtime-drawn-card-art"><img v-if="realtimeMyPlayer.pendingCard.imageUrl" :src="realtimeMyPlayer.pendingCard.imageUrl" :alt="`Carte ${realtimeMyPlayer.pendingCard.name}`" /><span v-else>{{ realtimeMyPlayer.pendingCard.name.slice(0, 1) }}</span></div><div class="realtime-drawn-card-copy"><strong>{{ realtimeMyPlayer.pendingCard.name }}</strong><span>Carte piochée</span></div></div><div v-else class="realtime-empty-draw">{{ realtimeMyTurn ? 'PIOCHER' : 'EN ATTENTE' }}</div><button type="button" :disabled="!canDraw" @click="realtimeDraw">PIOCHER</button></div><p v-if="realtimeCurrentPlayer" class="realtime-current">{{ realtimeMyTurn ? 'Choisis une catégorie pour poser ta carte.' : `Joueur ${realtimeState.currentPlayerNumber} prépare son action.` }}</p></div>
-      <section v-if="realtimeState.status === 'FINISHED' && realtimeState.result" class="realtime-result"><h2>Combat terminé</h2><p>Le moteur serveur a calculé le résultat officiel.</p></section>
+      <section v-if="realtimeState.status === 'AWAITING_RESULT'" class="realtime-result"><p class="eyebrow">Combat terminé</p><h2>Les deux shinobis sont complets.</h2><div class="combat-actions"><button type="button" :disabled="resultLoading" @click="calculateRealtimeWinner">{{ resultLoading ? 'CALCUL EN COURS...' : 'CALCULER LE VAINQUEUR' }}</button><button v-if="isRealtimeHost" type="button" :disabled="resultLoading" @click="manualResultOpen = true">CHOISIR LE VAINQUEUR</button></div></section>
+      <section v-if="realtimeState.status === 'FINISHED' && realtimeState.result" class="realtime-result"><p class="eyebrow">Résultat du combat</p><template v-if="autoRealtimeResult"><div class="combat-score"><article><h3>Joueur 1</h3><strong>{{ autoRealtimeResult.player1Total }}</strong><span>pts</span></article><b>VS</b><article><h3>Joueur 2</h3><strong>{{ autoRealtimeResult.player2Total }}</strong><span>pts</span></article></div><h2>{{ autoRealtimeResult.isDraw ? 'ÉGALITÉ' : `VAINQUEUR : ${realtimeWinnerName}` }}</h2><p>Résultat calculé par le moteur officiel.</p><details><summary>RÈGLES APPLIQUÉES</summary><p v-for="rule in [...autoRealtimeResult.player1.appliedRules, ...autoRealtimeResult.player2.appliedRules]" :key="rule.ruleId + rule.target + rule.after" class="rule-row">{{ rule.label }} · {{ rule.target }} : {{ rule.before }} → {{ rule.after }}</p></details></template><template v-else><h2>{{ realtimeResultIsDraw ? 'ÉGALITÉ' : `VAINQUEUR : ${realtimeWinnerName}` }}</h2><p>Résultat choisi manuellement par l’hôte.</p></template></section>
+      <div v-if="manualResultOpen" class="manual-result-modal" role="dialog" aria-modal="true"><section><p class="eyebrow">Qui a gagné ?</p><button type="button" :disabled="resultLoading" @click="submitManualRealtimeWinner(1)">JOUEUR 1 — {{ realtimeState.players[0]?.displayName }}</button><button type="button" :disabled="resultLoading" @click="submitManualRealtimeWinner(2)">JOUEUR 2 — {{ realtimeState.players[1]?.displayName }}</button><button type="button" :disabled="resultLoading" @click="submitManualRealtimeWinner(null, true)">ÉGALITÉ</button><button type="button" :disabled="resultLoading" @click="manualResultOpen = false">ANNULER</button></section></div>
     </section>
 
     <template v-if="!props.lobbyId && phase === 'construction'">

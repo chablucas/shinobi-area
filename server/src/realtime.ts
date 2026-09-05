@@ -4,6 +4,9 @@ import { requireJwtSecret } from './config/env.js'
 import { drawCard, findGame, getGameForUser, placeCard, publicGameState } from './services/realtimeGameService.js'
 
 type SocketData = { userId?: number; gameId?: string }
+let broadcastGameState: ((gameId: string) => Promise<void>) | null = null
+
+export async function emitGameState(gameId: string) { await broadcastGameState?.(gameId) }
 
 export function attachRealtime(io: Server) {
   io.use((socket, next) => {
@@ -27,6 +30,7 @@ export function attachRealtime(io: Server) {
       if (userId) socket.emit('game:state', await publicGameState(game, userId))
     }
   }
+  broadcastGameState = emitState
 
   io.on('connection', (socket) => {
     const userId = (socket.data as SocketData).userId
