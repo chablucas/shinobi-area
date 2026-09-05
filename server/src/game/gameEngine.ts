@@ -2,7 +2,7 @@ import { getCardKnowledgeBySlug, getCardKnowledgeById } from './cardKnowledge.js
 import { applyRules } from './rules/applyRules.js'
 import type { AppliedRule, Card, CombatPermissions, ValidationError, RuleContext } from './rules/types.js'
 
-export const STAT_KEYS = ['chakra', 'invocation', 'iq', 'ninjutsuAttack', 'ninjutsuDefense', 'genjutsu', 'taijutsu', 'avatar', 'body', 'fuinjutsu', 'senjutsu', 'kenjutsu', 'clan', 'speed', 'kekkeiGenkai'] as const
+export const STAT_KEYS = ['chakra', 'invocation', 'iq', 'ninjutsuAttack', 'ninjutsuDefense', 'genjutsu', 'taijutsu', 'avatar', 'body', 'fuinjutsu', 'senjutsu', 'kenjutsu', 'clan', 'speed', 'kekkeiGenkai', 'kekkeiMora'] as const
 export type StatKey = (typeof STAT_KEYS)[number]
 export type CombatStats = Record<StatKey, number>
 export type CardSelection = string | { slug?: string; id?: number; name?: string; clans?: string[]; stats?: Partial<CombatStats> }
@@ -30,7 +30,7 @@ export type FightResult = {
 }
 
 // shinobi-card-stats.json reste la source des statistiques numériques utilisées ici (via cardKnowledge)
-const categoryStats: Record<string, StatKey[]> = { chakra: ['chakra'], invocation: ['invocation'], iq: ['iq'], ninjutsu: ['ninjutsuAttack', 'ninjutsuDefense'], genjutsu: ['genjutsu'], taijutsu: ['taijutsu'], avatar: ['avatar'], body: ['body'], fuinjutsu: ['fuinjutsu'], 'fūinjutsu': ['fuinjutsu'], senjutsu: ['senjutsu'], kenjutsu: ['kenjutsu'], vitesse: ['speed'], speed: ['speed'], 'kekkei-genkai': ['kekkeiGenkai'], kekkeigenkai: ['kekkeiGenkai'], 'kekkei-mora': [], kekkeimora: [] }
+const categoryStats: Record<string, StatKey[]> = { chakra: ['chakra'], invocation: ['invocation'], iq: ['iq'], ninjutsu: ['ninjutsuAttack', 'ninjutsuDefense'], genjutsu: ['genjutsu'], taijutsu: ['taijutsu'], avatar: ['avatar'], body: ['body'], fuinjutsu: ['fuinjutsu'], 'fūinjutsu': ['fuinjutsu'], senjutsu: ['senjutsu'], kenjutsu: ['kenjutsu'], vitesse: ['speed'], speed: ['speed'], 'kekkei-genkai': ['kekkeiGenkai'], kekkeigenkai: ['kekkeiGenkai'], 'kekkei-mora': ['kekkeiMora'], kekkeimora: ['kekkeiMora'] }
 const fightCategories = ['chakra', 'invocation', 'iq', 'ninjutsu', 'genjutsu', 'taijutsu', 'avatar', 'body', 'fuinjutsu', 'senjutsu', 'kenjutsu', 'clan', 'vitesse', 'kekkei-genkai', 'kekkei-mora']
 
 function emptyStats(): CombatStats { return Object.fromEntries(STAT_KEYS.map((key) => [key, 0])) as CombatStats }
@@ -73,6 +73,16 @@ function categoryWinner(values: number[]): FightPlayer | 'draw' {
   if (values.filter((value) => value === highest).length !== 1) return 'draw'
   return (`player${values.indexOf(highest) + 1}`) as FightPlayer
 }
+function normalizeComparableScore(value: number): number {
+  return Number(value.toFixed(10))
+}
+function finalWinnerFromTotals(totals: Record<string, number>): FightPlayer | 'draw' {
+  const entries = Object.entries(totals) as Array<[FightPlayer, number]>
+  const normalized = entries.map(([player, total]) => [player, normalizeComparableScore(total)] as const)
+  const highest = Math.max(...normalized.map(([, total]) => total))
+  const winners = normalized.filter(([, total]) => total === highest)
+  return winners.length === 1 ? winners[0][0] : 'draw'
+}
 export function simulateFight(player1: ShinobiBuild, player2: ShinobiBuild, player3?: ShinobiBuild): FightResult {
   const builds = [player1, player2, player3].filter((build): build is ShinobiBuild => Boolean(build))
   const contexts = builds.map(contextFor)
@@ -87,11 +97,8 @@ export function simulateFight(player1: ShinobiBuild, player2: ShinobiBuild, play
     })
   const scores = { player1: 0, player2: 0, ...(player3 ? { player3: 0 } : {}) }
   for (const category of categories) if (category.winner !== 'draw') scores[category.winner] += 1
-  const scoreValues = Object.values(scores)
-  const highestScore = Math.max(...scoreValues)
-  const winner = invalid || scoreValues.filter((score) => score === highestScore).length !== 1
-    ? 'draw'
-    : (Object.entries(scores).find(([, score]) => score === highestScore)?.[0] as FightPlayer)
+  const totals = { player1: results[0]!.total, player2: results[1]!.total, ...(results[2] ? { player3: results[2].total } : {}) }
+  const winner = invalid ? 'draw' : finalWinnerFromTotals(totals)
   return {
     winner,
     player1: results[0]!,

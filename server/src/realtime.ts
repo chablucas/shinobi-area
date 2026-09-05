@@ -58,12 +58,22 @@ export function attachRealtime(io: Server) {
       try {
         await drawCard(userId, gameId)
         await emitState(gameId)
-      } catch (error) { socket.emit('game:error', { message: error instanceof Error ? error.message : 'Tirage refusé.' }) }
+      } catch (error) {
+        const message = error instanceof Error && /Transaction API error|Unable to start a transaction|Prisma|transaction|timeout|deadlock/i.test(error.message)
+          ? 'Impossible de démarrer la partie. Réessaie.'
+          : (error instanceof Error ? error.message : 'Tirage refusé.')
+        socket.emit('game:error', { message })
+      }
     })
     socket.on('game:place-card', async (payload: { gameId?: unknown; category?: unknown }) => {
       const gameId = payload?.gameId
       if (typeof gameId !== 'string' || socket.data.gameId !== gameId) return socket.emit('game:error', { message: 'Rejoins la partie avant de jouer.' })
-      try { await placeCard(userId, gameId, payload.category); await emitState(gameId) } catch (error) { socket.emit('game:error', { message: error instanceof Error ? error.message : 'Placement refusé.' }) }
+      try { await placeCard(userId, gameId, payload.category); await emitState(gameId) } catch (error) {
+        const message = error instanceof Error && /Transaction API error|Unable to start a transaction|Prisma|transaction|timeout|deadlock/i.test(error.message)
+          ? 'Impossible de démarrer la partie. Réessaie.'
+          : (error instanceof Error ? error.message : 'Placement refusé.')
+        socket.emit('game:error', { message })
+      }
     })
   })
 

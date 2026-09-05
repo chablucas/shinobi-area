@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { calculateCombat, calculateFinalStats, calculateTotal, simulateFight, type CombatStats } from '../src/game/gameEngine.js'
 
-const zeroStats = (): CombatStats => ({ chakra: 0, invocation: 0, iq: 0, ninjutsuAttack: 0, ninjutsuDefense: 0, genjutsu: 0, taijutsu: 0, avatar: 0, body: 0, fuinjutsu: 0, senjutsu: 0, kenjutsu: 0, clan: 0, speed: 0, kekkeiGenkai: 0 })
+const zeroStats = (): CombatStats => ({ chakra: 0, invocation: 0, iq: 0, ninjutsuAttack: 0, ninjutsuDefense: 0, genjutsu: 0, taijutsu: 0, avatar: 0, body: 0, fuinjutsu: 0, senjutsu: 0, kenjutsu: 0, clan: 0, speed: 0, kekkeiGenkai: 0, kekkeiMora: 0 })
 function card(name: string, stats: Partial<CombatStats> = {}, clans: string[] = []): object { return { name, slug: name.toLowerCase().replaceAll(' ', '-'), clans, stats: { ...zeroStats(), ...stats } } }
 function build(slots: Record<string, object | string>): { slots: Record<string, object | string> } { return { slots } }
 const iq100 = card('IQ 100', { iq: 100 })
@@ -49,6 +49,27 @@ test('sensory ne participe jamais au total', () => { const stats = calculateFina
 test('33. aucune statistique finale ne devient négative', () => assert.ok(Object.values(calculateFinalStats(build({ ninjutsu: card('Uchiwa', { ninjutsuAttack: 0, ninjutsuDefense: 0 }) }))).every((value) => value >= 0)))
 test('34. chaque règle déclenchée est tracée', () => { const result = calculateCombat(build({ clan: card('Uzumaki', {}, ['UZUMAKI']), chakra: card('C', { chakra: 80 }) })); assert.ok(result.appliedRules.some((rule) => rule.ruleId === 'clan-uzumaki-chakra')) })
 test('35. une composition invalide ne lance pas le combat', () => { const result = simulateFight(build({ chakra: 'unknown-card' }), build({ chakra: 'neutral' })); assert.equal(result.winner, 'draw'); assert.ok(result.player1.validationErrors.length > 0) })
+test('36. le gagnant est déterminé sur le score final, pas sur les catégories', () => {
+  const result = simulateFight(
+    build({ chakra: card('P1', { chakra: 794.95 }), ninjutsu: card('N1', { ninjutsuAttack: 0, ninjutsuDefense: 0 }), genjutsu: card('G1', { genjutsu: 0 }), taijutsu: card('T1', { taijutsu: 0 }), avatar: card('A1', { avatar: 0 }), body: card('B1', { body: 0 }), fuinjutsu: card('F1', { fuinjutsu: 0 }), senjutsu: card('S1', { senjutsu: 0 }), kenjutsu: card('K1', { kenjutsu: 0 }), iq: card('IQ1', { iq: 0 }), invocation: card('I1', { invocation: 0 }), 'kekkei-genkai': card('KG1', { kekkeiGenkai: 0 }), vitesse: card('V1', { speed: 0 }) }),
+    build({ chakra: card('P2', { chakra: 787.9499999999999 }), ninjutsu: card('N2', { ninjutsuAttack: 0, ninjutsuDefense: 0 }), genjutsu: card('G2', { genjutsu: 0 }), taijutsu: card('T2', { taijutsu: 0 }), avatar: card('A2', { avatar: 0 }), body: card('B2', { body: 0 }), fuinjutsu: card('F2', { fuinjutsu: 0 }), senjutsu: card('S2', { senjutsu: 0 }), kenjutsu: card('K2', { kenjutsu: 0 }), iq: card('IQ2', { iq: 0 }), invocation: card('I2', { invocation: 0 }), 'kekkei-genkai': card('KG2', { kekkeiGenkai: 0 }), vitesse: card('V2', { speed: 0 }) }),
+  )
+  assert.equal(result.winner, 'player1')
+  assert.equal(result.player1Total, 794.95)
+  assert.equal(result.player2Total, 787.9499999999999)
+})
+
+test('37. égalités exactes restent des égalités et les scores supérieurs gagnent', () => {
+  assert.equal(simulateFight(build({ chakra: card('P1', { chakra: 800 }) }), build({ chakra: card('P2', { chakra: 800 }) })).winner, 'draw')
+  assert.equal(simulateFight(build({ chakra: card('P1', { chakra: 799 }) }), build({ chakra: card('P2', { chakra: 800 }) })).winner, 'player2')
+})
+
+test('38. les valeurs canonique de Vitesse/Kekkei Genkai/Kekkei Mōra restent numériques', () => {
+  const stats = calculateFinalStats(build({ vitesse: card('V', { speed: 78 }), 'kekkei-genkai': card('KG', { kekkeiGenkai: 65 }), 'kekkei-mora': card('KM', { kekkeiMora: 92 }) }))
+  assert.equal(stats.speed, 78)
+  assert.equal(stats.kekkeiGenkai, 65)
+  assert.equal(stats.kekkeiMora, 92)
+})
 
 test('Minato dans un autre slot ne donne pas de Vitesse', () => assert.equal(calculateFinalStats(build({ body: card('Minato'), vitesse: card('V', { speed: 80 }) })).speed, 80))
 test('Tobirama dans un autre slot ne donne pas de Vitesse', () => assert.equal(calculateFinalStats(build({ body: card('Tobirama'), vitesse: card('V', { speed: 80 }) })).speed, 80))

@@ -16,6 +16,21 @@ function normalizeCategory(category: unknown): Category | null { return typeof c
 function stateOf(value: Prisma.JsonValue): StoredState { return value as unknown as StoredState }
 function playerFor(state: StoredState, userId: number) { return state.players.find((player) => player.userId === userId) }
 function playersAreComplete(state: StoredState) { return state.players.length === 2 && state.players.every((player) => GAME_CATEGORIES.every((category) => player.slots[category] !== null)) }
+function isTransientDbError(error: unknown): boolean {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) return ['P2034', 'P2024', 'P2028', 'P1001'].includes(error.code)
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase()
+    return /transaction api error|unable to start a transaction|timeout|deadlock|database.*unavailable|connection.*reset|connection.*closed/i.test(message)
+  }
+  return false
+}
+async function retryTransientMutation<T>(operation: () => Promise<T>): Promise<T> {
+  let lastError: unknown
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try { return await operation() } catch (error) { lastError = error; if (!isTransientDbError(error) || attempt >= 3) throw error }
+  }
+  throw lastError
+}
 function buildFor(player: StoredPlayer) {
   return { slots: Object.fromEntries(Object.entries(player.slots).map(([slot, id]) => [slot, getCardKnowledgeById(id!)?.slug ?? ''])) }
 }
@@ -129,7 +144,7 @@ export async function getGameForLobby(userId: number, lobbyId: string) {
 
 async function mutate(userId: number, gameId: string, mutation: (game: NonNullable<Awaited<ReturnType<typeof findGame>>>, state: StoredState, player: StoredPlayer) => boolean | void) {
   try {
-    const game = await prisma.$transaction(async (transaction) => {
+    const game = await retryTransientMutation(async () => prisma.$transaction(async (transaction) => {
       const current = await transaction.game.findUnique({ where: { id: gameId }, include: gameInclude() })
       if (!current) throw invalid('Partie introuvable.', 404)
       const state = stateOf(current.state)
@@ -140,9 +155,10 @@ async function mutate(userId: number, gameId: string, mutation: (game: NonNullab
       state.stateVersion = nextStateVersion
       const awaitingResult = current.status === GameStatus.PLAYING && playersAreComplete(state)
       return transaction.game.update({ where: { id: gameId }, data: { state: state as unknown as Prisma.InputJsonValue, status: awaitingResult ? GameStatus.AWAITING_RESULT : current.status, currentPlayerNumber: advanceTurn && !awaitingResult ? state.players[(player.playerNumber % state.players.length)]!.playerNumber : current.currentPlayerNumber, turnNumber: advanceTurn && !awaitingResult ? current.turnNumber + 1 : current.turnNumber }, include: gameInclude() })
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted }))
     return await publicGameState(game, userId)
   } catch (error) {
+    if (isTransientDbError(error)) throw invalid('Action temporairement indisponible. Réessaie.', 409)
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') throw invalid('Action concurrent refusée, réessaie.', 409)
     throw error
   }
@@ -175,7 +191,7 @@ export function placeCard(userId: number, gameId: string, rawCategory: unknown) 
 
 async function finalizeGame(userId: number, gameId: string, mode: 'AUTO' | 'MANUAL', winnerNumber?: 1 | 2 | null, isDraw?: boolean) {
   try {
-    const game = await prisma.$transaction(async (transaction) => {
+    const game = await retryTransientMutation(async () => prisma.$transaction(async (transaction) => {
       const current = await transaction.game.findUnique({ where: { id: gameId }, include: gameInclude() })
       if (!current) throw invalid('Partie introuvable.', 404)
       const state = stateOf(current.state)
@@ -194,9 +210,10 @@ async function finalizeGame(userId: number, gameId: string, mode: 'AUTO' | 'MANU
       state.result = result
       state.stateVersion = (Number(state.stateVersion ?? current.turnNumber) || 0) + 1
       return transaction.game.update({ where: { id: gameId }, data: { state: state as unknown as Prisma.InputJsonValue, status: GameStatus.FINISHED, winnerNumber: result.winnerNumber, finishedAt: new Date() }, include: gameInclude() })
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted }))
     return await publicGameState(game, userId)
   } catch (error) {
+    if (isTransientDbError(error)) throw invalid('Impossible de démarrer la partie. Réessaie.', 409)
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') throw invalid('Action concurrent refusée, réessaie.', 409)
     throw error
   }

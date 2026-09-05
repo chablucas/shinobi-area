@@ -14,6 +14,7 @@ export type CombatStats = {
   clan: number
   speed: number
   kekkeiGenkai: number
+  kekkeiMora: number
 }
 
 export type CombatComposition = { slots: Record<string, string> }

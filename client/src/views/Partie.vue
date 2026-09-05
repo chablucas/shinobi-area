@@ -25,6 +25,7 @@ import {
 } from '../game/gameEngine'
 import { chooseBestCategory } from '../game/ai/categoryEvaluator'
 import SocialHeader from '../components/SocialHeader.vue'
+import CombatDrawArea from '../components/CombatDrawArea.vue'
 
 type Phase = 'construction' | 'combat' | 'result'
 type GameMode = 'solo' | 'local2' | 'local3'
@@ -64,7 +65,7 @@ const winnerName = computed(() => winnerId.value ? `Joueur ${winnerId.value}` : 
 const playerCount = computed<2 | 3>(() => props.mode === 'local3' ? 3 : 2)
 const isComputerTurn = computed(() => props.mode === 'solo' && activePlayerId.value === 2)
 const combatBlocked = computed(() => Boolean(combatResult.value && (combatResult.value.player1.validationErrors.length || combatResult.value.player2.validationErrors.length)))
-const gameStatKeys: Record<string, keyof CombatResult['player1']['finalStats'] | null> = { chakra: 'chakra', invocation: 'invocation', iq: 'iq', ninjutsu: 'ninjutsuAttack', genjutsu: 'genjutsu', taijutsu: 'taijutsu', avatar: 'avatar', body: 'body', fuinjutsu: 'fuinjutsu', senjutsu: 'senjutsu', kenjutsu: 'kenjutsu', clan: null, vitesse: 'speed', 'kekkei-genkai': 'kekkeiGenkai', 'kekkei-mora': null }
+const gameStatKeys: Record<string, keyof CombatResult['player1']['finalStats'] | null> = { chakra: 'chakra', invocation: 'invocation', iq: 'iq', ninjutsu: 'ninjutsuAttack', genjutsu: 'genjutsu', taijutsu: 'taijutsu', avatar: 'avatar', body: 'body', fuinjutsu: 'fuinjutsu', senjutsu: 'senjutsu', kenjutsu: 'kenjutsu', clan: null, vitesse: 'speed', 'kekkei-genkai': 'kekkeiGenkai', 'kekkei-mora': 'kekkeiMora' }
 
 onMounted(async () => {
   await auth.loadCurrentUser()
@@ -222,6 +223,7 @@ function manualResult(): CombatResult {
   const results = builds.value.slice(0, 2).map((build) => {
     const finalStats = Object.fromEntries(Object.keys(gameStatKeys).filter((key) => gameStatKeys[key]).map((key) => [gameStatKeys[key], build.slots[key as CategorySlug]?.stats[gameStatKeys[key]!] ?? 0])) as CombatResult['player1']['finalStats']
     finalStats.clan = 0
+    finalStats.kekkeiMora = build.slots['kekkei-mora']?.stats.kekkeiMora ?? 0
     return { baseStats: { ...finalStats }, finalStats, total: Object.entries(finalStats).filter(([key]) => key !== 'clan').reduce((total, [, value]) => total + value, 0), appliedRules: [], permissions: { sharingan: false, rinnegan: false, byakugan: false, tenseigan: false, otsutsuki: false, uzumaki: false }, validationErrors: [] }
   })
   return { resolutionMode: 'manual', winner: 'draw', player1: results[0]!, player2: results[1]!, player1Total: results[0]!.total, player2Total: results[1]!.total, scores: { player1: 0, player2: 0 }, categories: [] }
@@ -235,7 +237,11 @@ function chooseManualWinner(winner: 'player1' | 'player2' | 'draw') {
 }
 
 function cardFor(build: PlayerBuild, slug: CategorySlug) { return build.slots[slug] }
-function finalValue(player: CombatResult['player1'], slug: CategorySlug) { return slug === 'clan' || slug === 'kekkei-mora' ? null : player.finalStats[gameStatKeys[slug]!] }
+function finalValue(player: CombatResult['player1'], slug: CategorySlug) {
+  if (slug === 'clan') return null
+  const value = player.finalStats[gameStatKeys[slug]!]
+  return typeof value === 'number' ? Number(value.toFixed(2)) : value
+}
 
 async function runSimulation() {
   if (phase.value !== 'combat' || simulating.value || builds.value.length < 2) return
@@ -279,6 +285,39 @@ function replay() {
 
 function slotCard(build: PlayerBuild, slug: CategorySlug) {
   return build.slots[slug]
+}
+
+type DrawCardLike = Pick<Card, 'name' | 'imageUrl' | 'clans' | 'traits'> & {
+  stats?: Record<string, number | null>
+}
+
+function drawStatsFor(card: DrawCardLike | null) {
+  if (!card) return []
+  const statsMap = card.stats ?? {}
+  const stats = [
+    ['Chakra', statsMap.chakra ?? 0],
+    ['IQ', statsMap.iq ?? 0],
+    ['Ninjutsu', statsMap.ninjutsuAttack ?? 0],
+    ['Genjutsu', statsMap.genjutsu ?? 0],
+    ['Taijutsu', statsMap.taijutsu ?? 0],
+    ['Body', statsMap.body ?? 0],
+    ['Vitesse', statsMap.speed ?? 0],
+    ['Kekkei Genkai', statsMap.kekkeiGenkai ?? 0],
+    ['Kekkei Mōra', statsMap.kekkeiMora ?? 0],
+  ] as Array<[string, number]>
+  return stats.filter(([, value]) => Number(value) > 0).map(([label, value]) => ({ label, value: Number(value).toFixed(0) }))
+}
+
+function drawBonusesFor(card: DrawCardLike | null) {
+  if (!card) return []
+  const bonuses: Array<{ label: string; value: string }> = []
+  const clans = card.clans?.length ? card.clans.join(' · ') : 'Aucun clan'
+  bonuses.push({ label: 'Clan', value: clans })
+  const kekkeiGenkai = card.traits?.abilities?.kekkeiGenkai?.length ? card.traits.abilities.kekkeiGenkai.join(' · ') : 'Aucun'
+  bonuses.push({ label: 'Kekkei Genkai', value: kekkeiGenkai })
+  const kekkeiMora = card.traits?.abilities?.kekkeiMora?.length ? card.traits.abilities.kekkeiMora.join(' · ') : 'Aucun'
+  bonuses.push({ label: 'Kekkei Mōra', value: kekkeiMora })
+  return bonuses
 }
 </script>
 
@@ -332,20 +371,18 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
               v-if="player.playerNumber === 1 && player.playerNumber === realtimePlayerNumber"
               class="realtime-draw-zone player-one-draw"
             >
-              <div v-if="player.pendingCard" class="realtime-drawn-card">
-                <div class="realtime-drawn-card-art">
-                  <img v-if="player.pendingCard.imageUrl" :src="player.pendingCard.imageUrl" :alt="player.pendingCard.name" />
-                  <span v-else>{{ player.pendingCard.name.slice(0, 1) }}</span>
-                </div>
-                <div class="realtime-drawn-card-copy">
-                  <strong>{{ player.pendingCard.name }}</strong>
-                  <span>Carte piochée</span>
-                </div>
-              </div>
-              <div v-else class="realtime-empty-draw">
-                {{ realtimeMyTurn ? 'PIOCHER' : 'EN ATTENTE' }}
-              </div>
-              <button type="button" :disabled="!canDraw" @click="realtimeDraw">PIOCHER</button>
+              <CombatDrawArea
+                :card="player.pendingCard"
+                title="Carte piochée"
+                :show-button="true"
+                :button-disabled="!canDraw"
+                :stats="drawStatsFor(player.pendingCard)"
+                :bonuses="drawBonusesFor(player.pendingCard)"
+                button-label="PIOCHER"
+                empty-text="Aucune carte"
+                :waiting-text="realtimeMyTurn ? 'PIOCHER' : 'EN ATTENTE'"
+                @draw="realtimeDraw"
+              />
             </div>
 
             <div class="realtime-slots">
@@ -369,7 +406,17 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
                   <strong>{{ player.slots[category]?.name }}</strong>
                   <small v-if="category === 'ninjutsu'">{{ player.slots[category]?.stats.ninjutsuAttack }} / {{ player.slots[category]?.stats.ninjutsuDefense }}</small>
                   <small v-else-if="category === 'clan'">{{ player.slots[category]?.clans.join(' · ') || 'Aucun' }}</small>
-                  <small v-else>{{ player.slots[category]?.stats[category] ?? 'Présente' }}</small>
+                  <small v-else>{{
+                    category === 'vitesse'
+                      ? Number(player.slots[category]?.stats.speed ?? 0).toFixed(0)
+                      : category === 'kekkei-genkai'
+                        ? Number(player.slots[category]?.stats.kekkeiGenkai ?? 0).toFixed(0)
+                        : category === 'kekkei-mora'
+                          ? Number(player.slots[category]?.stats.kekkeiMora ?? 0).toFixed(0)
+                          : typeof player.slots[category]?.stats[category] === 'number'
+                            ? Number(player.slots[category]!.stats[category]).toFixed(0)
+                            : '—'
+                  }}</small>
                 </template>
                 <small v-else>VIDE</small>
               </button>
@@ -380,20 +427,18 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
               v-if="player.playerNumber === 2 && player.playerNumber === realtimePlayerNumber"
               class="realtime-draw-zone player-two-draw"
             >
-              <div v-if="player.pendingCard" class="realtime-drawn-card">
-                <div class="realtime-drawn-card-art">
-                  <img v-if="player.pendingCard.imageUrl" :src="player.pendingCard.imageUrl" :alt="player.pendingCard.name" />
-                  <span v-else>{{ player.pendingCard.name.slice(0, 1) }}</span>
-                </div>
-                <div class="realtime-drawn-card-copy">
-                  <strong>{{ player.pendingCard.name }}</strong>
-                  <span>Carte piochée</span>
-                </div>
-              </div>
-              <div v-else class="realtime-empty-draw">
-                {{ realtimeMyTurn ? 'PIOCHER' : 'EN ATTENTE' }}
-              </div>
-              <button type="button" :disabled="!canDraw" @click="realtimeDraw">PIOCHER</button>
+              <CombatDrawArea
+                :card="player.pendingCard"
+                title="Carte piochée"
+                :show-button="true"
+                :button-disabled="!canDraw"
+                :stats="drawStatsFor(player.pendingCard)"
+                :bonuses="drawBonusesFor(player.pendingCard)"
+                button-label="PIOCHER"
+                empty-text="Aucune carte"
+                :waiting-text="realtimeMyTurn ? 'PIOCHER' : 'EN ATTENTE'"
+                @draw="realtimeDraw"
+              />
             </div>
           </article>
         </div>
@@ -480,43 +525,27 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
 
             <!-- Pioche du Joueur 1 : AU-DESSUS de son deck -->
             <div class="player-draw-area draw-area-top">
-              <div v-if="activePlayerId === 1 && pendingCard" class="active-draw-preview">
-                <div class="card-preview-compact">
-                  <div class="preview-img-box">
-                    <img v-if="pendingCard.imageUrl" :src="pendingCard.imageUrl" :alt="pendingCard.name" />
-                    <span v-else class="preview-letter">{{ pendingCard.name.slice(0, 1) }}</span>
-                  </div>
-                  <div class="preview-info">
-                    <span class="preview-badge">Carte piochée</span>
-                    <strong>{{ pendingCard.name }}</strong>
-                    <span class="preview-instruction">Touche une case libre ci-dessous</span>
-                  </div>
-                </div>
-              </div>
-
-              <div v-else-if="activePlayerId === 1 && !pendingCard" class="draw-cta-container">
-                <button
-                  class="draw-action-btn"
-                  type="button"
-                  :disabled="loading || availableCardCount === 0 || allBuildsComplete"
-                  @click="drawCard"
-                >
-                  <span>PIOCHER UNE CARTE (J1)</span>
-                  <span class="btn-icon">↓</span>
-                </button>
-                <button
-                  v-if="lastPlacement && lastPlacement.playerId === 1"
-                  class="undo-action-btn"
-                  type="button"
-                  @click="undoLastPlacement"
-                >
-                  ← Annuler le coup
-                </button>
-              </div>
-
-              <div v-else class="draw-waiting-badge">
-                <span>En attente du tour de Joueur 1</span>
-              </div>
+              <CombatDrawArea
+                v-if="activePlayerId === 1"
+                :card="pendingCard"
+                title="Carte piochée"
+                :show-button="!pendingCard"
+                :button-disabled="loading || availableCardCount === 0 || allBuildsComplete"
+                :stats="drawStatsFor(pendingCard)"
+                :bonuses="drawBonusesFor(pendingCard)"
+                button-label="PIOCHER UNE CARTE (J1)"
+                empty-text="Aucune carte"
+                :waiting-text="pendingCard ? 'Place ta carte' : 'En attente du tour de Joueur 1'"
+                @draw="drawCard"
+              />
+              <button
+                v-if="lastPlacement && lastPlacement.playerId === 1"
+                class="undo-action-btn"
+                type="button"
+                @click="undoLastPlacement"
+              >
+                ← Annuler le coup
+              </button>
             </div>
 
             <!-- Grille des 15 cartes Joueur 1 -->
@@ -626,47 +655,30 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
 
             <!-- Pioche du Joueur 2 : EN DESSOUS de son deck -->
             <div class="player-draw-area draw-area-bottom">
-              <div v-if="isComputerTurn" class="ai-thinking-badge">
+              <CombatDrawArea
+                v-if="activePlayerId === 2 && !isComputerTurn"
+                :card="pendingCard"
+                title="Carte piochée"
+                :show-button="!pendingCard"
+                :button-disabled="loading || availableCardCount === 0 || allBuildsComplete"
+                :stats="drawStatsFor(pendingCard)"
+                :bonuses="drawBonusesFor(pendingCard)"
+                button-label="PIOCHER UNE CARTE (J2)"
+                empty-text="Aucune carte"
+                :waiting-text="pendingCard ? 'Place ta carte' : isComputerTurn ? 'Ordinateur...' : 'En attente du tour de Joueur 2'"
+                @draw="drawCard"
+              />
+              <div v-else-if="isComputerTurn" class="ai-thinking-badge">
                 <span>L'ordinateur réfléchit et place son shinobi...</span>
               </div>
-
-              <div v-else-if="activePlayerId === 2 && pendingCard" class="active-draw-preview">
-                <div class="card-preview-compact">
-                  <div class="preview-img-box">
-                    <img v-if="pendingCard.imageUrl" :src="pendingCard.imageUrl" :alt="pendingCard.name" />
-                    <span v-else class="preview-letter">{{ pendingCard.name.slice(0, 1) }}</span>
-                  </div>
-                  <div class="preview-info">
-                    <span class="preview-badge">Carte piochée</span>
-                    <strong>{{ pendingCard.name }}</strong>
-                    <span class="preview-instruction">Touche une case libre ci-dessus</span>
-                  </div>
-                </div>
-              </div>
-
-              <div v-else-if="activePlayerId === 2 && !pendingCard" class="draw-cta-container">
-                <button
-                  class="draw-action-btn"
-                  type="button"
-                  :disabled="loading || availableCardCount === 0 || allBuildsComplete"
-                  @click="drawCard"
-                >
-                  <span>PIOCHER UNE CARTE (J2)</span>
-                  <span class="btn-icon">↓</span>
-                </button>
-                <button
-                  v-if="lastPlacement && lastPlacement.playerId === 2"
-                  class="undo-action-btn"
-                  type="button"
-                  @click="undoLastPlacement"
-                >
-                  ← Annuler le coup
-                </button>
-              </div>
-
-              <div v-else class="draw-waiting-badge">
-                <span>En attente du tour de Joueur 2</span>
-              </div>
+              <button
+                v-if="lastPlacement && lastPlacement.playerId === 2"
+                class="undo-action-btn"
+                type="button"
+                @click="undoLastPlacement"
+              >
+                ← Annuler le coup
+              </button>
             </div>
           </article>
 
@@ -722,43 +734,27 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
 
             <!-- Pioche du Joueur 3 : EN DESSOUS de son deck -->
             <div class="player-draw-area draw-area-bottom">
-              <div v-if="activePlayerId === 3 && pendingCard" class="active-draw-preview">
-                <div class="card-preview-compact">
-                  <div class="preview-img-box">
-                    <img v-if="pendingCard.imageUrl" :src="pendingCard.imageUrl" :alt="pendingCard.name" />
-                    <span v-else class="preview-letter">{{ pendingCard.name.slice(0, 1) }}</span>
-                  </div>
-                  <div class="preview-info">
-                    <span class="preview-badge">Carte piochée</span>
-                    <strong>{{ pendingCard.name }}</strong>
-                    <span class="preview-instruction">Touche une case libre ci-dessus</span>
-                  </div>
-                </div>
-              </div>
-
-              <div v-else-if="activePlayerId === 3 && !pendingCard" class="draw-cta-container">
-                <button
-                  class="draw-action-btn"
-                  type="button"
-                  :disabled="loading || availableCardCount === 0 || allBuildsComplete"
-                  @click="drawCard"
-                >
-                  <span>PIOCHER UNE CARTE (J3)</span>
-                  <span class="btn-icon">↓</span>
-                </button>
-                <button
-                  v-if="lastPlacement && lastPlacement.playerId === 3"
-                  class="undo-action-btn"
-                  type="button"
-                  @click="undoLastPlacement"
-                >
-                  ← Annuler le coup
-                </button>
-              </div>
-
-              <div v-else class="draw-waiting-badge">
-                <span>En attente du tour de Joueur 3</span>
-              </div>
+              <CombatDrawArea
+                v-if="activePlayerId === 3"
+                :card="pendingCard"
+                title="Carte piochée"
+                :show-button="!pendingCard"
+                :button-disabled="loading || availableCardCount === 0 || allBuildsComplete"
+                :stats="drawStatsFor(pendingCard)"
+                :bonuses="drawBonusesFor(pendingCard)"
+                button-label="PIOCHER UNE CARTE (J3)"
+                empty-text="Aucune carte"
+                :waiting-text="pendingCard ? 'Place ta carte' : 'En attente du tour de Joueur 3'"
+                @draw="drawCard"
+              />
+              <button
+                v-if="lastPlacement && lastPlacement.playerId === 3"
+                class="undo-action-btn"
+                type="button"
+                @click="undoLastPlacement"
+              >
+                ← Annuler le coup
+              </button>
             </div>
           </article>
         </section>
@@ -851,13 +847,13 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
           <div class="combat-score">
             <article class="score-card player-one">
               <h3>Joueur 1</h3>
-              <strong>{{ combatResult.player1.total }}</strong>
+              <strong>{{ Number(combatResult.player1.total).toFixed(2) }}</strong>
               <span>Total Points</span>
             </article>
             <b class="score-vs">VS</b>
             <article class="score-card player-two">
               <h3>Joueur 2</h3>
-              <strong>{{ combatResult.player2.total }}</strong>
+              <strong>{{ Number(combatResult.player2.total).toFixed(2) }}</strong>
               <span>Total Points</span>
             </article>
           </div>
@@ -887,7 +883,6 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
                     <span class="slot-card-name">{{ cardFor(builds[index]!, slug)?.name }}</span>
                     <span v-if="slug === 'ninjutsu'" class="final-stat-pair">ATQ {{ player.finalStats.ninjutsuAttack }} · DEF {{ player.finalStats.ninjutsuDefense }}</span>
                     <span v-else-if="slug === 'clan'" class="final-stat-pair">{{ cardFor(builds[index]!, slug)?.name }}</span>
-                    <span v-else-if="slug === 'kekkei-mora'" class="final-stat-pair">Active</span>
                     <span v-else class="final-stat-value">{{ finalValue(player, slug) }}</span>
                   </span>
                 </div>
