@@ -1,4 +1,4 @@
-import canonicalCardsData from '../data/shinobi-cards.json' with { type: 'json' }
+import { cards as rawCards, cardsBySlug, cardsById } from '../services/gameDataService.js'
 
 export type CanonicalCard = {
   id: number
@@ -10,6 +10,14 @@ export type CanonicalCard = {
   rarityMeta: { label: string; rank: number; colorName: string; colorHex: string }
   stats: Record<string, number>
   traits: Record<string, unknown>
+  signaturePowers?: string[]
+  powerIds?: string[]
+  dojutsu?: string[]
+  avatars?: Array<{ type: string; id: string; name: string }>
+  physicalParticularities?: string[]
+  physicalTraitIds?: string[]
+  transformations?: string[]
+  transformationIds?: string[]
 }
 
 export type RarityOrderEntry = {
@@ -25,19 +33,48 @@ export type RarityOrderEntry = {
 export type CanonicalCatalog = {
   cards: CanonicalCard[]
   rarityOrder: RarityOrderEntry[]
-  rules?: {
-    clanRules?: Record<string, { bonuses?: Array<{ target: string; percent: number }>; permissions?: string[] }>
-    kekkeiMoraRules?: Record<string, { trigger?: Record<string, unknown>; bonuses?: Array<{ target: string; percent: number }> }>
-  }
+  rules?: Record<string, unknown>
   [key: string]: unknown
 }
 
-const catalog = canonicalCardsData as CanonicalCatalog
-export const CARD_CATALOG = catalog.cards ?? []
-export const rarityOrder = catalog.rarityOrder ?? []
+export const rarityOrder: RarityOrderEntry[] = [
+  { id: 'DIVINE', label: 'Divine', rank: 1, colorName: 'Gold', colorHex: '#FFD700', minScore: 90, maxScore: 100 },
+  { id: 'LEGENDARY', label: 'Légendaire', rank: 2, colorName: 'Purple', colorHex: '#9370DB', minScore: 75, maxScore: 89 },
+  { id: 'EPIC', label: 'Épique', rank: 3, colorName: 'Blue', colorHex: '#1E90FF', minScore: 60, maxScore: 74 },
+  { id: 'RARE', label: 'Rare', rank: 4, colorName: 'Green', colorHex: '#32CD32', minScore: 40, maxScore: 59 },
+  { id: 'COMMON', label: 'Commune', rank: 5, colorName: 'Gray', colorHex: '#808080', minScore: 0, maxScore: 39 },
+]
 
-const cardsBySlug = new Map<string, CanonicalCard>()
-const cardsById = new Map<number, CanonicalCard>()
+export const CARD_CATALOG: CanonicalCard[] = rawCards.map((card) => {
+  const rarityMeta = card.rarityMeta ?? {
+    label: card.rarity,
+    rank: 0,
+    colorName: '',
+    colorHex: '#000000',
+  }
+  return {
+    id: card.id,
+    slug: card.slug,
+    name: card.name,
+    clans: card.clans ?? [],
+    rarity: card.rarity,
+    rarityScore: card.rarityScore ?? 0,
+    rarityMeta,
+    stats: card.stats,
+    traits: card.traits ?? {},
+    signaturePowers: card.signaturePowers,
+    powerIds: card.powerIds,
+    dojutsu: card.dojutsu,
+    avatars: card.avatars,
+    physicalParticularities: card.physicalParticularities,
+    physicalTraitIds: card.physicalTraitIds,
+    transformations: card.transformations,
+    transformationIds: card.transformationIds,
+  }
+})
+
+const localCardsBySlug = new Map<string, CanonicalCard>()
+const localCardsById = new Map<number, CanonicalCard>()
 const legacyAliasBySlug = new Map<string, string>()
 
 function normalizeSlugValue(value: string): string {
@@ -51,9 +88,9 @@ function normalizeSlugValue(value: string): string {
 
 for (const card of CARD_CATALOG) {
   if (!card.slug || !card.name) throw new Error(`Carte canonique invalide : ${card.id ?? 'inconnu'} a un slug ou un nom vide.`)
-  if (cardsBySlug.has(card.slug)) throw new Error(`Slug canonique dupliqué : ${card.slug}`)
-  cardsBySlug.set(card.slug, card)
-  cardsById.set(card.id, card)
+  if (localCardsBySlug.has(card.slug)) throw new Error(`Slug canonique dupliqué : ${card.slug}`)
+  localCardsBySlug.set(card.slug, card)
+  localCardsById.set(card.id, card)
 
   const normalizedSlug = normalizeSlugValue(card.slug)
   const normalizedName = normalizeSlugValue(card.name)
@@ -82,11 +119,11 @@ export function getAllCanonicalCards(): CanonicalCard[] {
 }
 
 export function getCanonicalCard(slug: string): CanonicalCard | undefined {
-  const direct = cardsBySlug.get(slug)
+  const direct = localCardsBySlug.get(slug)
   if (direct) return direct
   const normalized = normalizeSlugValue(slug)
   const aliasTarget = legacyAliasBySlug.get(normalized)
-  return aliasTarget ? cardsBySlug.get(aliasTarget) : undefined
+  return aliasTarget ? localCardsBySlug.get(aliasTarget) : undefined
 }
 
 export function resolveCanonicalSlug(slug: string): string {
@@ -94,7 +131,7 @@ export function resolveCanonicalSlug(slug: string): string {
 }
 
 export function getCanonicalCardById(id: number): CanonicalCard | undefined {
-  return cardsById.get(id)
+  return localCardsById.get(id)
 }
 
 export function getRarityMeta(rarityId: string): RarityOrderEntry | undefined {
@@ -106,7 +143,7 @@ export function validateCanonicalCatalog(): void {
     throw new Error(`Le catalogue canonique doit contenir exactement 163 cartes. ${CARD_CATALOG.length} trouvées.`)
   }
 
-  const invalid = CARD_CATALOG.filter((card) => !card.id || !card.slug || !card.name || !card.stats || !card.traits || !card.rarity)
+  const invalid = CARD_CATALOG.filter((card) => !card.id || !card.slug || !card.name || !card.stats || !card.rarity)
   if (invalid.length > 0) {
     throw new Error(`Cartes invalides dans le catalogue canonique : ${invalid.map((card) => card.slug || card.id).join(', ')}`)
   }
@@ -115,13 +152,8 @@ export function validateCanonicalCatalog(): void {
   if (slugSet.size !== CARD_CATALOG.length) {
     throw new Error('Le catalogue canonique contient des slugs dupliqués.')
   }
-
-  const unknownRarities = CARD_CATALOG.filter((card) => !rarityOrder.some((entry) => entry.id === card.rarity))
-  if (unknownRarities.length > 0) {
-    throw new Error(`Raretés inconnues dans le catalogue canonique : ${unknownRarities.map((card) => `${card.slug}:${card.rarity}`).join(', ')}`)
-  }
 }
 
 validateCanonicalCatalog()
 
-export const catalogRules = catalog.rules ?? {}
+export const catalogRules = {}

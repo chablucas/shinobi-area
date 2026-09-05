@@ -1,60 +1,355 @@
 import type { RuleContext } from './types.js'
-import { cardName, hasClan, percentage, points, setStat } from './ruleHelpers.js'
-import { BIJU_GENJUTSU_PENALTY_POINTS, EIGHT_GATES_BONUS, IQ_MASTER_BONUS, OTSUTSUKI_BONUS, PERFECT_NINJUTSU_DEFENSE_REDUCTION, PERFECT_TAIJUTSU_NINJUTSU_BONUS, SENJU_CHAKRA_BONUS, UZUMAKI_CHAKRA_BONUS } from './constants.js'
+import { rules as combatRules, type CombatRule, type RuleCondition, type RuleEffect } from '../../services/gameDataService.js'
+import type { StatKey } from '../gameEngine.js'
 
-const activeStats = ['chakra', 'invocation', 'iq', 'ninjutsuAttack', 'ninjutsuDefense', 'genjutsu', 'taijutsu', 'avatar', 'fuinjutsu', 'senjutsu', 'kenjutsu', 'kekkeiGenkai'] as const
-const bijuNames = ['shukaku', 'matatabi', 'isobu', 'son gokû', 'son goku', 'kokuô', 'kokuo', 'saiken', 'chômei', 'chomei', 'gyûki', 'gyuki', 'kurama', 'jûbi', 'juubi']
-const hasName = (context: RuleContext, slot: string, values: string[]) => values.some((value) => cardName(context, slot).includes(value))
-const hasBiju = (context: RuleContext) => hasName(context, 'avatar', bijuNames)
+const activeStats: StatKey[] = [
+  'chakra',
+  'invocation',
+  'iq',
+  'ninjutsuAttack',
+  'ninjutsuDefense',
+  'genjutsu',
+  'taijutsu',
+  'avatar',
+  'body',
+  'fuinjutsu',
+  'senjutsu',
+  'kenjutsu',
+  'speed',
+  'kekkeiGenkai',
+]
+
+function getSlotCard(ctx: RuleContext, slotName: string) {
+  const normSlot = slotName.toLowerCase().replace(/-/g, '')
+  for (const [key, card] of Object.entries(ctx.cards)) {
+    if (key.toLowerCase().replace(/-/g, '') === normSlot) {
+      return card
+    }
+  }
+  return undefined
+}
+
+function extractFieldValue(ctx: RuleContext, slotName: string, field: string): unknown {
+  const normSlot = slotName.toLowerCase()
+  if (normSlot === 'all' || normSlot === 'any') {
+    const values: unknown[] = []
+    for (const key of Object.keys(ctx.cards)) {
+      const v = extractFieldValue(ctx, key, field)
+      if (v !== undefined) {
+        if (Array.isArray(v)) values.push(...v)
+        else values.push(v)
+      }
+    }
+    return values
+  }
+
+  const card = getSlotCard(ctx, slotName)
+
+  if (field === 'card') {
+    return card !== undefined
+  }
+
+  if (!card) {
+    if (field === 'baseScore' || field === 'finalScore') return 0
+    if (field === 'defenseFinal') return ctx.finalStats.ninjutsuDefense
+    return undefined
+  }
+
+  if (field === 'card.slug') return card.slug
+  if (field === 'card.clans') return card.clans ?? []
+  if (field === 'card.powerIds') return card.powerIds ?? []
+  if (field === 'card.physicalTraitIds') return card.physicalTraitIds ?? []
+  if (field === 'card.transformationIds') return card.transformationIds ?? []
+  if (field === 'selectedAvatar.id') {
+    return card.avatars?.map((a) => a.id) ?? []
+  }
+  if (field === 'selectedAvatar.type') {
+    return card.avatars?.map((a) => a.type) ?? []
+  }
+  if (field === 'baseScore') {
+    const statKey = normSlot as StatKey
+    if (statKey in ctx.baseStats) return ctx.baseStats[statKey]
+    if (normSlot === 'ninjutsu') return ctx.baseStats.ninjutsuAttack
+    return card.stats[statKey] ?? 0
+  }
+  if (field === 'finalScore') {
+    const statKey = normSlot as StatKey
+    if (statKey in ctx.finalStats) return ctx.finalStats[statKey]
+    if (normSlot === 'ninjutsu') return ctx.finalStats.ninjutsuAttack
+    return ctx.finalStats[statKey] ?? 0
+  }
+  if (field === 'defenseFinal') {
+    return ctx.finalStats.ninjutsuDefense
+  }
+
+  return undefined
+}
+
+function evalSingleCondition(
+  cond: RuleCondition,
+  selfCtx: RuleContext,
+  opponentCtxs: RuleContext[]
+): boolean {
+  const targetCtxs = cond.side === 'SELF' ? [selfCtx] : opponentCtxs
+
+  if (targetCtxs.length === 0) {
+    return false
+  }
+
+  return targetCtxs.some((ctx) => {
+    const actualValue = extractFieldValue(ctx, cond.slot, cond.field)
+
+    if (cond.operator === 'NOT_EQUALS_PATH') {
+      let pathValue: unknown = undefined
+      if (typeof cond.value === 'string') {
+        const parts = cond.value.split('.')
+        if (parts[0] === 'self' && parts[1] === 'slots') {
+          const targetSlot = parts[2]
+          const targetField = parts.slice(3).join('.')
+          pathValue = extractFieldValue(selfCtx, targetSlot!, targetField)
+        }
+      }
+      return actualValue !== pathValue
+    }
+
+    if (cond.operator === 'EXISTS') {
+      return Boolean(actualValue) === Boolean(cond.value)
+    }
+
+    if (cond.operator === 'EQUALS') {
+      if (Array.isArray(actualValue)) {
+        return actualValue.includes(cond.value)
+      }
+      return actualValue === cond.value
+    }
+
+    if (cond.operator === 'NOT_EQUALS') {
+      if (Array.isArray(actualValue)) {
+        return !actualValue.includes(cond.value)
+      }
+      return actualValue !== cond.value
+    }
+
+    if (cond.operator === 'IN') {
+      const allowed = Array.isArray(cond.value) ? cond.value : [cond.value]
+      if (Array.isArray(actualValue)) {
+        return actualValue.some((val) => allowed.includes(val))
+      }
+      return allowed.includes(actualValue)
+    }
+
+    if (cond.operator === 'NOT_IN') {
+      const disallowed = Array.isArray(cond.value) ? cond.value : [cond.value]
+      if (Array.isArray(actualValue)) {
+        return !actualValue.some((val) => disallowed.includes(val))
+      }
+      return !disallowed.includes(actualValue)
+    }
+
+    if (cond.operator === 'CONTAINS') {
+      if (Array.isArray(actualValue)) {
+        return actualValue.includes(cond.value)
+      }
+      return actualValue === cond.value
+    }
+
+    if (cond.operator === 'NOT_CONTAINS') {
+      if (Array.isArray(actualValue)) {
+        return !actualValue.includes(cond.value)
+      }
+      return actualValue !== cond.value
+    }
+
+    if (cond.operator === 'CONTAINS_ANY') {
+      const targets = Array.isArray(cond.value) ? cond.value : [cond.value]
+      if (Array.isArray(actualValue)) {
+        return targets.some((t) => actualValue.includes(t))
+      }
+      return targets.includes(actualValue)
+    }
+
+    if (cond.operator === 'GREATER_THAN') {
+      return Number(actualValue) > Number(cond.value)
+    }
+
+    if (cond.operator === 'GREATER_OR_EQUAL') {
+      return Number(actualValue) >= Number(cond.value)
+    }
+
+    if (cond.operator === 'LESS_THAN') {
+      return Number(actualValue) < Number(cond.value)
+    }
+
+    if (cond.operator === 'LESS_OR_EQUAL') {
+      return Number(actualValue) <= Number(cond.value)
+    }
+
+    return false
+  })
+}
+
+function evalActivation(rule: CombatRule, selfCtx: RuleContext, opponentCtxs: RuleContext[]): boolean {
+  const act = rule.activation
+  if (!act) return true
+
+  if (act.all && act.all.length > 0) {
+    const allPass = act.all.every((cond) => evalSingleCondition(cond, selfCtx, opponentCtxs))
+    if (!allPass) return false
+  }
+
+  if (act.any && act.any.length > 0) {
+    const anyPass = act.any.some((cond) => evalSingleCondition(cond, selfCtx, opponentCtxs))
+    if (!anyPass) return false
+  }
+
+  if (act.none && act.none.length > 0) {
+    const anyInNonePass = act.none.some((cond) => evalSingleCondition(cond, selfCtx, opponentCtxs))
+    if (anyInNonePass) return false
+  }
+
+  if (act.anyFailure && act.anyFailure.length > 0) {
+    const failurePass = act.anyFailure.some((cond) => evalSingleCondition(cond, selfCtx, opponentCtxs))
+    if (!failurePass) return false
+  }
+
+  return true
+}
+
+function applyEffect(
+  effect: RuleEffect,
+  rule: CombatRule,
+  selfCtx: RuleContext,
+  opponentCtxs: RuleContext[]
+): void {
+  const targetCtxs = effect.side === 'SELF' ? [selfCtx] : opponentCtxs
+  if (effect.value === null) return
+
+  for (const ctx of targetCtxs) {
+    const targets: StatKey[] = []
+    if (effect.stat === 'allStats' || effect.slot === 'ALL') {
+      targets.push(...activeStats)
+    } else if (effect.stat === 'ninjutsu') {
+      targets.push('ninjutsuAttack', 'ninjutsuDefense')
+    } else if (effect.stat in ctx.finalStats) {
+      targets.push(effect.stat as StatKey)
+    }
+
+    for (const target of targets) {
+      const before = ctx.finalStats[target]
+      let after = before
+
+      if (effect.operation === 'PERCENT_ADD') {
+        const percent = effect.value / 100
+        after = Math.max(0, before * (1 + percent))
+        ctx.finalStats[target] = after
+        ctx.appliedRules.push({
+          ruleId: rule.id,
+          label: rule.name,
+          target,
+          operation: 'percentage',
+          value: percent,
+          before,
+          after,
+        })
+      } else if (effect.operation === 'POINT_ADD') {
+        after = Math.max(0, before + effect.value)
+        ctx.finalStats[target] = after
+        ctx.appliedRules.push({
+          ruleId: rule.id,
+          label: rule.name,
+          target,
+          operation: 'points',
+          value: effect.value,
+          before,
+          after,
+        })
+      } else if (effect.operation === 'SET_FINAL') {
+        after = Math.max(0, effect.value)
+        ctx.finalStats[target] = after
+        ctx.appliedRules.push({
+          ruleId: rule.id,
+          label: rule.name,
+          target,
+          operation: 'set',
+          value: effect.value,
+          before,
+          after,
+        })
+      } else if (effect.operation === 'DISABLE_POWER') {
+        ctx.validationErrors.push({
+          ruleId: rule.id,
+          message: `${rule.name} invalide.`,
+        })
+      }
+    }
+  }
+}
 
 export function applyRules(context: RuleContext, opponents?: RuleContext | RuleContext[]): void {
   const opponentList = Array.isArray(opponents) ? opponents : opponents ? [opponents] : []
-  const opponent = opponentList[0]
-  const iq = context.cards.iq?.stats.iq
-  if (iq === 100) for (const target of activeStats) percentage(context, 'iq-master', 'Bonus IQ maître', target, IQ_MASTER_BONUS)
 
-  const clan = context.cards.clan
-  if (hasClan(context, 'UZUMAKI')) { context.permissions.uzumaki = true; percentage(context, 'clan-uzumaki-chakra', 'Bonus du clan Uzumaki', 'chakra', UZUMAKI_CHAKRA_BONUS) }
-  if (hasClan(context, 'SENJU')) percentage(context, 'clan-senju-chakra', 'Bonus du clan Senju', 'chakra', SENJU_CHAKRA_BONUS)
-  if (hasClan(context, 'OTSUTSUKI')) { context.permissions.sharingan = true; context.permissions.rinnegan = true; context.permissions.otsutsuki = true; percentage(context, 'clan-otsutsuki', 'Bonus du clan Ôtsutsuki', 'chakra', OTSUTSUKI_BONUS); percentage(context, 'clan-otsutsuki', 'Bonus du clan Ôtsutsuki', 'body', OTSUTSUKI_BONUS); percentage(context, 'clan-otsutsuki', 'Bonus du clan Ôtsutsuki', 'speed', OTSUTSUKI_BONUS) }
-  if (clan?.clans.some((value) => value.toLowerCase() === 'uchiwa')) context.permissions.sharingan = true
-  if (context.permissions.sharingan && context.permissions.uzumaki) context.permissions.rinnegan = true
+  // Step 1: Update permissions from Clan card
+  const clanCard = context.cards.clan
+  if (clanCard) {
+    const clansLower = (clanCard.clans ?? []).map((c) => c.toLowerCase())
+    if (clansLower.includes('uzumaki')) context.permissions.uzumaki = true
+    if (clansLower.includes('otsutsuki')) {
+      context.permissions.sharingan = true
+      context.permissions.rinnegan = true
+      context.permissions.otsutsuki = true
+    }
+    if (clansLower.includes('uchiwa')) {
+      context.permissions.sharingan = true
+    }
+  }
+  if (context.permissions.sharingan && context.permissions.uzumaki) {
+    context.permissions.rinnegan = true
+  }
   context.finalStats.clan = 0
 
-  if (hasName(context, 'ninjutsu', ['minato', 'tobirama'])) percentage(context, 'ninjutsu-speed', 'Vitesse de Minato ou Tobirama', 'speed', 0.25)
-  if (context.baseStats.taijutsu === 100) {
-    percentage(context, 'taijutsu-master-ninjutsu', 'Bonus Taijutsu à 100', 'ninjutsuAttack', PERFECT_TAIJUTSU_NINJUTSU_BONUS)
-      if (opponentList.some((candidate) => candidate.baseStats.ninjutsuDefense === 100)) points(context, 'perfect-defense-taijutsu', 'Réduction du bonus Taijutsu', 'ninjutsuAttack', -(context.baseStats.ninjutsuAttack * PERFECT_TAIJUTSU_NINJUTSU_BONUS / 2))
-  }
-  if (hasName(context, 'taijutsu', ['guy 8 portes'])) {
-    percentage(context, 'guy-eight-gates', 'Bonus des Huit Portes', 'taijutsu', EIGHT_GATES_BONUS)
-      if (opponentList.some((candidate) => candidate.baseStats.ninjutsuDefense === 100)) points(context, 'perfect-defense-eight-gates', 'Réduction du bonus des Huit Portes', 'taijutsu', -(context.baseStats.taijutsu * EIGHT_GATES_BONUS / 2))
-  }
-  if (context.baseStats.genjutsu === 100 && opponent && hasName(opponent, 'avatar', ['hachibi', 'gyûki', 'gyuki', 'kurama', 'jûbi', 'juubi'])) points(context, 'genjutsu-biju-counter', 'Contre Genjutsu contre un Bijû', 'genjutsu', -BIJU_GENJUTSU_PENALTY_POINTS)
-    if (context.baseStats.genjutsu === 100 && opponentList.some((candidate) => hasName(candidate, 'avatar', ['hachibi', 'gyûki', 'gyuki', 'kurama', 'jûbi', 'juubi']))) points(context, 'genjutsu-biju-counter', 'Contre Genjutsu contre un Bijû', 'genjutsu', -BIJU_GENJUTSU_PENALTY_POINTS)
-    if (context.baseStats.ninjutsuDefense === 100) for (const candidate of opponentList) percentage(candidate, 'perfect-defense-ninjutsu', 'Défense Ninjutsu parfaite', 'ninjutsuAttack', -PERFECT_NINJUTSU_DEFENSE_REDUCTION)
+  // Step 2: Evaluate rules from classic.json
+  const enabledRules = combatRules.filter((r) => r.enabled !== false)
 
-  const avatar = cardName(context, 'avatar')
-  if (avatar.includes('shukaku')) percentage(context, 'biju-shukaku', 'Bonus de Shukaku', 'fuinjutsu', 0.25)
-  if (avatar.includes('matatabi')) percentage(context, 'biju-matatabi', 'Bonus de Matatabi', 'speed', 0.25)
-  if (avatar.includes('isobu')) percentage(context, 'biju-isobu', 'Bonus d’Isobu', 'genjutsu', 0.25)
-  if (avatar.includes('son gok') || avatar.includes('son gokû')) percentage(context, 'biju-son-goku', 'Bonus de Son Gokû', 'kekkeiGenkai', 0.25)
-  if (avatar.includes('koku')) percentage(context, 'biju-kokuo', 'Bonus de Kokuô', 'taijutsu', 0.25)
-  if (avatar.includes('saiken')) { percentage(context, 'biju-saiken', 'Bonus de Saiken', 'ninjutsuAttack', 0.25); percentage(context, 'biju-saiken', 'Bonus de Saiken', 'ninjutsuDefense', 0.25) }
-  if (avatar.includes('chomei') || avatar.includes('chômei')) percentage(context, 'biju-chomei', 'Bonus de Chômei', 'body', 0.25)
-  if (avatar.includes('gyûki') || avatar.includes('gyuki') || avatar.includes('hachibi')) percentage(context, 'biju-hachibi', 'Bonus de Gyûki', 'iq', 0.5)
-  if (avatar.includes('kurama')) percentage(context, 'biju-kurama', 'Bonus de Kurama', 'senjutsu', 0.5)
-  if (avatar.includes('kcm2') && hasName(context, 'senjutsu', ['naruto'])) setStat(context, 'kurama-kcm2-senjutsu', 'Senjutsu de Kurama KCM2', 'senjutsu', 100)
-  if (avatar.includes('jûbi') || avatar.includes('juubi')) { if (context.baseStats.chakra < 70) context.validationErrors.push({ ruleId: 'juubi-chakra', message: 'Le Jûbi nécessite au moins 70 points de Chakra.' }); if (!hasName(context, 'avatar', ['juubito', 'juubidara', 'jûbito', 'jûbidara'])) context.validationErrors.push({ ruleId: 'juubi-avatar', message: 'Le Jûbi nécessite Jûbito ou Jûbidara dans le slot Avatar.' }) }
+  const phases = ['VALIDATION_PENALTY', 'MODIFIER']
 
-  if (hasName(context, 'body', ['marque', 'curse mark']) && hasName(context, 'avatar', ['susanoo'])) percentage(context, 'body-avatar-susanoo', 'Marque maudite et Susanoo', 'avatar', 0.1)
-  if (hasName(context, 'fuinjutsu', ['karin', 'mito', 'kushina']) && opponent && hasBiju(opponent)) { percentage(context, 'fuinjutsu-biju-ninjutsu', 'Fûinjutsu contre un Bijû', 'ninjutsuAttack', 0.25); percentage(context, 'fuinjutsu-biju-ninjutsu', 'Fûinjutsu contre un Bijû', 'ninjutsuDefense', 0.25) }
-    if (hasName(context, 'fuinjutsu', ['karin', 'mito', 'kushina']) && opponentList.some(hasBiju)) { percentage(context, 'fuinjutsu-biju-ninjutsu', 'Fûinjutsu contre un Bijû', 'ninjutsuAttack', 0.25); percentage(context, 'fuinjutsu-biju-ninjutsu', 'Fûinjutsu contre un Bijû', 'ninjutsuDefense', 0.25) }
-    if (context.cards.senjutsu && opponentList.some((candidate) => hasClan(candidate, 'OTSUTSUKI') || candidate.cards.body?.clans.some((value) => value.toLowerCase() === 'otsutsuki'))) { percentage(context, 'senjutsu-otsutsuki', 'Senjutsu contre Ôtsutsuki', 'ninjutsuAttack', 0.25); percentage(context, 'senjutsu-otsutsuki', 'Senjutsu contre Ôtsutsuki', 'ninjutsuDefense', 0.25) }
-  const kenjutsuBonuses: [string, string, number][] = [['kisame', 'chakra', 0.1], ['itachi', 'ninjutsuAttack', 0.1], ['ginkaku', 'ninjutsuAttack', 0.1], ['kinkaku', 'ninjutsuAttack', 0.1], ['tenten', 'ninjutsuAttack', 0.05], ['madara', 'ninjutsuAttack', 0.15]]
-  for (const [name, target, value] of kenjutsuBonuses) if (cardName(context, 'kenjutsu') === name || (name === 'madara' && cardName(context, 'kenjutsu') === 'madara')) { percentage(context, `kenjutsu-${name}`, `Bonus de Kenjutsu ${name}`, target as typeof activeStats[number], value); if (target === 'ninjutsuAttack') percentage(context, `kenjutsu-${name}`, `Bonus de Kenjutsu ${name}`, 'ninjutsuDefense', value) }
-  if (hasName(context, 'kekkei-mora', ['hamura'])) { percentage(context, 'mora-hamura', 'Kekkei Môra de Hamura', 'chakra', 0.25); percentage(context, 'mora-hamura', 'Kekkei Môra de Hamura', 'ninjutsuAttack', 0.25); percentage(context, 'mora-hamura', 'Kekkei Môra de Hamura', 'ninjutsuDefense', 0.25) }
-  if (hasName(context, 'kekkei-mora', ['toneri'])) { percentage(context, 'mora-toneri', 'Kekkei Môra de Toneri', 'chakra', 0.1); percentage(context, 'mora-toneri', 'Kekkei Môra de Toneri', 'ninjutsuAttack', 0.1); percentage(context, 'mora-toneri', 'Kekkei Môra de Toneri', 'ninjutsuDefense', 0.1) }
-  if (opponentList.some((candidate) => hasName(candidate, 'taijutsu', ['guy 8 portes'])) && hasName(context, 'kekkei-mora', ['sasuke'])) percentage(context, 'sasuke-guy-counter', 'Sasuke contre Guy Huit Portes', 'kekkeiGenkai', -0.5)
-  if (!context.permissions.sharingan && hasName(context, 'ninjutsu', ['uchiwa'])) { percentage(context, 'sharingan-required', 'Technique Uchiwa sans Sharingan', 'ninjutsuAttack', -0.5); percentage(context, 'sharingan-required', 'Technique Uchiwa sans Sharingan', 'ninjutsuDefense', -0.5) }
+  for (const phase of phases) {
+    const phaseRules = enabledRules.filter((r) => r.phase === phase).sort((a, b) => b.priority - a.priority)
+
+    const triggeredRules: CombatRule[] = []
+
+    for (const rule of phaseRules) {
+      if (evalActivation(rule, context, opponentList)) {
+        triggeredRules.push(rule)
+      }
+    }
+
+    // Handle stacking group filtering for MAX_IN_GROUP
+    const finalRulesToApply: CombatRule[] = []
+    const groupBestRuleMap = new Map<string, CombatRule>()
+
+    for (const rule of triggeredRules) {
+      if (rule.stacking && rule.stacking.mode === 'MAX_IN_GROUP') {
+        const group = rule.stacking.group
+        const currentBest = groupBestRuleMap.get(group)
+        if (!currentBest || rule.priority > currentBest.priority) {
+          groupBestRuleMap.set(group, rule)
+        }
+      } else {
+        finalRulesToApply.push(rule)
+      }
+    }
+
+    for (const bestRule of groupBestRuleMap.values()) {
+      finalRulesToApply.push(bestRule)
+    }
+
+    // Sort final rules to apply by priority descending
+    finalRulesToApply.sort((a, b) => b.priority - a.priority)
+
+    for (const rule of finalRulesToApply) {
+      for (const effect of rule.effects) {
+        applyEffect(effect, rule, context, opponentList)
+      }
+    }
+  }
 }

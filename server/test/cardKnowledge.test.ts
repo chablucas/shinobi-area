@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import canonicalCatalog from '../src/data/shinobi-cards.json' with { type: 'json' }
+import { getAllCanonicalCards } from '../src/game/cardCatalog.js'
 import { CARD_KNOWLEDGE, CARD_KNOWLEDGE_COUNT, getCardKnowledgeBySlug, listCardKnowledge, rarityOrder } from '../src/game/cardKnowledge.js'
 
-const canonicalCards = canonicalCatalog.cards as Array<{ id: number; slug: string; name: string; stats: Record<string, number>; traits: Record<string, unknown>; rarity: string; rarityMeta: { label: string; rank: number; colorName: string; colorHex: string } }>
+const canonicalCards = getAllCanonicalCards() as Array<{ id: number; slug: string; name: string; stats: Record<string, number>; traits: Record<string, unknown>; rarity: string; rarityMeta: { label: string; rank: number; colorName: string; colorHex: string } }>
 
 test('le catalogue canonique contient exactement 163 cartes', () => {
   assert.equal(canonicalCards.length, 163)

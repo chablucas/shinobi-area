@@ -38,6 +38,10 @@ export type CardKnowledge = {
   rarityScore: number
   rarityMeta: { label: string; rank: number; colorName: string; colorHex: string }
   rarityMetadata: RarityMetadata
+  powerIds: string[]
+  physicalTraitIds: string[]
+  transformationIds: string[]
+  avatars: Array<{ id: string; type: string; name: string }>
 }
 
 type ClanRule = { bonuses: Array<{ target: string; percent: number }>; permissions: string[] }
@@ -85,6 +89,18 @@ function normalizeRarityMetadata(card: { rarity: string; rarityMeta?: { label: s
   }
 }
 
+const engineCategoryOf: Record<string, string[]> = { chakra: ['chakra'], invocation: ['invocation'], iq: ['iq'], ninjutsu: ['ninjutsuAttack', 'ninjutsuDefense'], genjutsu: ['genjutsu'], taijutsu: ['taijutsu'], body: ['body'], fuinjutsu: ['fuinjutsu'], senjutsu: ['senjutsu'], kenjutsu: ['kenjutsu'], vitesse: ['speed'], 'kekkei-genkai': ['kekkeiGenkai'], 'kekkei-mora': ['kekkeiMora'] }
+
+function eligibleSlotsOf(card: { stats: CardStats; clans: string[]; avatars?: Array<{ id: string; type: string; name: string }> }): string[] {
+  const slots: string[] = []
+  for (const [slot, statKeys] of Object.entries(engineCategoryOf)) {
+    if (statKeys.some((key) => (card.stats[key] ?? 0) > 0)) slots.push(slot)
+  }
+  if ((card.avatars ?? []).length > 0) slots.push('avatar')
+  if (card.clans.length > 0) slots.push('clan')
+  return slots
+}
+
 export const CARD_KNOWLEDGE: CardKnowledge[] = getAllCanonicalCards().map((card) => {
   const traits = card.traits as CardTraits
   const rarityMetadata = normalizeRarityMetadata(card)
@@ -96,6 +112,7 @@ export const CARD_KNOWLEDGE: CardKnowledge[] = getAllCanonicalCards().map((card)
     stats: card.stats as CardStats,
     traits: {
       ...traits,
+      eligibleSlots: eligibleSlotsOf(card),
       clanStrategicScore: clanStrategicScore(card.clans),
       kekkeiMoraStrategicScore: kekkeiMoraStrategicScore(card.name, traits.abilities?.kekkeiMora ?? []),
     },
@@ -103,6 +120,10 @@ export const CARD_KNOWLEDGE: CardKnowledge[] = getAllCanonicalCards().map((card)
     rarityScore: card.rarityScore,
     rarityMeta: card.rarityMeta ?? { label: rarityMetadata.label, rank: rarityMetadata.rank, colorName: rarityMetadata.colorName, colorHex: rarityMetadata.colorHex },
     rarityMetadata,
+    powerIds: card.powerIds ?? [],
+    physicalTraitIds: card.physicalTraitIds ?? [],
+    transformationIds: card.transformationIds ?? [],
+    avatars: card.avatars ?? [],
   }
 })
 

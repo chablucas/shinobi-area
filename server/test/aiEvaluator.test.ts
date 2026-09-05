@@ -3,10 +3,10 @@ import test from 'node:test'
 import { chooseBestCategory } from '../../client/src/game/ai/categoryEvaluator.js'
 import { createPlayerBuild } from '../../client/src/game/gameEngine.js'
 import type { Card } from '../../client/src/types/card.js'
-import canonicalCatalog from '../src/data/shinobi-cards.json' with { type: 'json' }
+import { getAllCanonicalCards } from '../src/game/cardCatalog.js'
 import { listCardKnowledge } from '../src/game/cardKnowledge.js'
 
-const catalogCards = canonicalCatalog.cards as Array<{ id: number; slug: string; name: string; clans: string[]; stats: Record<string, number> }>
+const catalogCards = getAllCanonicalCards() as Array<{ id: number; slug: string; name: string; clans: string[]; stats: Record<string, number> }>
 
 function card(stats: Record<string, number>, options: Partial<Pick<Card, 'slug' | 'clans' | 'traits'>> = {}): Card { return { id: 1, name: 'Fixture', slug: 'fixture', imageUrl: null, stats, ...options } }
 

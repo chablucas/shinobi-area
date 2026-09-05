@@ -1,0 +1,2407 @@
+{
+  "schemaVersion": "1.0.0",
+  "generatedFor": "Shinobi Area",
+  "fileRole": "GAME_AND_AI_RULES",
+  "dataFile": "shinobi-cards-data.json",
+  "canonicalCardKey": "slug",
+  "engineContract": {
+    "sides": [
+      "SELF",
+      "OPPONENT"
+    ],
+    "slots": [
+      "chakra",
+      "invocation",
+      "iq",
+      "ninjutsu",
+      "genjutsu",
+      "taijutsu",
+      "avatar",
+      "body",
+      "fuinjutsu",
+      "senjutsu",
+      "kenjutsu",
+      "clan",
+      "speed",
+      "kekkeiGenkai",
+      "kekkeiMora",
+      "ANY",
+      "ALL"
+    ],
+    "ninjutsuValues": {
+      "attack": "ninjutsuAttack",
+      "defense": "ninjutsuDefense",
+      "genericTarget": "ninjutsu applies to attack and defense"
+    },
+    "conditionGroups": {
+      "all": "toutes vraies",
+      "any": "au moins une vraie",
+      "none": "aucune vraie",
+      "anyFailure": "au moins une condition d’échec vraie"
+    },
+    "operators": [
+      "EXISTS",
+      "EQUALS",
+      "NOT_EQUALS_PATH",
+      "IN",
+      "NOT_IN",
+      "CONTAINS",
+      "NOT_CONTAINS",
+      "CONTAINS_ANY",
+      "GREATER_THAN",
+      "GREATER_OR_EQUAL",
+      "LESS_THAN"
+    ],
+    "effectOperations": [
+      "POINT_ADD",
+      "PERCENT_ADD",
+      "SET_FINAL",
+      "DISABLE_POWER"
+    ],
+    "percentageFormula": "scoreAfterPoints * (1 + sum(activePercentModifiers) / 100)",
+    "evaluationOrder": [
+      "LOAD_BASE_STATS",
+      "VALIDATION_PENALTY",
+      "POINT_ADD",
+      "PERCENT_ADD",
+      "SET_FINAL",
+      "RESULT"
+    ],
+    "symmetry": "Toutes les règles SELF/OPPONENT sont évaluées une fois pour chaque joueur en inversant les côtés.",
+    "selectedAvatarRequired": "Le placement Avatar doit stocker selectedAvatarId ; le moteur résout alors selectedAvatar depuis card.avatars.",
+    "missingSlotBehavior": "Une condition visant un slot vide est fausse, sauf opérateur explicitement prévu pour l’absence."
+  },
+  "modeRules": {
+    "oneCardPerSlot": true,
+    "oneUsePerCard": true,
+    "numericZeroIsValidPlacement": true,
+    "baseStatsAreImmutable": true,
+    "allowFinalStatsAbove100": true,
+    "clanIsMetadataNotNumericStat": true,
+    "kekkeiGenkaiCountsAsNinjutsu": false,
+    "kekkeiMoraCountsAsNinjutsu": false,
+    "edoTenseiMaySummonExtraCards": false,
+    "rarityAvailability": {
+      "twoPlayers": {
+        "excluded": [
+          "SEMI_GOD",
+          "DIVINE"
+        ]
+      },
+      "threePlayers": {
+        "excluded": []
+      }
+    },
+    "versionSpecificRules": {
+      "guy": {
+        "cardSlug": "guy",
+        "eightGatesMaximum": 7,
+        "hasEighthGateOfDeath": false
+      },
+      "guyEightGates": {
+        "cardSlug": "guy-8-portes",
+        "eightGatesMaximum": 8,
+        "requiredPowerId": "EIGHTH_GATE_OF_DEATH"
+      },
+      "susanoo": {
+        "clanValidationRequired": false,
+        "activationSource": "L’avatar sélectionné doit simplement exister dans card.avatars avec type SUSANOO."
+      },
+      "kakashiSharinganException": {
+        "cardSlugs": [
+          "kakashi",
+          "kakashi-ms",
+          "kakashi-dms"
+        ],
+        "appliesToSlots": [
+          "ninjutsu",
+          "genjutsu"
+        ],
+        "clanValidationRequired": false,
+        "reason": "Sharingan reçu/greffé depuis Obito."
+      }
+    }
+  },
+  "aiRules": {
+    "objective": "Maximiser le score final et les synergies sans gaspiller les slots rares.",
+    "placementScoreFormula": "baseStat + activatedSynergies + counterValue + scarcityValue + futureFlexibility - opportunityCost - invalidationRisk",
+    "excellentBaseStatThreshold": 85,
+    "forcedPlacementAllowed": true,
+    "gameChangerSlots": [
+      "chakra",
+      "iq",
+      "ninjutsu",
+      "avatar",
+      "clan",
+      "kekkeiMora"
+    ],
+    "flexibleSlots": [
+      "invocation",
+      "fuinjutsu",
+      "kenjutsu",
+      "genjutsu",
+      "taijutsu"
+    ],
+    "contextualSlots": [
+      "body",
+      "speed",
+      "kekkeiGenkai",
+      "senjutsu"
+    ],
+    "hardConstraints": [
+      {
+        "id": "AI_NO_AVATAR_WITHOUT_AVATAR",
+        "condition": "card.avatars.length === 0",
+        "forbiddenSlot": "avatar"
+      },
+      {
+        "id": "AI_NO_KEKKEI_MORA_AT_ZERO",
+        "condition": "card.stats.kekkeiMora === 0",
+        "forbiddenSlot": "kekkeiMora"
+      },
+      {
+        "id": "AI_USE_NUMERIC_STATS",
+        "condition": "0 est une valeur numérique valide",
+        "behavior": "Ne jamais remplacer une note par Présente/Absente"
+      }
+    ],
+    "decisionSteps": [
+      "Énumérer uniquement les slots encore libres.",
+      "Écarter les placements techniquement invalides.",
+      "Simuler toutes les règles actives pour chaque placement candidat.",
+      "Mesurer la rareté du slot selon le nombre de cartes restantes ayant une bonne note dans cette catégorie.",
+      "Augmenter la priorité des catégories possédant peu de bonnes cartes.",
+      "Pénaliser fortement l’utilisation précoce d’un slot game changer par une carte moyenne.",
+      "Comparer la valeur immédiate avec les meilleures cartes encore possibles dans la pioche.",
+      "Choisir le meilleur score de placement ; en cas d’égalité, préserver le slot le plus rare."
+    ],
+    "examples": [
+      {
+        "cardSlug": "karui",
+        "lesson": "Ne pas gaspiller Chakra, IQ, Ninjutsu, Avatar, Clan ou Kekkei Mōra ; privilégier une catégorie réellement adaptée."
+      },
+      {
+        "cardSlug": "jiraya",
+        "preferredEarlySlot": "senjutsu",
+        "lesson": "Le Senjutsu possède peu d’excellentes cartes et doit recevoir une valeur de rareté élevée."
+      },
+      {
+        "cardSlug": "gengetsu",
+        "preferredEarlySlot": "genjutsu",
+        "lesson": "Son Genjutsu ne dépend pas d’une validation Sharingan/clan."
+      }
+    ],
+    "opponentAwareness": {
+      "enabled": true,
+      "inspectOpponentPlacements": true,
+      "simulateCounters": true,
+      "doNotUseHiddenFutureCards": true
+    }
+  },
+  "combatRules": [
+    {
+      "id": "JUBI_REQUIREMENTS",
+      "name": "Conditions d’utilisation du Jūbi",
+      "enabled": true,
+      "phase": "VALIDATION_PENALTY",
+      "priority": 980,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "avatar",
+            "field": "selectedAvatar.id",
+            "operator": "EQUALS",
+            "value": "JUBI"
+          }
+        ],
+        "anyFailure": [
+          {
+            "side": "SELF",
+            "slot": "chakra",
+            "field": "baseScore",
+            "operator": "LESS_THAN",
+            "value": 70
+          },
+          {
+            "side": "SELF",
+            "slot": "body",
+            "field": "baseScore",
+            "operator": "LESS_THAN",
+            "value": 50
+          },
+          {
+            "side": "SELF",
+            "slot": "avatar",
+            "field": "card.slug",
+            "operator": "NOT_IN",
+            "value": [
+              "juubidara",
+              "juubito"
+            ]
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "avatar",
+          "stat": "avatar",
+          "operation": "SET_FINAL",
+          "value": 0
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "JUBI_REQUIREMENTS"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "RINNEGAN_NINJUTSU_VALIDATION",
+      "name": "Validation du Rinnegan en Ninjutsu",
+      "enabled": true,
+      "phase": "VALIDATION_PENALTY",
+      "priority": 960,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "ninjutsu",
+            "field": "card.powerIds",
+            "operator": "CONTAINS",
+            "value": "RINNEGAN"
+          }
+        ],
+        "none": [
+          {
+            "side": "SELF",
+            "slot": "clan",
+            "field": "card.clans",
+            "operator": "CONTAINS_ANY",
+            "value": [
+              "UZUMAKI",
+              "UCHIWA",
+              "OTSUTSUKI"
+            ]
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "ninjutsu",
+          "stat": "rinneganTechniques",
+          "operation": "DISABLE_POWER",
+          "value": "RINNEGAN"
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "RINNEGAN_NINJUTSU_VALIDATION"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "SHARINGAN_GENJUTSU_UNVALIDATED",
+      "name": "Genjutsu Sharingan sans clan compatible",
+      "enabled": true,
+      "phase": "VALIDATION_PENALTY",
+      "priority": 950,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "genjutsu",
+            "field": "card.powerIds",
+            "operator": "CONTAINS",
+            "value": "SHARINGAN"
+          }
+        ],
+        "none": [
+          {
+            "side": "SELF",
+            "slot": "clan",
+            "field": "card.clans",
+            "operator": "CONTAINS_ANY",
+            "value": [
+              "UCHIWA",
+              "OTSUTSUKI"
+            ]
+          },
+          {
+            "side": "SELF",
+            "slot": "genjutsu",
+            "field": "card.slug",
+            "operator": "IN",
+            "value": [
+              "kakashi",
+              "kakashi-ms",
+              "kakashi-dms"
+            ]
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "genjutsu",
+          "stat": "genjutsu",
+          "operation": "SET_FINAL",
+          "value": 0
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "SHARINGAN_GENJUTSU_UNVALIDATED"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "KURAMA_KCM2_NARUTO_SENJUTSU",
+      "name": "Kurama KCM2 avec le Senjutsu de Naruto",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 920,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "avatar",
+            "field": "card.slug",
+            "operator": "EQUALS",
+            "value": "naruto-kcm"
+          },
+          {
+            "side": "SELF",
+            "slot": "avatar",
+            "field": "selectedAvatar.id",
+            "operator": "EQUALS",
+            "value": "KURAMA"
+          },
+          {
+            "side": "SELF",
+            "slot": "senjutsu",
+            "field": "card.slug",
+            "operator": "IN",
+            "value": [
+              "naruto-ermite",
+              "naruto-kcm-sen",
+              "naruto-rikudo"
+            ]
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "senjutsu",
+          "stat": "senjutsu",
+          "operation": "SET_FINAL",
+          "value": 100
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "KURAMA_KCM2_NARUTO_SENJUTSU"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "SHARINGAN_NINJUTSU_UNVALIDATED",
+      "name": "Ninjutsu Sharingan sans clan compatible",
+      "enabled": true,
+      "phase": "VALIDATION_PENALTY",
+      "priority": 900,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "ninjutsu",
+            "field": "card.powerIds",
+            "operator": "CONTAINS",
+            "value": "SHARINGAN"
+          }
+        ],
+        "none": [
+          {
+            "side": "SELF",
+            "slot": "clan",
+            "field": "card.clans",
+            "operator": "CONTAINS_ANY",
+            "value": [
+              "UCHIWA",
+              "OTSUTSUKI"
+            ]
+          },
+          {
+            "side": "SELF",
+            "slot": "ninjutsu",
+            "field": "card.slug",
+            "operator": "IN",
+            "value": [
+              "kakashi",
+              "kakashi-ms",
+              "kakashi-dms"
+            ]
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "ninjutsu",
+          "stat": "ninjutsu",
+          "operation": "PERCENT_ADD",
+          "value": -50
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "SHARINGAN_NINJUTSU_UNVALIDATED"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "SICK_BODY_ALL_STATS",
+      "name": "Personnage malade placé en Body",
+      "enabled": false,
+      "status": "WAITING_FOR_BALANCE_VALUE",
+      "phase": "MODIFIER",
+      "priority": 880,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "body",
+            "field": "card.physicalTraitIds",
+            "operator": "CONTAINS",
+            "value": "SICK_BODY"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "ALL",
+          "stat": "allStats",
+          "operation": "PERCENT_ADD",
+          "value": null
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "SICK_BODY"
+      },
+      "ai": {
+        "considerDuringPlacement": true,
+        "treatAsMajorRisk": true
+      },
+      "notes": [
+        "La règle est conservée mais désactivée tant que le pourcentage exact n’est pas défini."
+      ]
+    },
+    {
+      "id": "MOKUTON_VS_BIJU_AVATAR",
+      "name": "Mokuton confirmé contre un Bijū",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 850,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "kekkeiGenkai",
+            "field": "card.powerIds",
+            "operator": "CONTAINS",
+            "value": "MOKUTON"
+          },
+          {
+            "side": "OPPONENT",
+            "slot": "avatar",
+            "field": "selectedAvatar.type",
+            "operator": "EQUALS",
+            "value": "BIJU"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "OPPONENT",
+          "slot": "avatar",
+          "stat": "avatar",
+          "operation": "PERCENT_ADD",
+          "value": -10
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "MOKUTON_VS_BIJU_AVATAR"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "GUDODAMA_RINNESHARINGAN_VS_EIGHTH_GATE",
+      "name": "Gudōdama ou Rinne Sharingan contre la huitième Porte",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 840,
+      "activation": {
+        "all": [
+          {
+            "side": "OPPONENT",
+            "slot": "taijutsu",
+            "field": "card.powerIds",
+            "operator": "CONTAINS",
+            "value": "EIGHTH_GATE_OF_DEATH"
+          }
+        ],
+        "any": [
+          {
+            "side": "SELF",
+            "slot": "kekkeiMora",
+            "field": "card.powerIds",
+            "operator": "CONTAINS",
+            "value": "GUDODAMA"
+          },
+          {
+            "side": "SELF",
+            "slot": "kekkeiMora",
+            "field": "card.powerIds",
+            "operator": "CONTAINS",
+            "value": "RINNE_SHARINGAN"
+          },
+          {
+            "side": "SELF",
+            "slot": "kekkeiGenkai",
+            "field": "card.powerIds",
+            "operator": "CONTAINS",
+            "value": "RINNE_SHARINGAN"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "OPPONENT",
+          "slot": "taijutsu",
+          "stat": "taijutsu",
+          "operation": "PERCENT_ADD",
+          "value": -50
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "GUDODAMA_RINNESHARINGAN_VS_EIGHTH_GATE"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "KAMUI_VS_TAIJUTSU",
+      "name": "Kamui contre Taijutsu",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 830,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "kekkeiGenkai",
+            "field": "card.powerIds",
+            "operator": "CONTAINS",
+            "value": "KAMUI"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "OPPONENT",
+          "slot": "taijutsu",
+          "stat": "taijutsu",
+          "operation": "PERCENT_ADD",
+          "value": -30
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "KAMUI_VS_TAIJUTSU"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      },
+      "notes": [
+        "S’applique également contre la huitième Porte."
+      ]
+    },
+    {
+      "id": "HIRAISHIN_VS_EIGHTH_GATE",
+      "name": "Hiraishin contre la huitième Porte",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 820,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "ninjutsu",
+            "field": "card.powerIds",
+            "operator": "CONTAINS",
+            "value": "HIRAISHIN"
+          },
+          {
+            "side": "OPPONENT",
+            "slot": "taijutsu",
+            "field": "card.powerIds",
+            "operator": "CONTAINS",
+            "value": "EIGHTH_GATE_OF_DEATH"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "OPPONENT",
+          "slot": "taijutsu",
+          "stat": "taijutsu",
+          "operation": "PERCENT_ADD",
+          "value": -40
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "HIRAISHIN_VS_EIGHTH_GATE"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "LIQUID_BODY_VS_TAIJUTSU",
+      "name": "Corps liquide contre Taijutsu",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 810,
+      "activation": {
+        "any": [
+          {
+            "side": "SELF",
+            "slot": "body",
+            "field": "card.physicalTraitIds",
+            "operator": "CONTAINS",
+            "value": "LIQUID_BODY"
+          },
+          {
+            "side": "SELF",
+            "slot": "kekkeiGenkai",
+            "field": "card.physicalTraitIds",
+            "operator": "CONTAINS",
+            "value": "LIQUID_BODY"
+          }
+        ],
+        "none": [
+          {
+            "side": "OPPONENT",
+            "slot": "taijutsu",
+            "field": "card.powerIds",
+            "operator": "CONTAINS",
+            "value": "EIGHTH_GATE_OF_DEATH"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "OPPONENT",
+          "slot": "taijutsu",
+          "stat": "taijutsu",
+          "operation": "PERCENT_ADD",
+          "value": -50
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "LIQUID_BODY_VS_TAIJUTSU"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "DEFENSE_100_VS_EIGHTH_GATE",
+      "name": "Défense Ninjutsu parfaite contre la huitième Porte",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 800,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "ninjutsu",
+            "field": "defenseFinal",
+            "operator": "GREATER_OR_EQUAL",
+            "value": 100
+          },
+          {
+            "side": "OPPONENT",
+            "slot": "taijutsu",
+            "field": "card.powerIds",
+            "operator": "CONTAINS",
+            "value": "EIGHTH_GATE_OF_DEATH"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "OPPONENT",
+          "slot": "taijutsu",
+          "stat": "taijutsu",
+          "operation": "PERCENT_ADD",
+          "value": -50
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "DEFENSE_100_VS_EIGHTH_GATE"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "SEXY_JUTSU_VS_OTSUTSUKI",
+      "name": "Sexy Jutsu contre un Ōtsutsuki",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 750,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "ninjutsu",
+            "field": "card.powerIds",
+            "operator": "CONTAINS",
+            "value": "SEXY_JUTSU"
+          }
+        ],
+        "any": [
+          {
+            "side": "OPPONENT",
+            "slot": "clan",
+            "field": "card.clans",
+            "operator": "CONTAINS",
+            "value": "OTSUTSUKI"
+          },
+          {
+            "side": "OPPONENT",
+            "slot": "body",
+            "field": "card.clans",
+            "operator": "CONTAINS",
+            "value": "OTSUTSUKI"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "OPPONENT",
+          "slot": "ALL",
+          "stat": "allStats",
+          "operation": "PERCENT_ADD",
+          "value": -10
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "SEXY_JUTSU_VS_OTSUTSUKI"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "NINJUTSU_DEFENSE_100",
+      "name": "Défense Ninjutsu à 100",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 700,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "ninjutsu",
+            "field": "defenseFinal",
+            "operator": "GREATER_OR_EQUAL",
+            "value": 100
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "OPPONENT",
+          "slot": "ninjutsu",
+          "stat": "ninjutsuAttack",
+          "operation": "PERCENT_ADD",
+          "value": -20
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "NINJUTSU_DEFENSE_100"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "JUBI_VALIDATED_BOOST",
+      "name": "Bonus du Jūbi validé",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 500,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "avatar",
+            "field": "selectedAvatar.id",
+            "operator": "EQUALS",
+            "value": "JUBI"
+          },
+          {
+            "side": "SELF",
+            "slot": "chakra",
+            "field": "baseScore",
+            "operator": "GREATER_OR_EQUAL",
+            "value": 70
+          },
+          {
+            "side": "SELF",
+            "slot": "body",
+            "field": "baseScore",
+            "operator": "GREATER_OR_EQUAL",
+            "value": 50
+          },
+          {
+            "side": "SELF",
+            "slot": "avatar",
+            "field": "card.slug",
+            "operator": "IN",
+            "value": [
+              "juubidara",
+              "juubito"
+            ]
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "chakra",
+          "stat": "chakra",
+          "operation": "PERCENT_ADD",
+          "value": 20
+        },
+        {
+          "side": "SELF",
+          "slot": "ninjutsu",
+          "stat": "ninjutsu",
+          "operation": "PERCENT_ADD",
+          "value": 20
+        },
+        {
+          "side": "SELF",
+          "slot": "speed",
+          "stat": "speed",
+          "operation": "PERCENT_ADD",
+          "value": 20
+        },
+        {
+          "side": "SELF",
+          "slot": "kekkeiMora",
+          "stat": "kekkeiMora",
+          "operation": "POINT_ADD",
+          "value": 40
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "JUBI_VALIDATED_BOOST"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "TAIJUTSU_100_NINJUTSU",
+      "name": "Taijutsu à 100",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 420,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "taijutsu",
+            "field": "finalScore",
+            "operator": "GREATER_OR_EQUAL",
+            "value": 100
+          }
+        ],
+        "none": [
+          {
+            "side": "OPPONENT",
+            "slot": "ninjutsu",
+            "field": "defenseFinal",
+            "operator": "GREATER_OR_EQUAL",
+            "value": 100
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "ninjutsu",
+          "stat": "ninjutsu",
+          "operation": "PERCENT_ADD",
+          "value": 50
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "TAIJUTSU_100_NINJUTSU"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "CHAKRA_OVER_100",
+      "name": "Chakra supérieur à 100",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 400,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "chakra",
+            "field": "finalScore",
+            "operator": "GREATER_THAN",
+            "value": 100
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "ninjutsu",
+          "stat": "ninjutsu",
+          "operation": "PERCENT_ADD",
+          "value": 5
+        },
+        {
+          "side": "SELF",
+          "slot": "genjutsu",
+          "stat": "genjutsu",
+          "operation": "PERCENT_ADD",
+          "value": 5
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "CHAKRA_OVER_100"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "IQ_AT_LEAST_100",
+      "name": "IQ égal ou supérieur à 100",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 400,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "iq",
+            "field": "finalScore",
+            "operator": "GREATER_OR_EQUAL",
+            "value": 100
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "ALL",
+          "stat": "allStats",
+          "operation": "PERCENT_ADD",
+          "value": 5
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "IQ_AT_LEAST_100"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      },
+      "notes": [
+        "La version la plus récente applique le bonus à toutes les statistiques, Body et Vitesse inclus."
+      ]
+    },
+    {
+      "id": "KAKASHI_DMS_OBITO_KAMUI",
+      "name": "Kakashi DMS Avatar avec Obito/Kamui",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 370,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "avatar",
+            "field": "card.slug",
+            "operator": "EQUALS",
+            "value": "kakashi-dms"
+          },
+          {
+            "side": "SELF",
+            "slot": "avatar",
+            "field": "selectedAvatar.id",
+            "operator": "EQUALS",
+            "value": "SUSANOO_PERFECT_KAMUI"
+          },
+          {
+            "side": "SELF",
+            "slot": "ANY",
+            "field": "card.powerIds",
+            "operator": "CONTAINS",
+            "value": "KAMUI"
+          },
+          {
+            "side": "SELF",
+            "slot": "ANY",
+            "field": "card.slug",
+            "operator": "IN",
+            "value": [
+              "obito",
+              "obito-orange",
+              "obito-blanc",
+              "juubito"
+            ]
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "ninjutsu",
+          "stat": "ninjutsu",
+          "operation": "PERCENT_ADD",
+          "value": 15
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "KAKASHI_DMS_OBITO_KAMUI"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "HIRAISHIN_DUO_COMBO",
+      "name": "Combinaison Hiraishin Minato/Tobirama",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 360,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "ninjutsu",
+            "field": "card.slug",
+            "operator": "IN",
+            "value": [
+              "minato",
+              "minato-kcm",
+              "tobirama"
+            ]
+          },
+          {
+            "side": "SELF",
+            "slot": "ninjutsu",
+            "field": "card.powerIds",
+            "operator": "CONTAINS",
+            "value": "HIRAISHIN"
+          },
+          {
+            "side": "SELF",
+            "slot": "kenjutsu",
+            "field": "card.slug",
+            "operator": "IN",
+            "value": [
+              "minato",
+              "minato-kcm",
+              "tobirama"
+            ]
+          },
+          {
+            "side": "SELF",
+            "slot": "kenjutsu",
+            "field": "card.powerIds",
+            "operator": "CONTAINS",
+            "value": "HIRAISHIN"
+          },
+          {
+            "side": "SELF",
+            "slot": "ninjutsu",
+            "field": "card.slug",
+            "operator": "NOT_EQUALS_PATH",
+            "value": "self.slots.kenjutsu.card.slug"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "speed",
+          "stat": "speed",
+          "operation": "PERCENT_ADD",
+          "value": 5
+        },
+        {
+          "side": "SELF",
+          "slot": "ninjutsu",
+          "stat": "ninjutsu",
+          "operation": "PERCENT_ADD",
+          "value": 5
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "HIRAISHIN_DUO_COMBO"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "OTSUTSUKI_CLAN_BOOST",
+      "name": "Bonus du clan Ōtsutsuki",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 350,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "clan",
+            "field": "card.clans",
+            "operator": "CONTAINS",
+            "value": "OTSUTSUKI"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "chakra",
+          "stat": "chakra",
+          "operation": "PERCENT_ADD",
+          "value": 30
+        },
+        {
+          "side": "SELF",
+          "slot": "body",
+          "stat": "body",
+          "operation": "PERCENT_ADD",
+          "value": 30
+        },
+        {
+          "side": "SELF",
+          "slot": "speed",
+          "stat": "speed",
+          "operation": "PERCENT_ADD",
+          "value": 30
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "OTSUTSUKI_CLAN_BOOST"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "SENJU_CLAN_CHAKRA",
+      "name": "Bonus du clan Senju",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 350,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "clan",
+            "field": "card.clans",
+            "operator": "CONTAINS",
+            "value": "SENJU"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "chakra",
+          "stat": "chakra",
+          "operation": "PERCENT_ADD",
+          "value": 10
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "SENJU_CLAN_CHAKRA"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "UZUMAKI_CLAN_CHAKRA",
+      "name": "Bonus du clan Uzumaki",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 350,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "clan",
+            "field": "card.clans",
+            "operator": "CONTAINS",
+            "value": "UZUMAKI"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "chakra",
+          "stat": "chakra",
+          "operation": "PERCENT_ADD",
+          "value": 25
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "UZUMAKI_CLAN_CHAKRA"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "FUINJUTSU_UZUMAKI_VS_BIJU",
+      "name": "Karin, Mito ou Kushina en Fūinjutsu contre un Bijū",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 340,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "fuinjutsu",
+            "field": "card.slug",
+            "operator": "IN",
+            "value": [
+              "karin",
+              "mito",
+              "kushina"
+            ]
+          },
+          {
+            "side": "OPPONENT",
+            "slot": "avatar",
+            "field": "selectedAvatar.type",
+            "operator": "EQUALS",
+            "value": "BIJU"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "ninjutsu",
+          "stat": "ninjutsu",
+          "operation": "PERCENT_ADD",
+          "value": 25
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "FUINJUTSU_UZUMAKI_VS_BIJU"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "HAMURA_KEKKEI_MORA",
+      "name": "Hamura en Kekkei Mōra",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 340,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "kekkeiMora",
+            "field": "card.slug",
+            "operator": "EQUALS",
+            "value": "hamura"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "chakra",
+          "stat": "chakra",
+          "operation": "PERCENT_ADD",
+          "value": 25
+        },
+        {
+          "side": "SELF",
+          "slot": "ninjutsu",
+          "stat": "ninjutsu",
+          "operation": "PERCENT_ADD",
+          "value": 25
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "HAMURA_KEKKEI_MORA"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "OTSUTSUKI_BODY_WITHOUT_CLAN",
+      "name": "Ōtsutsuki en Body sans clan Ōtsutsuki",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 340,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "body",
+            "field": "card.clans",
+            "operator": "CONTAINS",
+            "value": "OTSUTSUKI"
+          }
+        ],
+        "none": [
+          {
+            "side": "SELF",
+            "slot": "clan",
+            "field": "card.clans",
+            "operator": "CONTAINS",
+            "value": "OTSUTSUKI"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "chakra",
+          "stat": "chakra",
+          "operation": "PERCENT_ADD",
+          "value": 15
+        },
+        {
+          "side": "SELF",
+          "slot": "speed",
+          "stat": "speed",
+          "operation": "PERCENT_ADD",
+          "value": 15
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "OTSUTSUKI_BODY_WITHOUT_CLAN"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "TONERI_KEKKEI_MORA",
+      "name": "Toneri en Kekkei Mōra",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 340,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "kekkeiMora",
+            "field": "card.slug",
+            "operator": "IN",
+            "value": [
+              "toneri",
+              "toneri-km"
+            ]
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "chakra",
+          "stat": "chakra",
+          "operation": "PERCENT_ADD",
+          "value": 10
+        },
+        {
+          "side": "SELF",
+          "slot": "ninjutsu",
+          "stat": "ninjutsu",
+          "operation": "PERCENT_ADD",
+          "value": 10
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "TONERI_KEKKEI_MORA"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "CURSED_SEAL_BODY_SUSANOO",
+      "name": "Marque maudite en Body avec Susanoo",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 330,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "body",
+            "field": "card.physicalTraitIds",
+            "operator": "CONTAINS",
+            "value": "CURSED_SEAL"
+          },
+          {
+            "side": "SELF",
+            "slot": "avatar",
+            "field": "selectedAvatar.type",
+            "operator": "EQUALS",
+            "value": "SUSANOO"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "avatar",
+          "stat": "avatar",
+          "operation": "PERCENT_ADD",
+          "value": 10
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "CURSED_SEAL_BODY_SUSANOO"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "MADARA_INVOCATION_SUSANOO",
+      "name": "Madara sans Rinnegan en Invocation avec Susanoo",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 330,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "invocation",
+            "field": "card.slug",
+            "operator": "EQUALS",
+            "value": "madara"
+          },
+          {
+            "side": "SELF",
+            "slot": "invocation",
+            "field": "card.powerIds",
+            "operator": "NOT_CONTAINS",
+            "value": "RINNEGAN"
+          },
+          {
+            "side": "SELF",
+            "slot": "avatar",
+            "field": "selectedAvatar.type",
+            "operator": "EQUALS",
+            "value": "SUSANOO"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "avatar",
+          "stat": "avatar",
+          "operation": "PERCENT_ADD",
+          "value": 15
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "MADARA_INVOCATION_SUSANOO"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "SENJUTSU_VS_OTSUTSUKI_CLAN",
+      "name": "Senjutsu contre clan Ōtsutsuki",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 320,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "senjutsu",
+            "field": "baseScore",
+            "operator": "GREATER_THAN",
+            "value": 0
+          },
+          {
+            "side": "OPPONENT",
+            "slot": "clan",
+            "field": "card.clans",
+            "operator": "CONTAINS",
+            "value": "OTSUTSUKI"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "ninjutsu",
+          "stat": "ninjutsu",
+          "operation": "PERCENT_ADD",
+          "value": 25
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "SENJUTSU_VS_OTSUTSUKI_CLAN"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "SHISUI_DANZO_GENJUTSU_VS_MINOR_BIJU",
+      "name": "Shisui ou Danzō en Genjutsu contre un Bijū hors Kurama/Hachibi",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 310,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "genjutsu",
+            "field": "card.slug",
+            "operator": "IN",
+            "value": [
+              "shisui",
+              "danzo"
+            ]
+          },
+          {
+            "side": "OPPONENT",
+            "slot": "avatar",
+            "field": "selectedAvatar.type",
+            "operator": "EQUALS",
+            "value": "BIJU"
+          },
+          {
+            "side": "OPPONENT",
+            "slot": "avatar",
+            "field": "selectedAvatar.id",
+            "operator": "NOT_IN",
+            "value": [
+              "KURAMA",
+              "GYUKI"
+            ]
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "OPPONENT",
+          "slot": "avatar",
+          "stat": "avatar",
+          "operation": "PERCENT_ADD",
+          "value": -10
+        }
+      ],
+      "stacking": {
+        "mode": "MAX_IN_GROUP",
+        "group": "SHISUI_DANZO_GENJUTSU"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "BIJU_CHOMEI_BODY",
+      "name": "CHOMEI améliore body",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 300,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "avatar",
+            "field": "selectedAvatar.id",
+            "operator": "EQUALS",
+            "value": "CHOMEI"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "body",
+          "stat": "body",
+          "operation": "PERCENT_ADD",
+          "value": 25
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "BIJU_CHOMEI_BODY"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "BIJU_GYUKI_IQ",
+      "name": "GYUKI améliore iq",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 300,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "avatar",
+            "field": "selectedAvatar.id",
+            "operator": "EQUALS",
+            "value": "GYUKI"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "iq",
+          "stat": "iq",
+          "operation": "PERCENT_ADD",
+          "value": 50
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "BIJU_GYUKI_IQ"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "BIJU_ISOBU_GENJUTSU",
+      "name": "ISOBU améliore genjutsu",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 300,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "avatar",
+            "field": "selectedAvatar.id",
+            "operator": "EQUALS",
+            "value": "ISOBU"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "genjutsu",
+          "stat": "genjutsu",
+          "operation": "PERCENT_ADD",
+          "value": 25
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "BIJU_ISOBU_GENJUTSU"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "BIJU_KOKUO_TAIJUTSU",
+      "name": "KOKUO améliore taijutsu",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 300,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "avatar",
+            "field": "selectedAvatar.id",
+            "operator": "EQUALS",
+            "value": "KOKUO"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "taijutsu",
+          "stat": "taijutsu",
+          "operation": "PERCENT_ADD",
+          "value": 25
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "BIJU_KOKUO_TAIJUTSU"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "BIJU_KURAMA_SENJUTSU",
+      "name": "KURAMA améliore senjutsu",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 300,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "avatar",
+            "field": "selectedAvatar.id",
+            "operator": "EQUALS",
+            "value": "KURAMA"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "senjutsu",
+          "stat": "senjutsu",
+          "operation": "PERCENT_ADD",
+          "value": 50
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "BIJU_KURAMA_SENJUTSU"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "BIJU_MATATABI_SPEED",
+      "name": "MATATABI améliore speed",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 300,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "avatar",
+            "field": "selectedAvatar.id",
+            "operator": "EQUALS",
+            "value": "MATATABI"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "speed",
+          "stat": "speed",
+          "operation": "PERCENT_ADD",
+          "value": 25
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "BIJU_MATATABI_SPEED"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "BIJU_SAIKEN_NINJUTSU",
+      "name": "SAIKEN améliore ninjutsu",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 300,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "avatar",
+            "field": "selectedAvatar.id",
+            "operator": "EQUALS",
+            "value": "SAIKEN"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "ninjutsu",
+          "stat": "ninjutsu",
+          "operation": "PERCENT_ADD",
+          "value": 25
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "BIJU_SAIKEN_NINJUTSU"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "BIJU_SHUKAKU_FUINJUTSU",
+      "name": "SHUKAKU améliore fuinjutsu",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 300,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "avatar",
+            "field": "selectedAvatar.id",
+            "operator": "EQUALS",
+            "value": "SHUKAKU"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "fuinjutsu",
+          "stat": "fuinjutsu",
+          "operation": "PERCENT_ADD",
+          "value": 25
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "BIJU_SHUKAKU_FUINJUTSU"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "BIJU_SON_GOKU_KEKKEIGENKAI",
+      "name": "SON_GOKU améliore kekkeiGenkai",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 300,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "avatar",
+            "field": "selectedAvatar.id",
+            "operator": "EQUALS",
+            "value": "SON_GOKU"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "kekkeiGenkai",
+          "stat": "kekkeiGenkai",
+          "operation": "PERCENT_ADD",
+          "value": 25
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "BIJU_SON_GOKU_KEKKEIGENKAI"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "DOJUTSU_TAIJUTSU_BOOST",
+      "name": "Sharingan ou Byakugan confirmé par Body/Kekkei Genkai",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 300,
+      "activation": {
+        "any": [
+          {
+            "side": "SELF",
+            "slot": "body",
+            "field": "card.powerIds",
+            "operator": "CONTAINS_ANY",
+            "value": [
+              "SHARINGAN",
+              "BYAKUGAN"
+            ]
+          },
+          {
+            "side": "SELF",
+            "slot": "kekkeiGenkai",
+            "field": "card.powerIds",
+            "operator": "CONTAINS_ANY",
+            "value": [
+              "SHARINGAN",
+              "BYAKUGAN"
+            ]
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "taijutsu",
+          "stat": "taijutsu",
+          "operation": "PERCENT_ADD",
+          "value": 5
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "DOJUTSU_TAIJUTSU_BOOST"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "EIGHT_GATES_SPEED",
+      "name": "Ouverture des Portes internes",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 300,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "taijutsu",
+            "field": "card.powerIds",
+            "operator": "CONTAINS",
+            "value": "EIGHT_GATES"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "speed",
+          "stat": "speed",
+          "operation": "PERCENT_ADD",
+          "value": 10
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "EIGHT_GATES_SPEED"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "HIRAISHIN_NINJUTSU_SPEED",
+      "name": "Minato ou Tobirama en Ninjutsu",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 300,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "ninjutsu",
+            "field": "card.slug",
+            "operator": "IN",
+            "value": [
+              "minato",
+              "minato-kcm",
+              "tobirama"
+            ]
+          },
+          {
+            "side": "SELF",
+            "slot": "ninjutsu",
+            "field": "card.powerIds",
+            "operator": "CONTAINS",
+            "value": "HIRAISHIN"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "speed",
+          "stat": "speed",
+          "operation": "PERCENT_ADD",
+          "value": 10
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "HIRAISHIN_NINJUTSU_SPEED"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "ITACHI_KENJUTSU_AVATAR",
+      "name": "Itachi en Kenjutsu vers Avatar",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 300,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "kenjutsu",
+            "field": "card.slug",
+            "operator": "IN",
+            "value": [
+              "itachi",
+              "itachi-prime"
+            ]
+          },
+          {
+            "side": "SELF",
+            "slot": "avatar",
+            "field": "card",
+            "operator": "EXISTS",
+            "value": true
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "avatar",
+          "stat": "avatar",
+          "operation": "PERCENT_ADD",
+          "value": 5
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "ITACHI_KENJUTSU_AVATAR"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "ITACHI_KENJUTSU_NINJUTSU",
+      "name": "Itachi en Kenjutsu vers Ninjutsu",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 300,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "kenjutsu",
+            "field": "card.slug",
+            "operator": "IN",
+            "value": [
+              "itachi",
+              "itachi-prime"
+            ]
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "ninjutsu",
+          "stat": "ninjutsu",
+          "operation": "PERCENT_ADD",
+          "value": 10
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "ITACHI_KENJUTSU_NINJUTSU"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "KINKAKU_GINKAKU_KENJUTSU",
+      "name": "Kinkaku ou Ginkaku en Kenjutsu",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 300,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "kenjutsu",
+            "field": "card.slug",
+            "operator": "IN",
+            "value": [
+              "kinkaku",
+              "ginkaku"
+            ]
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "ninjutsu",
+          "stat": "ninjutsu",
+          "operation": "PERCENT_ADD",
+          "value": 10
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "KINKAKU_GINKAKU_KENJUTSU"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "KISAME_KENJUTSU",
+      "name": "Kisame en Kenjutsu",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 300,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "kenjutsu",
+            "field": "card.slug",
+            "operator": "EQUALS",
+            "value": "kisame"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "chakra",
+          "stat": "chakra",
+          "operation": "PERCENT_ADD",
+          "value": 10
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "KISAME_KENJUTSU"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "MADARA_KENJUTSU",
+      "name": "Madara de base en Kenjutsu",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 300,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "kenjutsu",
+            "field": "card.slug",
+            "operator": "EQUALS",
+            "value": "madara"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "ninjutsu",
+          "stat": "ninjutsu",
+          "operation": "PERCENT_ADD",
+          "value": 15
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "MADARA_KENJUTSU"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "SHISUI_DANZO_GENJUTSU_BASE",
+      "name": "Shisui ou Danzō en Genjutsu",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 300,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "genjutsu",
+            "field": "card.slug",
+            "operator": "IN",
+            "value": [
+              "shisui",
+              "danzo"
+            ]
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "ninjutsu",
+          "stat": "ninjutsu",
+          "operation": "PERCENT_ADD",
+          "value": 10
+        }
+      ],
+      "stacking": {
+        "mode": "MAX_IN_GROUP",
+        "group": "SHISUI_DANZO_GENJUTSU"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    },
+    {
+      "id": "TENTEN_KENJUTSU",
+      "name": "Tenten en Kenjutsu",
+      "enabled": true,
+      "phase": "MODIFIER",
+      "priority": 300,
+      "activation": {
+        "all": [
+          {
+            "side": "SELF",
+            "slot": "kenjutsu",
+            "field": "card.slug",
+            "operator": "IN",
+            "value": [
+              "tenten",
+              "tenten-rikudo"
+            ]
+          }
+        ]
+      },
+      "effects": [
+        {
+          "side": "SELF",
+          "slot": "ninjutsu",
+          "stat": "ninjutsu",
+          "operation": "PERCENT_ADD",
+          "value": 5
+        }
+      ],
+      "stacking": {
+        "mode": "STACK_WITH_DIFFERENT_RULES",
+        "group": "TENTEN_KENJUTSU"
+      },
+      "ai": {
+        "considerDuringPlacement": true
+      }
+    }
+  ],
+  "unresolvedBalance": [
+    {
+      "ruleId": "SICK_BODY_ALL_STATS",
+      "missingValue": "Pourcentage du nerf appliqué à toutes les statistiques",
+      "currentBehavior": "Règle désactivée"
+    }
+  ],
+  "supersededValues": [
+    {
+      "subject": "Minato/Tobirama en Ninjutsu",
+      "old": "+25 % Vitesse",
+      "active": "+10 % Vitesse"
+    },
+    {
+      "subject": "Clan Ōtsutsuki",
+      "old": "+35 % Chakra/Body/Vitesse",
+      "active": "+30 % Chakra/Body/Vitesse"
+    },
+    {
+      "subject": "IQ à 100",
+      "old": "Body et Vitesse exclus",
+      "active": "Toutes les statistiques incluses"
+    }
+  ],
+  "dataEncodedAdjustments": [
+    {
+      "subject": "Susanoo d’Itachi malade",
+      "behavior": "Sa puissance réduite est déjà représentée par la statistique Avatar de la carte itachi et son avatar SUSANOO_ARMORED_SICK.",
+      "runtimeModifier": false,
+      "reason": "Évite d’appliquer deux fois le même nerf de maladie."
+    }
+  ]
+}
