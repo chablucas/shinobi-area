@@ -7,7 +7,9 @@ const bijuNames = ['shukaku', 'matatabi', 'isobu', 'son gokû', 'son goku', 'kok
 const hasName = (context: RuleContext, slot: string, values: string[]) => values.some((value) => cardName(context, slot).includes(value))
 const hasBiju = (context: RuleContext) => hasName(context, 'avatar', bijuNames)
 
-export function applyRules(context: RuleContext, opponent?: RuleContext): void {
+export function applyRules(context: RuleContext, opponents?: RuleContext | RuleContext[]): void {
+  const opponentList = Array.isArray(opponents) ? opponents : opponents ? [opponents] : []
+  const opponent = opponentList[0]
   const iq = context.cards.iq?.stats.iq
   if (iq === 100) for (const target of activeStats) percentage(context, 'iq-master', 'Bonus IQ maître', target, IQ_MASTER_BONUS)
 
@@ -22,14 +24,15 @@ export function applyRules(context: RuleContext, opponent?: RuleContext): void {
   if (hasName(context, 'ninjutsu', ['minato', 'tobirama'])) percentage(context, 'ninjutsu-speed', 'Vitesse de Minato ou Tobirama', 'speed', 0.25)
   if (context.baseStats.taijutsu === 100) {
     percentage(context, 'taijutsu-master-ninjutsu', 'Bonus Taijutsu à 100', 'ninjutsuAttack', PERFECT_TAIJUTSU_NINJUTSU_BONUS)
-    if (opponent?.baseStats.ninjutsuDefense === 100) points(context, 'perfect-defense-taijutsu', 'Réduction du bonus Taijutsu', 'ninjutsuAttack', -(context.baseStats.ninjutsuAttack * PERFECT_TAIJUTSU_NINJUTSU_BONUS / 2))
+      if (opponentList.some((candidate) => candidate.baseStats.ninjutsuDefense === 100)) points(context, 'perfect-defense-taijutsu', 'Réduction du bonus Taijutsu', 'ninjutsuAttack', -(context.baseStats.ninjutsuAttack * PERFECT_TAIJUTSU_NINJUTSU_BONUS / 2))
   }
   if (hasName(context, 'taijutsu', ['guy 8 portes'])) {
     percentage(context, 'guy-eight-gates', 'Bonus des Huit Portes', 'taijutsu', EIGHT_GATES_BONUS)
-    if (opponent?.baseStats.ninjutsuDefense === 100) points(context, 'perfect-defense-eight-gates', 'Réduction du bonus des Huit Portes', 'taijutsu', -(context.baseStats.taijutsu * EIGHT_GATES_BONUS / 2))
+      if (opponentList.some((candidate) => candidate.baseStats.ninjutsuDefense === 100)) points(context, 'perfect-defense-eight-gates', 'Réduction du bonus des Huit Portes', 'taijutsu', -(context.baseStats.taijutsu * EIGHT_GATES_BONUS / 2))
   }
   if (context.baseStats.genjutsu === 100 && opponent && hasName(opponent, 'avatar', ['hachibi', 'gyûki', 'gyuki', 'kurama', 'jûbi', 'juubi'])) points(context, 'genjutsu-biju-counter', 'Contre Genjutsu contre un Bijû', 'genjutsu', -BIJU_GENJUTSU_PENALTY_POINTS)
-  if (context.baseStats.ninjutsuDefense === 100 && opponent) percentage(opponent, 'perfect-defense-ninjutsu', 'Défense Ninjutsu parfaite', 'ninjutsuAttack', -PERFECT_NINJUTSU_DEFENSE_REDUCTION)
+    if (context.baseStats.genjutsu === 100 && opponentList.some((candidate) => hasName(candidate, 'avatar', ['hachibi', 'gyûki', 'gyuki', 'kurama', 'jûbi', 'juubi']))) points(context, 'genjutsu-biju-counter', 'Contre Genjutsu contre un Bijû', 'genjutsu', -BIJU_GENJUTSU_PENALTY_POINTS)
+    if (context.baseStats.ninjutsuDefense === 100) for (const candidate of opponentList) percentage(candidate, 'perfect-defense-ninjutsu', 'Défense Ninjutsu parfaite', 'ninjutsuAttack', -PERFECT_NINJUTSU_DEFENSE_REDUCTION)
 
   const avatar = cardName(context, 'avatar')
   if (avatar.includes('shukaku')) percentage(context, 'biju-shukaku', 'Bonus de Shukaku', 'fuinjutsu', 0.25)
@@ -46,11 +49,12 @@ export function applyRules(context: RuleContext, opponent?: RuleContext): void {
 
   if (hasName(context, 'body', ['marque', 'curse mark']) && hasName(context, 'avatar', ['susanoo'])) percentage(context, 'body-avatar-susanoo', 'Marque maudite et Susanoo', 'avatar', 0.1)
   if (hasName(context, 'fuinjutsu', ['karin', 'mito', 'kushina']) && opponent && hasBiju(opponent)) { percentage(context, 'fuinjutsu-biju-ninjutsu', 'Fûinjutsu contre un Bijû', 'ninjutsuAttack', 0.25); percentage(context, 'fuinjutsu-biju-ninjutsu', 'Fûinjutsu contre un Bijû', 'ninjutsuDefense', 0.25) }
-  if (context.cards.senjutsu && opponent && (hasClan(opponent, 'OTSUTSUKI') || opponent.cards.body?.clans.some((value) => value.toLowerCase() === 'otsutsuki'))) { percentage(context, 'senjutsu-otsutsuki', 'Senjutsu contre Ôtsutsuki', 'ninjutsuAttack', 0.25); percentage(context, 'senjutsu-otsutsuki', 'Senjutsu contre Ôtsutsuki', 'ninjutsuDefense', 0.25) }
+    if (hasName(context, 'fuinjutsu', ['karin', 'mito', 'kushina']) && opponentList.some(hasBiju)) { percentage(context, 'fuinjutsu-biju-ninjutsu', 'Fûinjutsu contre un Bijû', 'ninjutsuAttack', 0.25); percentage(context, 'fuinjutsu-biju-ninjutsu', 'Fûinjutsu contre un Bijû', 'ninjutsuDefense', 0.25) }
+    if (context.cards.senjutsu && opponentList.some((candidate) => hasClan(candidate, 'OTSUTSUKI') || candidate.cards.body?.clans.some((value) => value.toLowerCase() === 'otsutsuki'))) { percentage(context, 'senjutsu-otsutsuki', 'Senjutsu contre Ôtsutsuki', 'ninjutsuAttack', 0.25); percentage(context, 'senjutsu-otsutsuki', 'Senjutsu contre Ôtsutsuki', 'ninjutsuDefense', 0.25) }
   const kenjutsuBonuses: [string, string, number][] = [['kisame', 'chakra', 0.1], ['itachi', 'ninjutsuAttack', 0.1], ['ginkaku', 'ninjutsuAttack', 0.1], ['kinkaku', 'ninjutsuAttack', 0.1], ['tenten', 'ninjutsuAttack', 0.05], ['madara', 'ninjutsuAttack', 0.15]]
   for (const [name, target, value] of kenjutsuBonuses) if (cardName(context, 'kenjutsu') === name || (name === 'madara' && cardName(context, 'kenjutsu') === 'madara')) { percentage(context, `kenjutsu-${name}`, `Bonus de Kenjutsu ${name}`, target as typeof activeStats[number], value); if (target === 'ninjutsuAttack') percentage(context, `kenjutsu-${name}`, `Bonus de Kenjutsu ${name}`, 'ninjutsuDefense', value) }
   if (hasName(context, 'kekkei-mora', ['hamura'])) { percentage(context, 'mora-hamura', 'Kekkei Môra de Hamura', 'chakra', 0.25); percentage(context, 'mora-hamura', 'Kekkei Môra de Hamura', 'ninjutsuAttack', 0.25); percentage(context, 'mora-hamura', 'Kekkei Môra de Hamura', 'ninjutsuDefense', 0.25) }
   if (hasName(context, 'kekkei-mora', ['toneri'])) { percentage(context, 'mora-toneri', 'Kekkei Môra de Toneri', 'chakra', 0.1); percentage(context, 'mora-toneri', 'Kekkei Môra de Toneri', 'ninjutsuAttack', 0.1); percentage(context, 'mora-toneri', 'Kekkei Môra de Toneri', 'ninjutsuDefense', 0.1) }
-  if (opponent && hasName(context, 'kekkei-mora', ['sasuke']) && hasName(opponent, 'taijutsu', ['guy 8 portes'])) percentage(context, 'sasuke-guy-counter', 'Sasuke contre Guy Huit Portes', 'kekkeiGenkai', -0.5)
+  if (opponentList.some((candidate) => hasName(candidate, 'taijutsu', ['guy 8 portes'])) && hasName(context, 'kekkei-mora', ['sasuke'])) percentage(context, 'sasuke-guy-counter', 'Sasuke contre Guy Huit Portes', 'kekkeiGenkai', -0.5)
   if (!context.permissions.sharingan && hasName(context, 'ninjutsu', ['uchiwa'])) { percentage(context, 'sharingan-required', 'Technique Uchiwa sans Sharingan', 'ninjutsuAttack', -0.5); percentage(context, 'sharingan-required', 'Technique Uchiwa sans Sharingan', 'ninjutsuDefense', -0.5) }
 }
