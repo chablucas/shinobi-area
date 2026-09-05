@@ -14,7 +14,7 @@ const mode = computed<TeamAuctionMode>(() => {
   return value === '1v1-real' || value === '1v1v1-real' ? value : '1v1-ai'
 })
 const modeLabel = computed(() => (mode.value === '1v1-ai' ? '1v1 IA' : mode.value === '1v1-real' ? '1v1 joueur réel' : '1v1v1 joueurs réels'))
-const expectedPlayers = computed(() => (mode.value === '1v1v1-real' ? 3 : 2))
+const expectedPlayers = computed(() => state.value?.expectedPlayers ?? (mode.value === '1v1v1-real' ? 3 : 2))
 
 const socket = ref<GameSocket | null>(null)
 const socketConnected = ref(false)
@@ -40,6 +40,9 @@ const opponents = computed(() => state.value?.players.filter((player) => player.
 const isMyTurn = computed(() => Boolean(state.value && myId.value !== null && state.value.currentTurnId === myId.value))
 const amWinner = computed(() => Boolean(state.value && myId.value !== null && state.value.winnerId === myId.value))
 const totalCapacity = computed(() => teamSizesArray.value.reduce((sum, size) => sum + size, 0))
+const lobbyPlayerCount = computed(() => state.value?.playerCount ?? state.value?.players.length ?? 0)
+const lobbyFreeSlots = computed(() => Math.max(expectedPlayers.value - lobbyPlayerCount.value, 0))
+const canStartGame = computed(() => Boolean(state.value?.canStart && isHost.value))
 
 const bidStep = computed(() => state.value?.rules.bidUnit ?? 10)
 const minBid = computed(() => state.value?.rules.minBid ?? 10)
@@ -195,7 +198,11 @@ onMounted(async () => {
   }
   const gameSocket = connectGameSocket(auth.token)
   socket.value = gameSocket
-  gameSocket.on('connect', () => { socketConnected.value = true; errorMessage.value = '' })
+  gameSocket.on('connect', () => {
+    socketConnected.value = true
+    errorMessage.value = ''
+    if (gameId.value) gameSocket.emit('team-auction:request-state', gameId.value)
+  })
   gameSocket.on('disconnect', () => { socketConnected.value = false })
   gameSocket.on('connect_error', () => { socketConnected.value = false; errorMessage.value = 'Connexion realtime impossible. Reconnexion...' })
   gameSocket.on('team-auction:state', (nextState) => { state.value = nextState; errorMessage.value = '' })
@@ -203,7 +210,7 @@ onMounted(async () => {
   const queryGameId = typeof route.query.gameId === 'string' ? route.query.gameId : ''
   if (queryGameId) {
     gameId.value = queryGameId
-    gameSocket.emit('team-auction:request-state', queryGameId)
+    if (gameSocket.connected) gameSocket.emit('team-auction:request-state', queryGameId)
   }
   loading.value = false
 })
@@ -260,10 +267,13 @@ onUnmounted(() => {
           <p class="ta-room-code">Code : <strong>{{ gameId }}</strong></p>
           <p class="ta-recap">{{ state?.teamSizes.length ?? teamSizesArray.length }} équipes · tailles {{ (state?.teamSizes ?? teamSizesArray).join(' / ') }} · budget {{ state?.initialBudget ?? initialBudget }} M</p>
           <ul class="ta-player-list">
-            <li v-for="player in state?.players ?? []" :key="String(player.id)">{{ player.displayName }}<span v-if="player.isAi"> (IA)</span></li>
+            <li v-for="player in state?.players ?? []" :key="String(player.id)">
+              ✓ {{ player.displayName }}<span v-if="player.isAi"> (IA)</span><span v-if="state?.hostId !== null && player.id === state?.hostId"> — Hôte</span>
+            </li>
+            <li v-for="slot in lobbyFreeSlots" :key="`waiting-${slot}`" class="ta-player-waiting">○ En attente</li>
           </ul>
-          <p class="ta-recap">{{ state?.players.length ?? 0 }} / {{ expectedPlayers }} joueurs · {{ expectedPlayers - (state?.players.length ?? 0) }} place(s) restante(s)</p>
-          <button v-if="isHost" type="button" class="cta-sub-btn primary" :disabled="(state?.players.length ?? 0) < expectedPlayers" @click="startGame">
+          <p class="ta-recap">{{ lobbyPlayerCount }} / {{ expectedPlayers }} joueurs · {{ lobbyFreeSlots }} place(s) restante(s)</p>
+          <button v-if="isHost" type="button" class="cta-sub-btn primary" :disabled="!canStartGame" @click="startGame">
             Lancer la partie
           </button>
           <p v-else class="ta-status">En attente de l’hôte...</p>
@@ -514,6 +524,10 @@ input[type='text'] {
   margin: 12px 0;
   padding: 0;
   font-size: 0.85rem;
+}
+
+.ta-player-waiting {
+  color: var(--text-muted);
 }
 
 .ta-status {

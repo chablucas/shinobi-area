@@ -18,6 +18,9 @@ export type TeamAuctionState = {
   hostId: number | null
   mode: TeamAuctionMode
   phase: 'LOBBY' | 'DRAW' | 'BIDDING' | 'PLACEMENT' | 'RESULTS' | 'FINISHED'
+  expectedPlayers: number
+  playerCount: number
+  canStart: boolean
   teamSizes: number[]
   initialBudget: number
   roundNumber: number

@@ -15,9 +15,19 @@ const teamAuctionHosts = new Map<string, number>()
 
 function teamAuctionExpectedPlayers(mode: TeamAuctionMode) { return mode === '1v1v1-real' ? 3 : 2 }
 function isTeamAuctionParticipant(game: TeamAuctionGame, userId: number) { return game.players.some((player) => player.id === userId) }
+/** Le nombre de joueurs vient des participants uniques, jamais du nombre de sockets. */
+function teamAuctionPlayerCount(game: TeamAuctionGame) { return new Set(game.players.map((player) => String(player.id))).size }
+function teamAuctionCanStart(game: TeamAuctionGame) { return game.phase === 'LOBBY' && teamAuctionPlayerCount(game) === teamAuctionExpectedPlayers(game.mode) }
 async function teamAuctionDisplayName(userId: number) {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { displayName: true } })
   return user?.displayName.trim() || 'Joueur'
+}
+
+/** Salon adossé à un GameLobby Prisma : seuls le créateur et les invités peuvent entrer. */
+async function isTeamAuctionLobbyMember(gameId: string, userId: number) {
+  const lobby = await prisma.gameLobby.findUnique({ where: { id: gameId }, select: { creatorId: true, invites: { select: { inviteeId: true } } } })
+  if (!lobby) return true
+  return lobby.creatorId === userId || lobby.invites.some((invite) => invite.inviteeId === userId)
 }
 
 async function getOrInitTeamAuctionGame(gameId: string, userId: number) {
@@ -87,6 +97,9 @@ async function teamAuctionPublicState(game: TeamAuctionGame) {
     hostId: teamAuctionHosts.get(game.gameId) ?? null,
     mode: game.mode,
     phase: game.phase,
+    expectedPlayers: teamAuctionExpectedPlayers(game.mode),
+    playerCount: teamAuctionPlayerCount(game),
+    canStart: teamAuctionCanStart(game),
     teamSizes: game.teamSizes,
     initialBudget: game.initialBudget,
     roundNumber: game.roundNumber,
@@ -179,6 +192,22 @@ export function attachRealtime(io: Server) {
     io.in(`team-auction:${gameId}`).emit('team-auction:state', await teamAuctionPublicState(game))
   }
 
+  /** Enregistre le participant (une seule fois par userId), rattache le socket au salon. */
+  async function joinTeamAuctionLobby(socket: { join: (room: string) => Promise<void> | void; data: SocketData }, gameId: string, userId: number) {
+    const game = await getOrInitTeamAuctionGame(gameId, userId)
+    if (!game) throw new Error('Salon Team Auction introuvable.')
+    const alreadyParticipant = isTeamAuctionParticipant(game, userId)
+    if (!alreadyParticipant) {
+      if (game.phase !== 'LOBBY') throw new Error('La partie a déjà démarré.')
+      if (!(await isTeamAuctionLobbyMember(gameId, userId))) throw new Error('Tu ne participes pas à ce salon.')
+      if (teamAuctionPlayerCount(game) >= teamAuctionExpectedPlayers(game.mode)) throw new Error('Le salon est plein.')
+      game.players.push({ id: userId, displayName: await teamAuctionDisplayName(userId), isAi: false, budget: game.initialBudget, teams: game.teamSizes.map(() => []), passedCurrentRound: false, activeCurrentRound: true })
+    }
+    await socket.join(`team-auction:${gameId}`)
+    socket.data.gameId = gameId
+    return { game, added: !alreadyParticipant }
+  }
+
   io.on('connection', (socket) => {
     const userId = (socket.data as SocketData).userId
     if (!userId) return
@@ -202,15 +231,7 @@ export function attachRealtime(io: Server) {
     socket.on('team-auction:join', async (gameId: unknown, acknowledge?: (response: unknown) => void) => {
       try {
         if (typeof gameId !== 'string' || !gameId) throw new Error('Code de salon invalide.')
-        const game = await getOrInitTeamAuctionGame(gameId, userId)
-        if (!game) throw new Error('Salon Team Auction introuvable.')
-        if (game.phase !== 'LOBBY') throw new Error('La partie a déjà démarré.')
-        if (!game.players.some((player) => player.id === userId)) {
-          if (game.players.length >= teamAuctionExpectedPlayers(game.mode)) throw new Error('Le salon est plein.')
-          game.players.push({ id: userId, displayName: await teamAuctionDisplayName(userId), isAi: false, budget: game.initialBudget, teams: game.teamSizes.map(() => []), passedCurrentRound: false, activeCurrentRound: true })
-        }
-        await socket.join(`team-auction:${gameId}`)
-        socket.data.gameId = gameId
+        await joinTeamAuctionLobby(socket, gameId, userId)
         await emitTeamAuctionState(gameId)
         acknowledge?.({ ok: true, gameId })
       } catch (error) { acknowledge?.({ ok: false, message: teamAuctionError(error) }); socket.emit('team-auction:error', { message: teamAuctionError(error) }) }
@@ -219,19 +240,18 @@ export function attachRealtime(io: Server) {
       try {
         if (typeof gameId !== 'string' || teamAuctionHosts.get(gameId) !== userId) throw new Error('Seul l’hôte peut lancer cette partie.')
         const game = getTeamAuctionGame(gameId)
-        if (!game || game.players.length !== teamAuctionExpectedPlayers(game.mode)) throw new Error('Le nombre de joueurs requis n’est pas atteint.')
+        if (!game) throw new Error('Salon Team Auction introuvable.')
+        if (game.phase !== 'LOBBY') throw new Error('La partie a déjà démarré.')
+        if (!teamAuctionCanStart(game)) throw new Error('Le nombre de joueurs requis n’est pas atteint.')
         startTeamAuctionGame(gameId); advanceTeamAuction(gameId); await emitTeamAuctionState(gameId)
       } catch (error) { socket.emit('team-auction:error', { message: teamAuctionError(error) }) }
     })
     socket.on('team-auction:request-state', async (gameId: unknown) => {
       try {
         if (typeof gameId !== 'string' || !gameId) throw new Error('Code de salon invalide.')
-        const game = await getOrInitTeamAuctionGame(gameId, userId)
-        if (!game) throw new Error('Salon Team Auction introuvable.')
-        if (!isTeamAuctionParticipant(game, userId)) throw new Error('Session/joueur invalide.')
-        await socket.join(`team-auction:${gameId}`)
-        socket.data.gameId = gameId
-        socket.emit('team-auction:state', await teamAuctionPublicState(game))
+        const { game, added } = await joinTeamAuctionLobby(socket, gameId, userId)
+        if (added) await emitTeamAuctionState(gameId)
+        else socket.emit('team-auction:state', await teamAuctionPublicState(game))
       } catch (error) { socket.emit('team-auction:error', { message: teamAuctionError(error) }) }
     })
     socket.on('team-auction:action', async (payload: { gameId?: unknown; action?: unknown; amount?: unknown; teamIndex?: unknown }) => {
@@ -247,7 +267,19 @@ export function attachRealtime(io: Server) {
         await emitTeamAuctionState(gameId)
       } catch (error) { socket.emit('team-auction:error', { message: teamAuctionError(error) }) }
     })
-    socket.on('team-auction:leave', async (gameId: unknown) => { if (typeof gameId === 'string') { await socket.leave(`team-auction:${gameId}`); socket.data.gameId = undefined } })
+    socket.on('team-auction:leave', async (gameId: unknown) => {
+      if (typeof gameId !== 'string' || !gameId) return
+      await socket.leave(`team-auction:${gameId}`)
+      socket.data.gameId = undefined
+      const game = getTeamAuctionGame(gameId)
+      if (!game || game.phase !== 'LOBBY' || teamAuctionHosts.get(gameId) === userId) return
+      const remaining = await io.in(`team-auction:${gameId}`).fetchSockets()
+      if (remaining.some((other) => (other.data as SocketData).userId === userId)) return
+      const index = game.players.findIndex((player) => player.id === userId)
+      if (index === -1) return
+      game.players.splice(index, 1)
+      await emitTeamAuctionState(gameId)
+    })
     socket.on('game:join', async (gameId: unknown, acknowledge?: (response: unknown) => void) => {
       try {
         if (typeof gameId !== 'string' || !gameId) throw Object.assign(new Error('Identifiant de partie invalide.'), { statusCode: 400 })
