@@ -22,7 +22,10 @@ function buildFor(player: StoredPlayer) {
 const lobbyInclude = { creator: { select: { id: true, displayName: true } }, invites: { include: { invitee: { select: { id: true, displayName: true } } } } }
 function gameInclude() { return { lobby: { include: lobbyInclude } } }
 
-async function cardView(id: number, imageById: Map<number, string | null>) {
+// Les IDs stockés dans l'état de partie (pile, pendingCardId, slots) sont les IDs du catalogue canonique
+// (shinobi-cards.json), jamais les IDs autoincrement de la table Prisma Card. Toute jointure avec Prisma
+// (imageUrl notamment) doit donc se faire par slug canonique, pas par id.
+async function cardView(id: number, imageBySlug: Map<string, string | null>) {
   const card = getCardKnowledgeById(id)
   if (!card) return null
   return {
@@ -31,7 +34,7 @@ async function cardView(id: number, imageById: Map<number, string | null>) {
     name: card.name,
     clans: card.clans,
     stats: card.stats,
-    imageUrl: imageById.get(id) ?? null,
+    imageUrl: imageBySlug.get(card.slug) ?? null,
     eligibleSlots: card.traits.eligibleSlots,
   }
 }
@@ -40,26 +43,33 @@ export async function publicGameState(game: Awaited<ReturnType<typeof findGame>>
   if (!game) return null
   const state = stateOf(game.state)
   const stateVersion = Number.isFinite(state.stateVersion) ? Number(state.stateVersion) : (game.turnNumber ?? 0)
-  const cardIds = new Set<number>()
+  const cardSlugs = new Set<string>()
   for (const player of state.players) {
-    if (player.pendingCardId) cardIds.add(player.pendingCardId)
-    for (const cardId of Object.values(player.slots)) if (cardId) cardIds.add(cardId)
+    if (player.pendingCardId) {
+      const slug = getCardKnowledgeById(player.pendingCardId)?.slug
+      if (slug) cardSlugs.add(slug)
+    }
+    for (const cardId of Object.values(player.slots)) {
+      if (!cardId) continue
+      const slug = getCardKnowledgeById(cardId)?.slug
+      if (slug) cardSlugs.add(slug)
+    }
   }
-  const imageById = new Map<number, string | null>(
-    (await prisma.card.findMany({ where: { id: { in: [...cardIds] } }, select: { id: true, imageUrl: true } })).map((card) => [card.id, card.imageUrl]),
+  const imageBySlug = new Map<string, string | null>(
+    (await prisma.card.findMany({ where: { slug: { in: [...cardSlugs] } }, select: { slug: true, imageUrl: true } })).map((card) => [card.slug, card.imageUrl]),
   )
   const players = [] as Array<{ userId: number | null; displayName: string; playerNumber: number; cardsRemaining: number; pendingCard: Awaited<ReturnType<typeof cardView>> | null; slots: Record<string, Awaited<ReturnType<typeof cardView>> | null> }>
   for (const player of state.players) {
     const slots: Record<string, Awaited<ReturnType<typeof cardView>> | null> = {}
     for (const [category, cardId] of Object.entries(player.slots)) {
-      slots[category] = cardId ? await cardView(cardId, imageById) : null
+      slots[category] = cardId ? await cardView(cardId, imageBySlug) : null
     }
     players.push({
       userId: player.userId,
       displayName: player.displayName,
       playerNumber: player.playerNumber,
       cardsRemaining: player.pile.length,
-      pendingCard: player.userId === userId && player.pendingCardId ? await cardView(player.pendingCardId, imageById) : null,
+      pendingCard: player.userId === userId && player.pendingCardId ? await cardView(player.pendingCardId, imageBySlug) : null,
       slots,
     })
   }
@@ -87,9 +97,12 @@ export async function createOrGetGame(lobbyId: string) {
   if (lobby.status !== 'PLAYING') throw invalid('Le salon n’est pas en cours.', 409)
   const users = [lobby.creator, ...lobby.invites.filter((invite) => invite.status === 'ACCEPTED').map((invite) => invite.invitee)]
   if (users.length < 2) throw invalid('Les joueurs du salon ne sont pas prêts.', 409)
-  const knowledge = listCardKnowledge().map((card) => card.id)
-  const cards = await prisma.card.findMany({ where: { id: { in: knowledge } }, select: { id: true } })
-  const available = cards.map((card) => card.id).sort(() => Math.random() - 0.5)
+  // Le deck stocke des IDs canoniques : l'intersection avec Prisma se fait par slug canonique,
+  // jamais en supposant que l'ID canonique (JSON) égale l'ID Prisma (autoincrement).
+  const canonicalCards = listCardKnowledge()
+  const present = await prisma.card.findMany({ where: { slug: { in: canonicalCards.map((card) => card.slug) } }, select: { slug: true } })
+  const presentSlugs = new Set(present.map((card) => card.slug))
+  const available = canonicalCards.filter((card) => presentSlugs.has(card.slug)).map((card) => card.id).sort(() => Math.random() - 0.5)
   const players: StoredPlayer[] = users.map((user, index) => ({ userId: user.id, displayName: user.displayName, playerNumber: index + 1, pile: available.filter((_, cardIndex) => cardIndex % users.length === index), pendingCardId: null, slots: emptySlots() }))
   const state: StoredState = { players }
   try {
