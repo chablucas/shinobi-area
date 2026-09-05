@@ -1,0 +1,828 @@
+{
+  "schemaVersion": "1.0.0",
+  "generatedFor": "Shinobi Area",
+  "mode": "TEAM_AUCTION",
+  "joinKey": "slug",
+  "scoreField": "generalScore",
+  "scoreRange": {
+    "min": 0,
+    "max": 100
+  },
+  "cards": [
+    {
+      "slug": "hagoromo",
+      "name": "Hagoromo",
+      "generalScore": 98
+    },
+    {
+      "slug": "hiruzen-vieux",
+      "name": "Hiruzen Vieux",
+      "generalScore": 78
+    },
+    {
+      "slug": "dan",
+      "name": "Dan",
+      "generalScore": 50
+    },
+    {
+      "slug": "kankuro",
+      "name": "Kankuro",
+      "generalScore": 60
+    },
+    {
+      "slug": "juubidara",
+      "name": "Juubidara",
+      "generalScore": 97
+    },
+    {
+      "slug": "sasuke-rikudo",
+      "name": "Sasuke Rikudo",
+      "generalScore": 96
+    },
+    {
+      "slug": "rock-lee",
+      "name": "Rock Lee",
+      "generalScore": 70
+    },
+    {
+      "slug": "samui",
+      "name": "Samui",
+      "generalScore": 45
+    },
+    {
+      "slug": "kinkaku",
+      "name": "Kinkaku",
+      "generalScore": 72
+    },
+    {
+      "slug": "tsunade-malade",
+      "name": "Tsunade Malade",
+      "generalScore": 28
+    },
+    {
+      "slug": "fuka",
+      "name": "Fuka",
+      "generalScore": 57
+    },
+    {
+      "slug": "kabuto",
+      "name": "Kabuto",
+      "generalScore": 67
+    },
+    {
+      "slug": "kimimaro",
+      "name": "Kimimaro",
+      "generalScore": 74
+    },
+    {
+      "slug": "fugaku",
+      "name": "Fugaku",
+      "generalScore": 72
+    },
+    {
+      "slug": "kakuzu",
+      "name": "Kakuzu",
+      "generalScore": 78
+    },
+    {
+      "slug": "sakura-prime",
+      "name": "Sakura Prime",
+      "generalScore": 88
+    },
+    {
+      "slug": "asuma",
+      "name": "Asuma",
+      "generalScore": 62
+    },
+    {
+      "slug": "naruto",
+      "name": "Naruto",
+      "generalScore": 55
+    },
+    {
+      "slug": "mei",
+      "name": "Mei",
+      "generalScore": 76
+    },
+    {
+      "slug": "chiyo",
+      "name": "Chiyo",
+      "generalScore": 71
+    },
+    {
+      "slug": "ashura-prime",
+      "name": "Ashura Prime",
+      "generalScore": 95
+    },
+    {
+      "slug": "zetsu-noir",
+      "name": "Zetsu Noir",
+      "generalScore": 74
+    },
+    {
+      "slug": "ino",
+      "name": "Ino",
+      "generalScore": 50
+    },
+    {
+      "slug": "shino",
+      "name": "Shino",
+      "generalScore": 59
+    },
+    {
+      "slug": "sakumo",
+      "name": "Sakumo",
+      "generalScore": 82
+    },
+    {
+      "slug": "shisui",
+      "name": "Shisui",
+      "generalScore": 86
+    },
+    {
+      "slug": "rin",
+      "name": "Rin",
+      "generalScore": 34
+    },
+    {
+      "slug": "naruto-rikudo",
+      "name": "Naruto Rikudo",
+      "generalScore": 99
+    },
+    {
+      "slug": "hizashi",
+      "name": "Hizashi",
+      "generalScore": 68
+    },
+    {
+      "slug": "kidomaru",
+      "name": "Kidomaru",
+      "generalScore": 58
+    },
+    {
+      "slug": "hamura",
+      "name": "Hamura",
+      "generalScore": 94
+    },
+    {
+      "slug": "pakura",
+      "name": "Pakura",
+      "generalScore": 67
+    },
+    {
+      "slug": "kisame",
+      "name": "Kisame",
+      "generalScore": 82
+    },
+    {
+      "slug": "killer-bee",
+      "name": "Killer Bee",
+      "generalScore": 86
+    },
+    {
+      "slug": "utakata",
+      "name": "Utakata",
+      "generalScore": 69
+    },
+    {
+      "slug": "ebisu",
+      "name": "Ebisu",
+      "generalScore": 43
+    },
+    {
+      "slug": "ukon-et-sakon",
+      "name": "Ukon & Sakon",
+      "generalScore": 58
+    },
+    {
+      "slug": "tenten-rikudo",
+      "name": "Tenten Rikudo",
+      "generalScore": 72
+    },
+    {
+      "slug": "tsunade",
+      "name": "Tsunade",
+      "generalScore": 84
+    },
+    {
+      "slug": "konohamaru-sj",
+      "name": "Konohamaru SJ",
+      "generalScore": 2
+    },
+    {
+      "slug": "aoba",
+      "name": "Aoba",
+      "generalScore": 48
+    },
+    {
+      "slug": "tenten",
+      "name": "Tenten",
+      "generalScore": 54
+    },
+    {
+      "slug": "guren",
+      "name": "Guren",
+      "generalScore": 70
+    },
+    {
+      "slug": "toneri-km",
+      "name": "Toneri KM",
+      "generalScore": 95
+    },
+    {
+      "slug": "kakashi-dms",
+      "name": "Kakashi DMS",
+      "generalScore": 97
+    },
+    {
+      "slug": "obito",
+      "name": "Obito",
+      "generalScore": 89
+    },
+    {
+      "slug": "duy",
+      "name": "Duy",
+      "generalScore": 68
+    },
+    {
+      "slug": "konohamaru",
+      "name": "Konohamaru",
+      "generalScore": 58
+    },
+    {
+      "slug": "toneri",
+      "name": "Toneri",
+      "generalScore": 92
+    },
+    {
+      "slug": "baki",
+      "name": "Baki",
+      "generalScore": 57
+    },
+    {
+      "slug": "naruto-sj",
+      "name": "Naruto SJ",
+      "generalScore": 1
+    },
+    {
+      "slug": "hiashi",
+      "name": "Hiashi",
+      "generalScore": 71
+    },
+    {
+      "slug": "sasuke-ms",
+      "name": "Sasuke MS",
+      "generalScore": 84
+    },
+    {
+      "slug": "kiba",
+      "name": "Kiba",
+      "generalScore": 54
+    },
+    {
+      "slug": "kitsuchi",
+      "name": "Kitsuchi",
+      "generalScore": 61
+    },
+    {
+      "slug": "ao",
+      "name": "Ao",
+      "generalScore": 55
+    },
+    {
+      "slug": "naruto-kcm1",
+      "name": "Naruto Kcm1",
+      "generalScore": 88
+    },
+    {
+      "slug": "kazekage-iii",
+      "name": "Kazekage III",
+      "generalScore": 78
+    },
+    {
+      "slug": "torune",
+      "name": "Torune",
+      "generalScore": 68
+    },
+    {
+      "slug": "indra",
+      "name": "Indra",
+      "generalScore": 94
+    },
+    {
+      "slug": "obito-orange",
+      "name": "Obito Orange",
+      "generalScore": 82
+    },
+    {
+      "slug": "kushina",
+      "name": "Kushina",
+      "generalScore": 74
+    },
+    {
+      "slug": "darui",
+      "name": "Darui",
+      "generalScore": 72
+    },
+    {
+      "slug": "nagato-prime",
+      "name": "Nagato Prime",
+      "generalScore": 92
+    },
+    {
+      "slug": "mifune",
+      "name": "Mifune",
+      "generalScore": 76
+    },
+    {
+      "slug": "zetsu-blanc",
+      "name": "Zetsu Blanc",
+      "generalScore": 38
+    },
+    {
+      "slug": "hinata",
+      "name": "Hinata",
+      "generalScore": 58
+    },
+    {
+      "slug": "mangetsu",
+      "name": "Mangetsu",
+      "generalScore": 75
+    },
+    {
+      "slug": "naruto-ermite",
+      "name": "Naruto Ermite",
+      "generalScore": 80
+    },
+    {
+      "slug": "minato",
+      "name": "Minato",
+      "generalScore": 91
+    },
+    {
+      "slug": "obito-blanc",
+      "name": "Obito Blanc",
+      "generalScore": 93
+    },
+    {
+      "slug": "kakashi-ms",
+      "name": "Kakashi MS",
+      "generalScore": 82
+    },
+    {
+      "slug": "fuu",
+      "name": "Fuu",
+      "generalScore": 68
+    },
+    {
+      "slug": "zetsu",
+      "name": "Zetsu",
+      "generalScore": 50
+    },
+    {
+      "slug": "kabuto-ermite",
+      "name": "Kabuto Ermite",
+      "generalScore": 89
+    },
+    {
+      "slug": "jiraya",
+      "name": "Jiraya",
+      "generalScore": 85
+    },
+    {
+      "slug": "temari",
+      "name": "Temari",
+      "generalScore": 61
+    },
+    {
+      "slug": "yahiko",
+      "name": "Yahiko",
+      "generalScore": 55
+    },
+    {
+      "slug": "guy",
+      "name": "Guy",
+      "generalScore": 86
+    },
+    {
+      "slug": "madara",
+      "name": "Madara",
+      "generalScore": 94
+    },
+    {
+      "slug": "kurenai",
+      "name": "Kurenai",
+      "generalScore": 61
+    },
+    {
+      "slug": "chosa",
+      "name": "Chosa",
+      "generalScore": 54
+    },
+    {
+      "slug": "kaguya",
+      "name": "Kaguya",
+      "generalScore": 100
+    },
+    {
+      "slug": "tayuya",
+      "name": "Tayuya",
+      "generalScore": 57
+    },
+    {
+      "slug": "jirobo",
+      "name": "Jirobo",
+      "generalScore": 52
+    },
+    {
+      "slug": "karin",
+      "name": "Karin",
+      "generalScore": 48
+    },
+    {
+      "slug": "shikamaru",
+      "name": "Shikamaru",
+      "generalScore": 65
+    },
+    {
+      "slug": "ashura",
+      "name": "Ashura",
+      "generalScore": 89
+    },
+    {
+      "slug": "genma",
+      "name": "Genma",
+      "generalScore": 51
+    },
+    {
+      "slug": "rasa",
+      "name": "Rasa",
+      "generalScore": 76
+    },
+    {
+      "slug": "inoichi",
+      "name": "Inoichi",
+      "generalScore": 57
+    },
+    {
+      "slug": "kurotsochi",
+      "name": "Kurotsochi",
+      "generalScore": 61
+    },
+    {
+      "slug": "hiruzen",
+      "name": "Hiruzen",
+      "generalScore": 88
+    },
+    {
+      "slug": "a",
+      "name": "A",
+      "generalScore": 87
+    },
+    {
+      "slug": "ooniki-vieux",
+      "name": "Ooniki Vieux",
+      "generalScore": 80
+    },
+    {
+      "slug": "shin",
+      "name": "Shin",
+      "generalScore": 75
+    },
+    {
+      "slug": "naruto-kcm-sen",
+      "name": "Naruto Kcm Sen",
+      "generalScore": 93
+    },
+    {
+      "slug": "akatsuchi",
+      "name": "Akatsuchi",
+      "generalScore": 56
+    },
+    {
+      "slug": "yagura",
+      "name": "Yagura",
+      "generalScore": 76
+    },
+    {
+      "slug": "choji-geant",
+      "name": "Choji Geant",
+      "generalScore": 65
+    },
+    {
+      "slug": "neji",
+      "name": "Neji",
+      "generalScore": 69
+    },
+    {
+      "slug": "sasori",
+      "name": "Sasori",
+      "generalScore": 80
+    },
+    {
+      "slug": "orochimaru",
+      "name": "Orochimaru",
+      "generalScore": 86
+    },
+    {
+      "slug": "sasuke-ems",
+      "name": "Sasuke EMS",
+      "generalScore": 91
+    },
+    {
+      "slug": "zabuza",
+      "name": "Zabuza",
+      "generalScore": 63
+    },
+    {
+      "slug": "karui",
+      "name": "Karui",
+      "generalScore": 48
+    },
+    {
+      "slug": "gengetsu",
+      "name": "Gengetsu",
+      "generalScore": 81
+    },
+    {
+      "slug": "omoi",
+      "name": "Omoi",
+      "generalScore": 52
+    },
+    {
+      "slug": "sasuke",
+      "name": "Sasuke",
+      "generalScore": 72
+    },
+    {
+      "slug": "iruka",
+      "name": "Iruka",
+      "generalScore": 40
+    },
+    {
+      "slug": "chojuro",
+      "name": "Chojuro",
+      "generalScore": 63
+    },
+    {
+      "slug": "hanzo",
+      "name": "Hanzo",
+      "generalScore": 84
+    },
+    {
+      "slug": "tobirama",
+      "name": "Tobirama",
+      "generalScore": 91
+    },
+    {
+      "slug": "konan",
+      "name": "Konan",
+      "generalScore": 76
+    },
+    {
+      "slug": "kushimaru",
+      "name": "Kushimaru",
+      "generalScore": 68
+    },
+    {
+      "slug": "kakashi-hokage",
+      "name": "Kakashi Hokage",
+      "generalScore": 84
+    },
+    {
+      "slug": "pain",
+      "name": "Pain",
+      "generalScore": 91
+    },
+    {
+      "slug": "ibiki",
+      "name": "Ibiki",
+      "generalScore": 46
+    },
+    {
+      "slug": "ginkaku",
+      "name": "Ginkaku",
+      "generalScore": 69
+    },
+    {
+      "slug": "juubito",
+      "name": "Juubito",
+      "generalScore": 96
+    },
+    {
+      "slug": "fu",
+      "name": "Fu",
+      "generalScore": 65
+    },
+    {
+      "slug": "haku",
+      "name": "Haku",
+      "generalScore": 67
+    },
+    {
+      "slug": "nagato-malade",
+      "name": "Nagato Malade",
+      "generalScore": 58
+    },
+    {
+      "slug": "jugo",
+      "name": "Jugo",
+      "generalScore": 71
+    },
+    {
+      "slug": "madara-prime",
+      "name": "Madara Prime",
+      "generalScore": 96
+    },
+    {
+      "slug": "mu",
+      "name": "Mu",
+      "generalScore": 85
+    },
+    {
+      "slug": "jinin",
+      "name": "Jinin",
+      "generalScore": 60
+    },
+    {
+      "slug": "aa",
+      "name": "Aa",
+      "generalScore": 83
+    },
+    {
+      "slug": "indra-ms",
+      "name": "Indra MS",
+      "generalScore": 89
+    },
+    {
+      "slug": "kakashi",
+      "name": "Kakashi",
+      "generalScore": 72
+    },
+    {
+      "slug": "minato-kcm",
+      "name": "Minato Kcm",
+      "generalScore": 94
+    },
+    {
+      "slug": "itachi-prime",
+      "name": "Itachi Prime",
+      "generalScore": 90
+    },
+    {
+      "slug": "sai",
+      "name": "Sai",
+      "generalScore": 58
+    },
+    {
+      "slug": "kimimaro-malade",
+      "name": "Kimimaro Malade",
+      "generalScore": 34
+    },
+    {
+      "slug": "oonoki",
+      "name": "Oonoki",
+      "generalScore": 84
+    },
+    {
+      "slug": "yamato",
+      "name": "Yamato",
+      "generalScore": 69
+    },
+    {
+      "slug": "suigetsu",
+      "name": "Suigetsu",
+      "generalScore": 63
+    },
+    {
+      "slug": "danzo",
+      "name": "Danzo",
+      "generalScore": 80
+    },
+    {
+      "slug": "yugito",
+      "name": "Yugito",
+      "generalScore": 70
+    },
+    {
+      "slug": "gaara",
+      "name": "Gaara",
+      "generalScore": 84
+    },
+    {
+      "slug": "madara-vieux",
+      "name": "Madara Vieux",
+      "generalScore": 66
+    },
+    {
+      "slug": "hayate",
+      "name": "Hayate",
+      "generalScore": 48
+    },
+    {
+      "slug": "itachi",
+      "name": "Itachi",
+      "generalScore": 87
+    },
+    {
+      "slug": "ameyuri",
+      "name": "Ameyuri",
+      "generalScore": 62
+    },
+    {
+      "slug": "gari",
+      "name": "Gari",
+      "generalScore": 59
+    },
+    {
+      "slug": "orochimaru-malade",
+      "name": "Orochimaru Malade",
+      "generalScore": 30
+    },
+    {
+      "slug": "anko",
+      "name": "Anko",
+      "generalScore": 52
+    },
+    {
+      "slug": "choji",
+      "name": "Choji",
+      "generalScore": 58
+    },
+    {
+      "slug": "hidan",
+      "name": "Hidan",
+      "generalScore": 72
+    },
+    {
+      "slug": "izuna",
+      "name": "Izuna",
+      "generalScore": 84
+    },
+    {
+      "slug": "guy-8-portes",
+      "name": "Guy 8 Portes",
+      "generalScore": 95
+    },
+    {
+      "slug": "hashirama",
+      "name": "Hashirama",
+      "generalScore": 93
+    },
+    {
+      "slug": "roshi",
+      "name": "Roshi",
+      "generalScore": 69
+    },
+    {
+      "slug": "chosa-geant",
+      "name": "Chosa Geant",
+      "generalScore": 60
+    },
+    {
+      "slug": "deidara",
+      "name": "Deidara",
+      "generalScore": 79
+    },
+    {
+      "slug": "shikaku",
+      "name": "Shikaku",
+      "generalScore": 58
+    },
+    {
+      "slug": "sakura",
+      "name": "Sakura",
+      "generalScore": 67
+    },
+    {
+      "slug": "mito",
+      "name": "Mito",
+      "generalScore": 73
+    },
+    {
+      "slug": "hashirama-prime",
+      "name": "Hashirama Prime",
+      "generalScore": 95
+    },
+    {
+      "slug": "shizune",
+      "name": "Shizune",
+      "generalScore": 44
+    },
+    {
+      "slug": "han",
+      "name": "Han",
+      "generalScore": 72
+    },
+    {
+      "slug": "jinpachi",
+      "name": "Jinpachi",
+      "generalScore": 58
+    },
+    {
+      "slug": "naruto-kcm",
+      "name": "Naruto Kcm",
+      "generalScore": 91
+    }
+  ]
+}

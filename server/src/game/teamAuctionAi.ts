@@ -1,12 +1,12 @@
 import { getCardKnowledgeById, listCardKnowledge } from './cardKnowledge.js'
-import { calculateCharacterOverallScore, calculateTeamScore, chooseBestTeamPlacement } from './teamMode.js'
+import { calculateTeamAuctionCharacterScore, calculateTeamAuctionScore, chooseBestTeamAuctionPlacement } from './teamMode.js'
 import type { TeamAuctionGame, TeamAuctionPlayer } from '../services/teamAuctionGameService.js'
 
 function teamCardsScore(teamCards: number[], game: TeamAuctionGame): number {
   if (!teamCards.length) return 0
-  return calculateTeamScore(teamCards.map((cardId) => {
+  return calculateTeamAuctionScore(teamCards.map((cardId) => {
     const card = getCardKnowledgeById(cardId)
-    return { name: card?.name ?? String(cardId), stats: card?.stats ?? {} }
+    return { name: card?.name ?? String(cardId), slug: card?.slug ?? '' }
   }))
 }
 
@@ -21,13 +21,13 @@ function makePlacementInput(game: TeamAuctionGame, player: TeamAuctionPlayer, ca
       .flat()
       .map((opponentCardId) => ({
         name: getCardKnowledgeById(opponentCardId)?.name ?? String(opponentCardId),
-        stats: getCardKnowledgeById(opponentCardId)?.stats ?? {},
+        slug: getCardKnowledgeById(opponentCardId)?.slug ?? '',
       }))
 
     return {
       members: team.map((memberId) => ({
         name: getCardKnowledgeById(memberId)?.name ?? String(memberId),
-        stats: getCardKnowledgeById(memberId)?.stats ?? {},
+        slug: getCardKnowledgeById(memberId)?.slug ?? '',
       })),
       opponent: opponent.length ? opponent : [],
       size: game.teamSizes[index] ?? 1,
@@ -35,7 +35,7 @@ function makePlacementInput(game: TeamAuctionGame, player: TeamAuctionPlayer, ca
   })
 
   return {
-    card: { name: card.name, stats: card.stats },
+    card: { name: card.name, slug: card.slug },
     teams: teams.filter((team) => (team.members.length ?? 0) < (game.teamSizes[teams.indexOf(team)] ?? 1)),
   }
 }
@@ -47,8 +47,8 @@ export function teamAuctionAiDecision(game: TeamAuctionGame, playerId: TeamAucti
   const currentCard = getCardKnowledgeById(game.currentCardId)
   if (!currentCard) return { action: 'pass' as const }
 
-  const currentScore = calculateCharacterOverallScore(currentCard)
-  const deck = listCardKnowledge().map((card) => ({ card, score: calculateCharacterOverallScore(card) }))
+  const currentScore = calculateTeamAuctionCharacterScore({ slug: currentCard.slug })
+  const deck = listCardKnowledge().map((card) => ({ card, score: calculateTeamAuctionCharacterScore({ slug: card.slug }) }))
   const sorted = [...deck].sort((a, b) => b.score - a.score)
   const rank = sorted.findIndex((entry) => entry.card.id === currentCard.id) + 1
   const totalCardsNeeded = game.teamSizes.reduce((sum, size) => sum + size, 0)
@@ -58,8 +58,8 @@ export function teamAuctionAiDecision(game: TeamAuctionGame, playerId: TeamAucti
   const placementInput = makePlacementInput(game, player, game.currentCardId)
   const placementScore = placementInput
     ? Math.max(...placementInput.teams.map((team, index) => {
-        const candidate = chooseBestTeamPlacement(
-          { name: currentCard.name, stats: currentCard.stats },
+        const candidate = chooseBestTeamAuctionPlacement(
+          { name: currentCard.name, slug: currentCard.slug },
           [
             { members: team.members, opponent: team.opponent, size: team.size },
           ],
@@ -111,12 +111,12 @@ export function pickTeamPlacementForCard(game: TeamAuctionGame, playerId: TeamAu
   const options = player.teams
     .map((team, index) => ({
       teamIndex: index,
-      members: team.map((memberId) => ({ name: getCardKnowledgeById(memberId)?.name ?? String(memberId), stats: getCardKnowledgeById(memberId)?.stats ?? {} })),
+      members: team.map((memberId) => ({ name: getCardKnowledgeById(memberId)?.name ?? String(memberId), slug: getCardKnowledgeById(memberId)?.slug ?? '' })),
       opponent: game.players
         .filter((candidate) => candidate.id !== playerId)
         .map((candidate) => candidate.teams[index] ?? [])
         .flat()
-        .map((memberId) => ({ name: getCardKnowledgeById(memberId)?.name ?? String(memberId), stats: getCardKnowledgeById(memberId)?.stats ?? {} })),
+        .map((memberId) => ({ name: getCardKnowledgeById(memberId)?.name ?? String(memberId), slug: getCardKnowledgeById(memberId)?.slug ?? '' })),
       size: game.teamSizes[index] ?? 1,
     }))
     .filter((option) => option.members.length < (game.teamSizes[option.teamIndex] ?? 1))
@@ -126,8 +126,8 @@ export function pickTeamPlacementForCard(game: TeamAuctionGame, playerId: TeamAu
   const best = options
     .map((option, index) => ({
       index,
-      score: chooseBestTeamPlacement(
-        { name: card.name, stats: card.stats },
+      score: chooseBestTeamAuctionPlacement(
+        { name: card.name, slug: card.slug },
         [{ members: option.members, opponent: option.opponent, size: option.size }],
         { remainingSlots: (game.teamSizes[option.teamIndex] ?? 1) - option.members.length, budgetRemaining: player.budget, strategicNeed: Math.max(0, 3 - player.teams.flat().length) },
       )?.score ?? 0,

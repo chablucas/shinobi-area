@@ -5,7 +5,8 @@ import { prisma } from './config/prisma.js'
 import { drawCard, findGame, getGameForUser, placeCard, publicGameState } from './services/realtimeGameService.js'
 import { getCardKnowledgeById } from './game/cardKnowledge.js'
 import { teamAuctionRules } from './game/teamAuctionRules.js'
-import { calculateCharacterOverallScore, calculateTeamScore } from './game/teamMode.js'
+import { calculateTeamAuctionScore } from './game/teamMode.js'
+import { getTeamAuctionPowerScore } from './game/teamAuctionPower.js'
 import { allInTeamBid, chooseAiPlacement, createTeamAuctionGame, drawNextTeamCard, evaluateTeamAuctionAi, getTeamAuctionGame, passTeamBid, placeTeamCard, startTeamAuctionGame, submitTeamBid, type TeamAuctionGame, type TeamAuctionMode } from './services/teamAuctionGameService.js'
 
 type SocketData = { userId?: number; gameId?: string }
@@ -78,7 +79,7 @@ async function teamAuctionPublicState(game: TeamAuctionGame) {
 
   const cardView = (cardId: number) => {
     const card = getCardKnowledgeById(cardId)
-    return card ? { id: card.id, name: card.name, slug: card.slug, imageUrl: imageBySlug.get(card.slug) ?? null, rarity: card.rarity, rarityScore: card.rarityScore, score: calculateCharacterOverallScore(card), stats: card.stats } : null
+    return card ? { id: card.id, name: card.name, slug: card.slug, imageUrl: imageBySlug.get(card.slug) ?? null, rarity: card.rarity, rarityScore: card.rarityScore, score: getTeamAuctionPowerScore(card.slug), stats: card.stats } : null
   }
 
   return {
@@ -106,7 +107,7 @@ async function teamAuctionPublicState(game: TeamAuctionGame) {
       teams: player.teams.map((team, index) => ({
         teamNumber: index + 1,
         capacity: game.teamSizes[index] ?? 0,
-        average: calculateTeamScore(team.map((cardId) => ({ stats: getCardKnowledgeById(cardId)?.stats ?? {} }))),
+        average: calculateTeamAuctionScore(team.map((cardId) => ({ slug: getCardKnowledgeById(cardId)?.slug ?? '' }))),
         cards: team.map((cardId) => cardView(cardId) ?? { id: cardId, name: String(cardId), slug: '', imageUrl: null, rarity: '', rarityScore: 0, score: 0, stats: {} }),
       })),
     })),

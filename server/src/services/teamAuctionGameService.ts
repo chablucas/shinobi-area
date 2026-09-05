@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { getCardKnowledgeById, listCardKnowledge } from '../game/cardKnowledge.js'
 import { teamAuctionRules, normalizeBid, isValidBid, getMinimumOpenBid } from '../game/teamAuctionRules.js'
-import { calculateCharacterOverallScore, calculateTeamScore, resolveFinalStandings } from '../game/teamMode.js'
+import { resolveTeamAuctionFinalStandings } from '../game/teamMode.js'
 import { pickTeamPlacementForCard, teamAuctionAiDecision } from '../game/teamAuctionAi.js'
 
 export type TeamAuctionMode = '1v1-ai' | '1v1-real' | '1v1v1-real'
@@ -149,6 +149,7 @@ function advanceOrResolveBidding(game: TeamAuctionGame, startIndex: number) {
     game.currentBid = 0
     game.currentBidderId = null
     game.currentTurnId = null
+    game.openerIndex = (game.openerIndex + 1) % game.players.length
     return
   }
   game.currentTurnId = game.players[nextIndex]!.id
@@ -167,6 +168,7 @@ function finishRound(game: TeamAuctionGame) {
     game.currentCardId = null
     game.currentBid = 0
     game.currentBidderId = null
+    game.openerIndex = (game.openerIndex + 1) % game.players.length
     return
   }
 
@@ -181,11 +183,11 @@ function computeFinalResults(game: TeamAuctionGame) {
     id: player.id,
     teams: player.teams.map((teamCardIds) => teamCardIds.map((cardId) => {
       const card = cardById(cardId)
-      return { name: card?.name ?? String(cardId), stats: card?.stats ?? {} }
+      return { name: card?.name ?? String(cardId), slug: card?.slug ?? '' }
     })),
   }))
 
-  const { standings } = resolveFinalStandings(teamParticipants as Array<{ id: number | string; teams: any[][] }>)
+  const { standings } = resolveTeamAuctionFinalStandings(teamParticipants as Array<{ id: number | string; teams: any[][] }>)
   const best = standings[0]!
   const winners = standings
     .filter((standing) => standing.victories === best.victories && Math.abs(standing.totalTeamScore - best.totalTeamScore) < 1e-9)

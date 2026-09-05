@@ -272,3 +272,128 @@ test('l’IA respecte la règle de non-connaissance de la prochaine pioche', () 
   assert.ok(nextCard)
   assert.notEqual(nextCard, game.currentCardId)
 })
+
+test('une carte generalScore très faible (Sexy Jutsu) est facilement passée par l’IA', () => {
+  const game = makeGame('1v1-ai', [2], 500)
+  const sj = getCardKnowledgeBySlug('naruto-sj')!
+  startTeamAuctionGame(game.gameId)
+  game.currentCardId = sj.id
+  game.phase = 'BIDDING'
+  game.currentTurnId = 2
+  game.currentBid = 50
+  const decision = evaluateTeamAuctionAi(game.gameId, 2)
+  assert.equal(decision?.action, 'pass')
+})
+
+test('Kaguya (generalScore 100) reçoit un plafond d’enchère supérieur à une carte faible', () => {
+  const kaguya = getCardKnowledgeBySlug('kaguya')!
+  const sj = getCardKnowledgeBySlug('konohamaru-sj')!
+  const eliteGame = makeGame('1v1-ai', [3, 3], 500)
+  eliteGame.currentCardId = kaguya.id
+  eliteGame.phase = 'BIDDING'
+  eliteGame.currentTurnId = 2
+  const weakGame = makeGame('1v1-ai', [3, 3], 500)
+  weakGame.currentCardId = sj.id
+  weakGame.phase = 'BIDDING'
+  weakGame.currentTurnId = 2
+  const eliteDecision = evaluateTeamAuctionAi(eliteGame.gameId, 2)
+  const weakDecision = evaluateTeamAuctionAi(weakGame.gameId, 2)
+  assert.equal(eliteDecision?.action, 'bid')
+  assert.ok(weakDecision?.action !== 'bid' || weakDecision.amount < eliteDecision.amount)
+  assert.ok(eliteDecision.amount <= eliteGame.players[1]!.budget)
+})
+
+test('même sur Kaguya, l’IA ne dépasse jamais son budget', () => {
+  const kaguya = getCardKnowledgeBySlug('kaguya')!
+  const game = makeGame('1v1-ai', [3, 3], 500)
+  game.players[1]!.budget = 30
+  game.currentCardId = kaguya.id
+  game.phase = 'BIDDING'
+  game.currentTurnId = 2
+  const decision = evaluateTeamAuctionAi(game.gameId, 2)
+  if (decision?.action === 'bid') {
+    assert.ok(decision.amount <= game.players[1]!.budget)
+  }
+})
+
+test('rotation des openers TEST A : elle continue même si un joueur n’a presque plus de budget', () => {
+  const game = makeGame('1v1-real', [3, 3], 500)
+  game.players[1]!.budget = 5
+  startTeamAuctionGame(game.gameId)
+  drawNextTeamCard(game.gameId)
+  assert.equal(game.currentTurnId, 1)
+  submitTeamBid(game.gameId, 1, 10)
+  assert.equal(game.phase, 'PLACEMENT')
+  assert.equal(game.winnerId, 1)
+  placeTeamCard(game.gameId, 1, 0)
+  drawNextTeamCard(game.gameId)
+  assert.equal(game.currentTurnId, 2, 'le joueur à faible budget doit rester opener de la carte suivante')
+})
+
+test('rotation des openers TEST B : A ouvre 10, B mise 20, A incapable de 30 → B gagne immédiatement à 20', () => {
+  const game = makeGame('1v1-real', [2], 500)
+  game.players[0]!.budget = 25
+  startTeamAuctionGame(game.gameId)
+  drawNextTeamCard(game.gameId)
+  submitTeamBid(game.gameId, 1, 10)
+  assert.equal(game.currentTurnId, 2)
+  submitTeamBid(game.gameId, 2, 20)
+  assert.equal(game.phase, 'PLACEMENT')
+  assert.equal(game.winnerId, 2)
+  assert.equal(game.currentBid, 20)
+  assert.equal(game.players[1]!.budget, 480)
+})
+
+test('rotation des openers TEST C : un PASS résout la carte sans casser la rotation de la carte suivante', () => {
+  const game = makeGame('1v1-real', [2, 2], 500)
+  startTeamAuctionGame(game.gameId)
+  drawNextTeamCard(game.gameId)
+  submitTeamBid(game.gameId, 1, 10)
+  passTeamBid(game.gameId, 2)
+  assert.equal(game.phase, 'PLACEMENT')
+  assert.equal(game.winnerId, 1)
+  placeTeamCard(game.gameId, 1, 0)
+  drawNextTeamCard(game.gameId)
+  assert.equal(game.currentTurnId, 2)
+})
+
+test('rotation des openers TEST D (1v1v1) : B gagne immédiatement quand A et C sont incapables de 30', () => {
+  const game = makeGame('1v1v1-real', [2, 2], 500)
+  game.players[0]!.budget = 25
+  game.players[2]!.budget = 25
+  startTeamAuctionGame(game.gameId)
+  drawNextTeamCard(game.gameId)
+  submitTeamBid(game.gameId, 1, 10)
+  assert.equal(game.currentTurnId, 2)
+  submitTeamBid(game.gameId, 2, 20)
+  assert.equal(game.phase, 'PLACEMENT')
+  assert.equal(game.winnerId, 2)
+  assert.equal(game.currentBid, 20)
+})
+
+test('rotation des openers TEST E (1v1) : la carte avance quand tout le monde PASS sans bid', () => {
+  const game = makeGame('1v1-real', [2, 2], 500)
+  startTeamAuctionGame(game.gameId)
+  drawNextTeamCard(game.gameId)
+  assert.equal(game.currentTurnId, 1)
+  passTeamBid(game.gameId, 1)
+  assert.equal(game.currentTurnId, 2)
+  passTeamBid(game.gameId, 2)
+  assert.equal(game.phase, 'DRAW')
+  assert.equal(game.currentCardId, null)
+  drawNextTeamCard(game.gameId)
+  assert.equal(game.currentTurnId, 2, 'l’opener suivant doit être le joueur suivant même sans aucun bid')
+})
+
+test('rotation des openers TEST F (1v1v1) : la carte avance quand tout le monde PASS sans bid', () => {
+  const game = makeGame('1v1v1-real', [2, 2, 2], 500)
+  startTeamAuctionGame(game.gameId)
+  drawNextTeamCard(game.gameId)
+  assert.equal(game.currentTurnId, 1)
+  passTeamBid(game.gameId, 1)
+  passTeamBid(game.gameId, 2)
+  passTeamBid(game.gameId, 3)
+  assert.equal(game.phase, 'DRAW')
+  drawNextTeamCard(game.gameId)
+  assert.equal(game.currentTurnId, 2, 'l’opener suivant doit être le joueur suivant même sans aucun bid')
+})
