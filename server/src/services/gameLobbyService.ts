@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { GameInviteStatus, GameLobbyStatus, GameMode } from '@prisma/client'
 import { prisma } from '../config/prisma.js'
 import { createOrGetGame } from './realtimeGameService.js'
@@ -9,8 +10,8 @@ function invalid(message: string, statusCode = 400) {
 }
 
 function modeOf(mode: unknown) {
-  if (mode === '1v1') return GameMode.ONE_V_ONE
-  if (mode === '1v1v1') return GameMode.ONE_V_ONE_V_THREE
+  if (mode === '1v1' || mode === 'team-1v1') return GameMode.ONE_V_ONE
+  if (mode === '1v1v1' || mode === 'team-1v1v1') return GameMode.ONE_V_ONE_V_THREE
   throw invalid('Mode de combat invalide.')
 }
 
@@ -22,13 +23,17 @@ function lobbyInclude() {
   return { creator: { select: userSelect }, invites: { include: { invitee: { select: userSelect } }, orderBy: { createdAt: 'asc' as const } } }
 }
 
-const AI_PLAYER = { id: null, displayName: 'IA Shinobi Area', avatarUrl: null, status: 'ACCEPTED', inviteId: null, isAi: true } as const
+const AI_PLAYER = { id: null, displayName: 'IA', avatarUrl: null, status: 'ACCEPTED', inviteId: null, isAi: true } as const
 
 function formatLobby(lobby: Awaited<ReturnType<typeof findLobby>>) {
   if (!lobby) return null
+  const isTeam = lobby.id.startsWith('ta_')
+  const modeLabel = isTeam
+    ? (lobby.mode === GameMode.ONE_V_ONE ? 'team-1v1' : 'team-1v1v1')
+    : (lobby.mode === GameMode.ONE_V_ONE ? '1v1' : '1v1v1')
   return {
     id: lobby.id,
-    mode: lobby.mode === GameMode.ONE_V_ONE ? '1v1' : '1v1v1',
+    mode: modeLabel,
     creatorId: lobby.creatorId,
     status: lobby.status,
     includesAi: lobby.includesAi,
@@ -48,6 +53,7 @@ async function findLobby(id: string) {
 
 export async function createGameLobby(creatorId: number, mode: unknown, opponentIds: unknown, includesAi: unknown = false) {
   const gameMode = modeOf(mode)
+  const isTeam = typeof mode === 'string' && mode.startsWith('team-')
   const wantsAi = includesAi === true
   if (wantsAi && gameMode !== GameMode.ONE_V_ONE_V_THREE) throw invalid('L’IA ne peut compléter que le mode 1v1v1.')
   const requiredOpponents = gameMode === GameMode.ONE_V_ONE ? 1 : wantsAi ? 1 : 2
@@ -58,13 +64,27 @@ export async function createGameLobby(creatorId: number, mode: unknown, opponent
   if (users.length !== ids.length) throw invalid('Un adversaire est introuvable.', 404)
   const duplicate = await prisma.gameLobby.findFirst({ where: { creatorId, status: { in: [GameLobbyStatus.WAITING, GameLobbyStatus.READY] }, invites: { some: { inviteeId: { in: ids }, status: GameInviteStatus.PENDING } } } })
   if (duplicate) throw invalid('Une invitation est déjà en attente pour cet adversaire.', 409)
-  const lobby = await prisma.gameLobby.create({ data: { creatorId, mode: gameMode, includesAi: wantsAi, invites: { create: ids.map((inviteeId) => ({ inviteeId })) } }, include: lobbyInclude() })
+  const customId = isTeam ? `ta_${randomUUID()}` : undefined
+  const lobby = await prisma.gameLobby.create({ data: { ...(customId ? { id: customId } : {}), creatorId, mode: gameMode, includesAi: wantsAi, invites: { create: ids.map((inviteeId) => ({ inviteeId })) } }, include: lobbyInclude() })
   return formatLobby(lobby)
 }
 
 export async function listGameInvites(userId: number) {
   const invites = await prisma.gameInvite.findMany({ where: { inviteeId: userId, status: GameInviteStatus.PENDING }, include: { lobby: { include: { creator: { select: userSelect } } } }, orderBy: { createdAt: 'desc' } })
-  return invites.map((invite) => ({ id: invite.id, lobbyId: invite.lobbyId, mode: invite.lobby.mode === GameMode.ONE_V_ONE ? '1v1' : '1v1v1', status: invite.status, createdAt: invite.createdAt, creator: publicUser(invite.lobby.creator) }))
+  return invites.map((invite) => {
+    const isTeam = invite.lobbyId.startsWith('ta_')
+    const modeLabel = isTeam
+      ? (invite.lobby.mode === GameMode.ONE_V_ONE ? 'team-1v1' : 'team-1v1v1')
+      : (invite.lobby.mode === GameMode.ONE_V_ONE ? '1v1' : '1v1v1')
+    return {
+      id: invite.id,
+      lobbyId: invite.lobbyId,
+      mode: modeLabel,
+      status: invite.status,
+      createdAt: invite.createdAt,
+      creator: publicUser(invite.lobby.creator),
+    }
+  })
 }
 
 async function pendingInvite(userId: number, inviteId: string) {

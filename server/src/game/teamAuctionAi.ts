@@ -54,7 +54,7 @@ export function teamAuctionAiDecision(game: TeamAuctionGame, playerId: TeamAucti
   const totalCardsNeeded = game.teamSizes.reduce((sum, size) => sum + size, 0)
   const owned = player.teams.flat().length
   const cardsStillNeeded = Math.max(1, totalCardsNeeded - owned)
-  const budgetAverage = player.budget / cardsStillNeeded
+  const budgetPerRemainingCard = player.budget / cardsStillNeeded
   const placementInput = makePlacementInput(game, player, game.currentCardId)
   const placementScore = placementInput
     ? Math.max(...placementInput.teams.map((team, index) => {
@@ -69,36 +69,35 @@ export function teamAuctionAiDecision(game: TeamAuctionGame, playerId: TeamAucti
       }))
     : 0
 
-  const topCardBias = currentScore >= 90 ? 240 : 0
-  const weakCardBias = currentScore <= 40 ? -180 : 0
-  const budgetPressure = budgetAverage > 0 ? Math.min(200, (player.budget / budgetAverage) * 22) : 0
-  const rankBias = Math.max(0, 200 - rank * 8)
-  const maxReasonableBid = Math.min(
+  const percentile = deck.length > 1 ? 1 - ((rank - 1) / (deck.length - 1)) : 1
+  const placementImpact = Math.max(0, placementScore - currentScore)
+  const isElite = percentile >= 0.97 && currentScore >= 90
+  const isWeak = percentile <= 0.35 || currentScore <= 40
+  const reserve = cardsStillNeeded > 1 ? budgetPerRemainingCard * (cardsStillNeeded - 1) * 0.7 : 0
+  const spendableBudget = Math.max(0, player.budget - reserve)
+  const strategicValue = (currentScore * 0.65) + (percentile * 120) + (placementImpact * 1.6)
+  const aiMaxBid = Math.floor(Math.min(
     player.budget,
-    Math.max(10, Math.round(currentScore * 2 + rankBias + placementScore * 2 + topCardBias + weakCardBias + budgetPressure)),
-  )
+    Math.max(10, budgetPerRemainingCard * (isElite ? 3.5 : 0.55 + percentile * 1.35) + strategicValue),
+  ) / 10) * 10
+  const nextLegalBid = game.currentBid === 0 ? 10 : game.currentBid + 10
 
-  if (currentScore <= 40 && game.currentBid >= Math.min(30, Math.round(budgetAverage * 0.75))) {
+  if (nextLegalBid > player.budget || nextLegalBid > aiMaxBid) {
     return { action: 'pass' as const }
   }
 
-  if (game.currentBid > 0 && game.currentBid >= maxReasonableBid) {
-    return { action: 'pass' as const }
-  }
+  if (isWeak && game.currentBid > 0) return { action: 'pass' as const }
 
-  if (currentScore >= 96 && cardsStillNeeded <= 2) {
+  if (isElite && cardsStillNeeded <= 2 && placementImpact >= 15 && player.budget <= Math.max(aiMaxBid, spendableBudget)) {
     return { action: 'allin' as const }
   }
 
-  if (game.currentBid === 0 && currentScore >= 80 && cardsStillNeeded <= 3) {
-    return { action: 'bid' as const, amount: Math.min(player.budget, Math.max(10, Math.min(maxReasonableBid, 200))) }
-  }
-
   if (game.currentBid === 0) {
-    return { action: 'bid' as const, amount: Math.min(player.budget, Math.max(10, Math.min(maxReasonableBid, 80))) }
+    const openingBid = Math.min(aiMaxBid, Math.max(10, Math.floor(Math.min(aiMaxBid, budgetPerRemainingCard * (isElite ? 1.4 : 0.45 + percentile * 0.4)) / 10) * 10))
+    return { action: 'bid' as const, amount: openingBid }
   }
 
-  const raise = Math.min(player.budget, Math.max(game.currentBid + 10, Math.min(maxReasonableBid, game.currentBid + 30)))
+  const raise = Math.min(player.budget, aiMaxBid, Math.max(nextLegalBid, Math.min(aiMaxBid, game.currentBid + Math.max(10, Math.floor(budgetPerRemainingCard * 0.2 / 10) * 10))))
   if (raise <= game.currentBid) return { action: 'pass' as const }
   return { action: 'bid' as const, amount: raise }
 }

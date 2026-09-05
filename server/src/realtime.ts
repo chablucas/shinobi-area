@@ -5,7 +5,7 @@ import { prisma } from './config/prisma.js'
 import { drawCard, findGame, getGameForUser, placeCard, publicGameState } from './services/realtimeGameService.js'
 import { getCardKnowledgeById } from './game/cardKnowledge.js'
 import { teamAuctionRules } from './game/teamAuctionRules.js'
-import { calculateTeamScore } from './game/teamMode.js'
+import { calculateCharacterOverallScore, calculateTeamScore } from './game/teamMode.js'
 import { allInTeamBid, chooseAiPlacement, createTeamAuctionGame, drawNextTeamCard, evaluateTeamAuctionAi, getTeamAuctionGame, passTeamBid, placeTeamCard, startTeamAuctionGame, submitTeamBid, type TeamAuctionGame, type TeamAuctionMode } from './services/teamAuctionGameService.js'
 
 type SocketData = { userId?: number; gameId?: string }
@@ -14,6 +14,48 @@ const teamAuctionHosts = new Map<string, number>()
 
 function teamAuctionExpectedPlayers(mode: TeamAuctionMode) { return mode === '1v1v1-real' ? 3 : 2 }
 function isTeamAuctionParticipant(game: TeamAuctionGame, userId: number) { return game.players.some((player) => player.id === userId) }
+async function teamAuctionDisplayName(userId: number) {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { displayName: true } })
+  return user?.displayName.trim() || 'Joueur'
+}
+
+async function getOrInitTeamAuctionGame(gameId: string, userId: number) {
+  let game = getTeamAuctionGame(gameId)
+  if (game) return game
+
+  const lobby = await prisma.gameLobby.findUnique({
+    where: { id: gameId },
+    include: {
+      creator: { select: { id: true, displayName: true } },
+      invites: { include: { invitee: { select: { id: true, displayName: true } } } },
+    },
+  })
+  if (!lobby) return null
+
+  const isParticipant = lobby.creatorId === userId || lobby.invites.some((invite) => invite.inviteeId === userId)
+  if (!isParticipant) return null
+
+  const mode: TeamAuctionMode = lobby.mode === 'ONE_V_ONE' ? '1v1-real' : '1v1v1-real'
+  const players: Array<{ id: number | string; displayName: string; isAi: boolean }> = [
+    { id: lobby.creator.id, displayName: lobby.creator.displayName, isAi: false },
+    ...lobby.invites
+      .filter((invite) => invite.status === 'ACCEPTED' || invite.inviteeId === userId)
+      .map((invite) => ({ id: invite.invitee.id, displayName: invite.invitee.displayName, isAi: false })),
+  ]
+  if (lobby.includesAi && players.length < teamAuctionExpectedPlayers(mode)) {
+    players.push({ id: `ai-${lobby.id}`, displayName: 'IA', isAi: true })
+  }
+
+  game = createTeamAuctionGame({
+    gameId: lobby.id,
+    mode,
+    players,
+    teamSizes: [3, 3],
+    initialBudget: 500,
+  })
+  teamAuctionHosts.set(lobby.id, lobby.creatorId)
+  return game
+}
 
 async function teamAuctionPublicState(game: TeamAuctionGame) {
   const slugs = new Set<string>()
@@ -36,7 +78,7 @@ async function teamAuctionPublicState(game: TeamAuctionGame) {
 
   const cardView = (cardId: number) => {
     const card = getCardKnowledgeById(cardId)
-    return card ? { id: card.id, name: card.name, slug: card.slug, imageUrl: imageBySlug.get(card.slug) ?? null, rarity: card.rarity, rarityScore: card.rarityScore, stats: card.stats } : null
+    return card ? { id: card.id, name: card.name, slug: card.slug, imageUrl: imageBySlug.get(card.slug) ?? null, rarity: card.rarity, rarityScore: card.rarityScore, score: calculateCharacterOverallScore(card), stats: card.stats } : null
   }
 
   return {
@@ -65,7 +107,7 @@ async function teamAuctionPublicState(game: TeamAuctionGame) {
         teamNumber: index + 1,
         capacity: game.teamSizes[index] ?? 0,
         average: calculateTeamScore(team.map((cardId) => ({ stats: getCardKnowledgeById(cardId)?.stats ?? {} }))),
-        cards: team.map((cardId) => cardView(cardId) ?? { id: cardId, name: String(cardId), slug: '', imageUrl: null, rarity: '', rarityScore: 0, stats: {} }),
+        cards: team.map((cardId) => cardView(cardId) ?? { id: cardId, name: String(cardId), slug: '', imageUrl: null, rarity: '', rarityScore: 0, score: 0, stats: {} }),
       })),
     })),
   }
@@ -145,8 +187,8 @@ export function attachRealtime(io: Server) {
         if (mode !== '1v1-ai' && mode !== '1v1-real' && mode !== '1v1v1-real') throw new Error('Mode Team Auction invalide.')
         const teamSizes = Array.isArray(payload.teamSizes) ? payload.teamSizes.filter((size): size is number => typeof size === 'number') : []
         const initialBudget = typeof payload.initialBudget === 'number' ? payload.initialBudget : 0
-        const players: Array<{ id: number | string; displayName: string; isAi: boolean }> = [{ id: userId, displayName: `Joueur ${userId}`, isAi: false }]
-        if (mode === '1v1-ai') players.push({ id: `ai-${userId}`, displayName: 'Matteo', isAi: true })
+        const players: Array<{ id: number | string; displayName: string; isAi: boolean }> = [{ id: userId, displayName: await teamAuctionDisplayName(userId), isAi: false }]
+        if (mode === '1v1-ai') players.push({ id: `ai-${userId}`, displayName: 'IA', isAi: true })
         const game = createTeamAuctionGame({ mode, players, teamSizes, initialBudget })
         teamAuctionHosts.set(game.gameId, userId)
         await socket.join(`team-auction:${game.gameId}`)
@@ -159,12 +201,13 @@ export function attachRealtime(io: Server) {
     socket.on('team-auction:join', async (gameId: unknown, acknowledge?: (response: unknown) => void) => {
       try {
         if (typeof gameId !== 'string' || !gameId) throw new Error('Code de salon invalide.')
-        const game = getTeamAuctionGame(gameId)
+        const game = await getOrInitTeamAuctionGame(gameId, userId)
         if (!game) throw new Error('Salon Team Auction introuvable.')
         if (game.phase !== 'LOBBY') throw new Error('La partie a déjà démarré.')
-        if (game.players.some((player) => player.id === userId)) throw new Error('Tu es déjà dans ce salon.')
-        if (game.players.length >= teamAuctionExpectedPlayers(game.mode)) throw new Error('Le salon est plein.')
-        game.players.push({ id: userId, displayName: `Joueur ${userId}`, isAi: false, budget: game.initialBudget, teams: game.teamSizes.map(() => []), passedCurrentRound: false, activeCurrentRound: true })
+        if (!game.players.some((player) => player.id === userId)) {
+          if (game.players.length >= teamAuctionExpectedPlayers(game.mode)) throw new Error('Le salon est plein.')
+          game.players.push({ id: userId, displayName: await teamAuctionDisplayName(userId), isAi: false, budget: game.initialBudget, teams: game.teamSizes.map(() => []), passedCurrentRound: false, activeCurrentRound: true })
+        }
         await socket.join(`team-auction:${gameId}`)
         socket.data.gameId = gameId
         await emitTeamAuctionState(gameId)
@@ -182,7 +225,7 @@ export function attachRealtime(io: Server) {
     socket.on('team-auction:request-state', async (gameId: unknown) => {
       try {
         if (typeof gameId !== 'string' || !gameId) throw new Error('Code de salon invalide.')
-        const game = getTeamAuctionGame(gameId)
+        const game = await getOrInitTeamAuctionGame(gameId, userId)
         if (!game) throw new Error('Salon Team Auction introuvable.')
         if (!isTeamAuctionParticipant(game, userId)) throw new Error('Session/joueur invalide.')
         await socket.join(`team-auction:${gameId}`)

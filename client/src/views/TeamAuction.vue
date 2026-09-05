@@ -55,7 +55,9 @@ const canBid = computed(() =>
   localBidAmount.value <= budget.value &&
   localBidAmount.value % bidStep.value === 0,
 )
+const canRaise = computed(() => minimumNextBid.value <= budget.value)
 const bidHint = computed(() => {
+  if (!canRaise.value) return 'Budget insuffisant pour surenchérir : la carte est attribuée automatiquement.'
   if (canBid.value) return ''
   if (!Number.isFinite(localBidAmount.value) || localBidAmount.value % bidStep.value !== 0) return `Le montant doit être un multiple de ${bidStep.value}.`
   if (localBidAmount.value <= currentBid.value) return `Le montant doit dépasser ${currentBid.value} M.`
@@ -71,7 +73,7 @@ function playerName(id: number | string | null) {
 const currentBidderName = computed(() => playerName(state.value?.currentBidderId ?? null))
 const turnStatusLabel = computed(() => {
   if (!state.value) return ''
-  if (isMyTurn.value) return 'À vous de jouer'
+  if (isMyTurn.value && canRaise.value) return 'À vous de jouer'
   const turnPlayer = state.value.players.find((player) => player.id === state.value?.currentTurnId)
   if (!turnPlayer) return ''
   return turnPlayer.isAi ? `${turnPlayer.displayName} réfléchit...` : `${turnPlayer.displayName} est en train de jouer...`
@@ -267,10 +269,11 @@ onUnmounted(() => {
         <div class="ta-teams-panel ta-teams-mine">
           <h3>Mes équipes</h3>
           <div v-for="team in me?.teams ?? []" :key="team.teamNumber" class="ta-team-block" :class="{ complete: team.cards.length >= team.capacity }">
-            <p class="ta-team-title">Équipe {{ team.teamNumber }} — {{ team.cards.length }}/{{ team.capacity }} · reste {{ team.capacity - team.cards.length }} · moy. {{ teamAverageLabel(team.average) }}<span v-if="team.cards.length >= team.capacity"> COMPLÈTE</span></p>
             <ul class="ta-team-cards">
               <li v-for="card in team.cards" :key="card.id"><img v-if="card.imageUrl" :src="card.imageUrl" :alt="card.name" />{{ card.name }}</li>
             </ul>
+            <p class="ta-team-title">Équipe {{ team.teamNumber }} · {{ team.cards.length }}/{{ team.capacity }}<span v-if="team.cards.length >= team.capacity"> · COMPLÈTE</span></p>
+            <p class="ta-team-meta">{{ team.capacity - team.cards.length }} place(s) restante(s) · Moyenne {{ teamAverageLabel(team.average) }}</p>
           </div>
         </div>
 
@@ -286,7 +289,7 @@ onUnmounted(() => {
                 <span v-else>{{ state.currentCard.name.slice(0, 1) }}</span>
               </div>
               <h2>{{ state.currentCard.name }}</h2>
-              <p class="ta-rarity">{{ state.currentCard.rarity }} · Note {{ state.currentCard.rarityScore }}</p>
+              <p class="ta-rarity">{{ state.currentCard.rarity }} · Note {{ state.currentCard.score.toFixed(2) }}</p>
             </div>
             <div class="ta-bid-info">
               <p>Meilleure enchère : <strong>{{ state.currentBid }} M</strong><span v-if="currentBidderName"> — {{ currentBidderName }}</span></p>
@@ -300,7 +303,7 @@ onUnmounted(() => {
               </li>
             </ul>
 
-            <div v-if="isMyTurn" class="ta-bid-controls">
+            <div v-if="isMyTurn && canRaise" class="ta-bid-controls">
               <div class="ta-amount-field">
                 <button type="button" @click="decrementBid" :disabled="!canDecrement">−</button>
                 <input type="number" v-model.number="localBidAmount" :step="bidStep" />
@@ -313,7 +316,7 @@ onUnmounted(() => {
                 <button type="button" class="cta-sub-btn ghost" @click="passBid">PASSER</button>
               </div>
             </div>
-            <p v-else class="ta-status">{{ turnStatusLabel }}</p>
+            <p v-else class="ta-status">{{ isMyTurn ? bidHint : turnStatusLabel }}</p>
           </template>
 
           <template v-else-if="state?.phase === 'PLACEMENT'">
@@ -362,10 +365,11 @@ onUnmounted(() => {
           <div v-for="opponent in opponents" :key="String(opponent.id)" class="ta-opponent-block">
             <p class="ta-opponent-name">{{ opponent.displayName }}<span v-if="opponent.isAi"> (IA)</span> · {{ opponent.budget }} M</p>
             <div v-for="team in opponent.teams" :key="team.teamNumber" class="ta-team-block" :class="{ complete: team.cards.length >= team.capacity }">
-              <p class="ta-team-title">Équipe {{ team.teamNumber }} — {{ team.cards.length }}/{{ team.capacity }} · reste {{ team.capacity - team.cards.length }} · moy. {{ teamAverageLabel(team.average) }}</p>
               <ul class="ta-team-cards">
                 <li v-for="card in team.cards" :key="card.id"><img v-if="card.imageUrl" :src="card.imageUrl" :alt="card.name" />{{ card.name }}</li>
               </ul>
+              <p class="ta-team-title">Équipe {{ team.teamNumber }} · {{ team.cards.length }}/{{ team.capacity }}</p>
+              <p class="ta-team-meta">{{ team.capacity - team.cards.length }} place(s) restante(s) · Moyenne {{ teamAverageLabel(team.average) }}</p>
             </div>
           </div>
         </div>
@@ -513,8 +517,8 @@ input[type='text'] {
 
 .ta-game {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: minmax(260px, 3fr) minmax(320px, 4fr) minmax(260px, 3fr);
+  gap: 14px;
   align-items: start;
 }
 
@@ -542,6 +546,12 @@ input[type='text'] {
   font-size: 0.78rem;
   color: var(--text-muted);
   margin: 0 0 6px;
+}
+
+.ta-team-meta {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
 }
 
 .ta-team-cards {
@@ -577,9 +587,9 @@ input[type='text'] {
 }
 
 .ta-current-image {
-  width: min(260px, 70vw);
+  width: min(190px, 50vw);
   aspect-ratio: 3 / 4;
-  margin: 0 auto 14px;
+  margin: 0 auto 10px;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
   overflow: hidden;
@@ -739,6 +749,12 @@ input[type='text'] {
   .ta-teams-opponents {
     order: 3;
   }
+}
+
+@media (min-width: 961px) and (max-width: 1180px) {
+  .ta-container { padding-left: 12px; padding-right: 12px; }
+  .ta-teams-panel, .ta-center-panel { padding: 14px; }
+  .ta-current-image { width: min(165px, 22vw); }
 }
 
 @media (max-width: 600px) {

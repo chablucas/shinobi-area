@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { createGameLobby, listFriends, type ChallengeMode, type Friend } from './services/socialApi'
 import { useAuthStore } from './stores/auth'
@@ -41,9 +41,16 @@ async function openInviteDialog(mode: ChallengeMode) {
 }
 
 function requiredFriendCount() {
-  if (inviteMode.value === '1v1') return 1
+  if (inviteMode.value === '1v1' || inviteMode.value === 'team-1v1') return 1
   return completeWithAi.value ? 1 : 2
 }
+
+const inviteTitle = computed(() => {
+  if (inviteMode.value === 'team-1v1') return 'Invite un ami en Team Auction'
+  if (inviteMode.value === 'team-1v1v1') return 'Invite 2 amis en Team Auction'
+  if (inviteMode.value === '1v1') return 'Invite un ami'
+  return 'Envie d’un plaisir à 3 ?'
+})
 
 function toggleFriend(id: number) {
   const maximum = requiredFriendCount()
@@ -68,14 +75,21 @@ async function createInvite() {
   sendingInvite.value = true
   inviteError.value = ''
   try {
+    const isTeam = inviteMode.value.startsWith('team-')
+    const currentMode = inviteMode.value
     const lobby = await createGameLobby(
       auth.token,
-      inviteMode.value,
+      currentMode,
       selectedFriendIds.value,
-      inviteMode.value === '1v1v1' && completeWithAi.value,
+      currentMode === '1v1v1' && completeWithAi.value,
     )
     inviteMode.value = null
-    await router.push(`/lobby/${lobby.id}`)
+    if (isTeam) {
+      const taMode = currentMode === 'team-1v1' ? '1v1-real' : '1v1v1-real'
+      await router.push({ path: '/team-game', query: { mode: taMode, gameId: lobby.id } })
+    } else {
+      await router.push(`/lobby/${lobby.id}`)
+    }
   } catch (exception) {
     inviteError.value = exception instanceof Error ? exception.message : 'Invitation impossible.'
   } finally {
@@ -245,7 +259,8 @@ async function goTeamAuction(mode: TeamAuctionMode) {
               </div>
             </div>
             <div class="cta-actions-dual">
-              <button type="button" class="cta-sub-btn primary" @click="goTeamAuction('1v1-real')">JOUER</button>
+              <button type="button" class="cta-sub-btn primary" @click="goTeamAuction('1v1-real')">CRÉER / JOUER</button>
+              <button type="button" class="cta-sub-btn secondary" @click="openInviteDialog('team-1v1')">INVITER UN AMI</button>
             </div>
           </div>
 
@@ -262,7 +277,8 @@ async function goTeamAuction(mode: TeamAuctionMode) {
               </div>
             </div>
             <div class="cta-actions-dual">
-              <button type="button" class="cta-sub-btn primary" @click="goTeamAuction('1v1v1-real')">JOUER</button>
+              <button type="button" class="cta-sub-btn primary" @click="goTeamAuction('1v1v1-real')">CRÉER / JOUER</button>
+              <button type="button" class="cta-sub-btn secondary" @click="openInviteDialog('team-1v1v1')">INVITER 2 AMIS</button>
             </div>
           </div>
         </div>
@@ -279,17 +295,17 @@ async function goTeamAuction(mode: TeamAuctionMode) {
         <div class="invite-heading">
           <div>
             <p class="kicker">Combat social</p>
-            <h2 id="invite-title">{{ inviteMode === '1v1' ? 'Invite un ami' : 'Envie d’un plaisir à 3 ?' }}</h2>
+            <h2 id="invite-title">{{ inviteTitle }}</h2>
           </div>
           <button class="invite-close" type="button" aria-label="Fermer" @click="inviteMode = null">×</button>
         </div>
         <p class="invite-copy">
           {{
-            inviteMode === '1v1'
-              ? 'Sélectionne un ami pour lancer le salon 1v1.'
+            inviteMode === '1v1' || inviteMode === 'team-1v1'
+              ? 'Sélectionne un ami pour lancer le salon.'
               : completeWithAi
-                ? 'Sélectionne un ami, l’IA complètera le combat.'
-                : 'Sélectionne deux amis distincts pour lancer le salon 1v1v1.'
+                ? 'Sélectionne un ami, l’IA complètera la partie.'
+                : 'Sélectionne deux amis distincts pour lancer le salon.'
           }}
         </p>
         <div v-if="inviteMode === '1v1v1'" class="invite-ai-toggle">

@@ -112,15 +112,46 @@ function nextNonPassedPlayerIndex(game: TeamAuctionGame, startIndex: number) {
   return startIndex
 }
 
-function nextTurnIndex(game: TeamAuctionGame, startIndex: number) {
-  const candidateIndex = nextNonPassedPlayerIndex(game, startIndex)
-  const candidate = game.players[candidateIndex]
-  if (candidate && candidate.budget >= teamAuctionRules.minBid) return candidateIndex
-  return startIndex
+export function minimumNextTeamBid(game: Pick<TeamAuctionGame, 'currentBid'>) {
+  return game.currentBid === 0 ? teamAuctionRules.openingBid : game.currentBid + teamAuctionRules.bidUnit
 }
 
-function countActivePlayers(game: TeamAuctionGame) {
-  return game.players.filter((player) => player.activeCurrentRound && !player.passedCurrentRound).length
+export function canPlayerRaise(player: TeamAuctionPlayer, game: Pick<TeamAuctionGame, 'currentBid'>) {
+  return !player.passedCurrentRound && player.activeCurrentRound && minimumNextTeamBid(game) <= player.budget
+}
+
+function refreshBiddingEligibility(game: TeamAuctionGame) {
+  for (const player of game.players) {
+    if (!player.passedCurrentRound) player.activeCurrentRound = canPlayerRaise(player, game)
+  }
+}
+
+function nextEligiblePlayerIndex(game: TeamAuctionGame, startIndex: number) {
+  const playerCount = game.players.length
+  for (let offset = 1; offset <= playerCount; offset += 1) {
+    const candidateIndex = (startIndex + offset) % playerCount
+    const candidate = game.players[candidateIndex]!
+    if (canPlayerRaise(candidate, game)) return candidateIndex
+  }
+  return null
+}
+
+function advanceOrResolveBidding(game: TeamAuctionGame, startIndex: number) {
+  refreshBiddingEligibility(game)
+  const nextIndex = nextEligiblePlayerIndex(game, startIndex)
+  if (game.currentBidderId !== null && (nextIndex === null || game.players[nextIndex]?.id === game.currentBidderId)) {
+    finishRound(game)
+    return
+  }
+  if (nextIndex === null) {
+    game.phase = 'DRAW'
+    game.currentCardId = null
+    game.currentBid = 0
+    game.currentBidderId = null
+    game.currentTurnId = null
+    return
+  }
+  game.currentTurnId = game.players[nextIndex]!.id
 }
 
 function allTeamsComplete(game: TeamAuctionGame) {
@@ -271,13 +302,7 @@ export function submitTeamBid(gameId: string, playerId: TeamAuctionPlayerId, amo
   game.currentBidderId = playerId
 
   const currentIndex = game.players.findIndex((entry) => entry.id === playerId)
-  const nextIndex = nextTurnIndex(game, currentIndex)
-  game.currentTurnId = game.players[nextIndex]?.id ?? playerId
-
-  const activeCount = countActivePlayers(game)
-  if (activeCount <= 1 && game.currentBid > 0 && game.currentBidderId) {
-    finishRound(game)
-  }
+  advanceOrResolveBidding(game, currentIndex)
 
   return game
 }
@@ -294,20 +319,7 @@ export function passTeamBid(gameId: string, playerId: TeamAuctionPlayerId) {
   player.passedCurrentRound = true
   player.activeCurrentRound = false
   const currentIndex = game.players.findIndex((candidate) => candidate.id === playerId)
-  const nextActiveIndex = nextTurnIndex(game, currentIndex)
-  game.currentTurnId = game.players[nextActiveIndex]?.id ?? null
-
-  const remainingActive = countActivePlayers(game)
-  if (remainingActive <= 1 && game.currentBidderId) {
-    finishRound(game)
-  }
-
-  if (remainingActive === 0) {
-    game.phase = 'DRAW'
-    game.currentCardId = null
-    game.currentBid = 0
-    game.currentBidderId = null
-  }
+  advanceOrResolveBidding(game, currentIndex)
 
   return game
 }
@@ -319,7 +331,7 @@ export function allInTeamBid(gameId: string, playerId: TeamAuctionPlayerId) {
   const player = playerById(game, playerId)
   if (!player) throw new Error('Joueur introuvable.')
   const allInAmount = Math.floor(player.budget / teamAuctionRules.bidUnit) * teamAuctionRules.bidUnit
-  if (allInAmount <= 0) throw new Error('Le joueur ne peut pas ALL-IN.')
+  if (allInAmount < minimumNextTeamBid(game)) throw new Error('Le ALL-IN doit dépasser l’enchère actuelle.')
   return submitTeamBid(gameId, playerId, allInAmount)
 }
 

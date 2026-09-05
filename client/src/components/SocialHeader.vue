@@ -103,7 +103,23 @@ function publicProfile(id: number) { open.value = false; void router.push(`/prof
 async function addFriend(id: number) { if (!auth.token) return; await sendFriendRequest(auth.token, id); const player = results.value.players.find((item) => item.id === id); if (player) { player.friendshipStatus = 'PENDING'; player.friendshipDirection = 'sent' } }
 async function acceptSearchRequest(player: SearchResult['players'][number]) { if (!auth.token || !player.friendshipRequestId) return; await acceptFriendRequest(auth.token, player.friendshipRequestId); player.friendshipStatus = 'ACCEPTED'; player.friendshipDirection = null }
 async function answer(request: FriendRequest, accepted: boolean) { if (!auth.token) return; requests.value = requests.value.filter((item) => item.id !== request.id); try { if (accepted) await acceptFriendRequest(auth.token, request.id); else await rejectFriendRequest(auth.token, request.id) } finally { await refreshNotifications() } }
-async function answerGameInvite(invite: GameInvite, accepted: boolean) { if (!auth.token) return; gameInvites.value = gameInvites.value.filter((item) => item.id !== invite.id); try { const lobby = accepted ? await acceptGameInvite(auth.token, invite.id) : await rejectGameInvite(auth.token, invite.id); if (accepted) void router.push(`/lobby/${lobby.id}`) } finally { await refreshNotifications() } }
+async function answerGameInvite(invite: GameInvite, accepted: boolean) {
+  if (!auth.token) return
+  gameInvites.value = gameInvites.value.filter((item) => item.id !== invite.id)
+  try {
+    const lobby = accepted ? await acceptGameInvite(auth.token, invite.id) : await rejectGameInvite(auth.token, invite.id)
+    if (accepted) {
+      if (invite.mode.startsWith('team-')) {
+        const taMode = invite.mode === 'team-1v1' ? '1v1-real' : '1v1v1-real'
+        void router.push({ path: '/team-game', query: { mode: taMode, gameId: lobby.id } })
+      } else {
+        void router.push(`/lobby/${lobby.id}`)
+      }
+    }
+  } finally {
+    await refreshNotifications()
+  }
+}
 function statusLabel(player: SearchResult['players'][number]) { if (player.friendshipStatus === 'ACCEPTED') return 'AMI'; if (player.friendshipDirection === 'received') return 'ACCEPTER'; if (player.friendshipStatus === 'PENDING') return 'DEMANDE ENVOYÉE'; return 'AJOUTER EN AMI' }
 </script>
 
@@ -228,7 +244,7 @@ function statusLabel(player: SearchResult['players'][number]) { if (player.frien
       </article>
       <article v-for="invite in gameInvites" :key="`game-${invite.id}`" class="notif-item">
         <span class="notif-desc">
-          <b>{{ invite.creator.displayName }}</b> vous défie en {{ invite.mode }}
+          <b>{{ invite.creator.displayName }}</b> vous défie en {{ invite.mode === 'team-1v1' ? 'Team Auction 1v1' : invite.mode === 'team-1v1v1' ? 'Team Auction 1v1v1' : invite.mode }}
         </span>
         <div class="notif-actions">
           <button type="button" class="btn-accept" @click="answerGameInvite(invite, true)">ACCEPTER</button>

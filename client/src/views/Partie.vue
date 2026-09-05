@@ -114,6 +114,7 @@ onMounted(async () => {
 onUnmounted(() => { realtimeSocket.value?.disconnect() })
 
 const realtimeCurrentPlayer = computed(() => realtimeState.value?.players.find((player) => player.playerNumber === realtimeState.value?.currentPlayerNumber) ?? null)
+const realtimeCurrentPlayerName = computed(() => realtimeCurrentPlayer.value?.displayName ?? `Joueur ${realtimeState.value?.currentPlayerNumber ?? 1}`)
 const realtimeMyPlayer = computed(() => realtimeState.value?.players.find((player) => player.playerNumber === realtimePlayerNumber.value) ?? null)
 const realtimeMyTurn = computed(() => Boolean(realtimeState.value && realtimePlayerNumber.value === realtimeState.value.currentPlayerNumber))
 const isRealtimeHost = computed(() => auth.user?.id === realtimeHostId.value)
@@ -354,7 +355,7 @@ function drawBonusesFor(card: DrawCardLike | null) {
       <!-- Combat multijoueur temps réel -->
       <section v-if="props.lobbyId && realtimeState" class="realtime-game">
         <div class="realtime-turn" :class="{ active: realtimeMyTurn }">
-          <strong>{{ realtimeMyTurn ? 'À TON TOUR' : `AU TOUR DE JOUEUR ${realtimeState.currentPlayerNumber}` }}</strong>
+          <strong>{{ realtimeMyTurn ? 'À TON TOUR' : `AU TOUR DE ${realtimeCurrentPlayerName.toUpperCase()}` }}</strong>
           <span>Tour {{ realtimeState.turnNumber }}</span>
         </div>
 
@@ -368,7 +369,7 @@ function drawBonusesFor(card: DrawCardLike | null) {
             <header>
               <div>
                 <p class="eyebrow">Joueur {{ player.playerNumber }}</p>
-                <h2>{{ player.userId === auth.user?.id ? 'Toi' : player.displayName }}</h2>
+                <h2>{{ player.displayName }}<span v-if="player.userId === auth.user?.id"> (Toi)</span></h2>
               </div>
               <span>{{ player.cardsRemaining }} cartes</span>
             </header>

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { getCardKnowledgeBySlug } from '../src/game/cardKnowledge.js'
+import { getCardKnowledgeBySlug, listCardKnowledge } from '../src/game/cardKnowledge.js'
+import { calculateCharacterOverallScore } from '../src/game/teamMode.js'
 import { evaluateTeamAuctionAi, createTeamAuctionGame, submitTeamBid, startTeamAuctionGame, drawNextTeamCard, passTeamBid, allInTeamBid, placeTeamCard, getTeamAuctionGame, chooseAiPlacement } from '../src/services/teamAuctionGameService.js'
 
 function makeGame(mode: '1v1-ai' | '1v1-real' | '1v1v1-real' = '1v1-ai', teamSizes = [3, 2], initialBudget = 500) {
@@ -67,6 +68,29 @@ test('une enchère supérieure au budget est refusée', () => {
   assert.throws(() => submitTeamBid(game.gameId, 1, 120), /Enchère invalide/)
 })
 
+test('une enchère à 500 M est résolue sans proposer 510 M au concurrent', () => {
+  const game = makeGame('1v1-ai', [2], 500)
+  startTeamAuctionGame(game.gameId)
+  drawNextTeamCard(game.gameId)
+  submitTeamBid(game.gameId, 1, 500)
+  assert.equal(game.phase, 'PLACEMENT')
+  assert.equal(game.winnerId, 1)
+  assert.equal(game.players[1]!.activeCurrentRound, false)
+})
+
+test('une enchère à 420 M est résolue quand le concurrent a seulement 400 M', () => {
+  const game = makeGame('1v1-ai', [2], 500)
+  game.players[0]!.budget = 400
+  startTeamAuctionGame(game.gameId)
+  drawNextTeamCard(game.gameId)
+  game.currentBid = 410
+  game.currentBidderId = 1
+  game.currentTurnId = 2
+  submitTeamBid(game.gameId, 2, 420)
+  assert.equal(game.phase, 'PLACEMENT')
+  assert.equal(game.winnerId, 2)
+})
+
 test('une action hors tour est refusée', () => {
   const game = makeGame('1v1-ai', [2], 500)
   startTeamAuctionGame(game.gameId)
@@ -111,8 +135,30 @@ test('ALL-IN est autorisé et consomme bien le budget de la dernière offre', ()
   drawNextTeamCard(game.gameId)
   allInTeamBid(game.gameId, 1)
   assert.equal(game.currentBid, 280)
-  assert.equal(game.players[0]!.budget, 280)
+  assert.equal(game.players[0]!.budget, 0)
   assert.equal(game.currentBidderId, 1)
+})
+
+test('ALL-IN est refusé lorsqu’il ne dépasse pas l’enchère actuelle', () => {
+  const game = makeGame('1v1-ai', [2], 100)
+  startTeamAuctionGame(game.gameId)
+  drawNextTeamCard(game.gameId)
+  game.currentBid = 100
+  game.currentBidderId = 2
+  game.currentTurnId = 1
+  assert.throws(() => allInTeamBid(game.gameId, 1), /doit dépasser/)
+})
+
+test('seul le prix final est débité après une série de surenchères', () => {
+  const game = makeGame('1v1-real', [2], 500)
+  startTeamAuctionGame(game.gameId)
+  drawNextTeamCard(game.gameId)
+  submitTeamBid(game.gameId, 1, 10)
+  submitTeamBid(game.gameId, 2, 30)
+  submitTeamBid(game.gameId, 1, 100)
+  passTeamBid(game.gameId, 2)
+  assert.equal(game.players[0]!.budget, 400)
+  assert.equal(game.players[1]!.budget, 500)
 })
 
 test('le placement dans une équipe pleine est refusé', () => {
@@ -156,16 +202,57 @@ test('le scoring final 1v1 et le tirage du vainqueur fonctionnent', () => {
   assert.ok(game.finalResults || game.phase === 'RESULTS')
 })
 
-test('l’IA passe sur une mauvaise carte', () => {
+test('l’IA passe quand la prochaine offre dépasse son plafond sur une carte faible', () => {
   const game = makeGame('1v1-ai', [2], 500)
   const lowCard = getCardKnowledgeBySlug('zetsu-blanc')!
   startTeamAuctionGame(game.gameId)
   game.currentCardId = lowCard.id
   game.phase = 'BIDDING'
   game.currentTurnId = 2
-  game.currentBid = 10
+  game.currentBid = 100
   const decision = evaluateTeamAuctionAi(game.gameId, 2)
-  assert.ok(decision === null || decision.action === 'pass' || decision.action === 'bid')
+  assert.equal(decision?.action, 'pass')
+})
+
+test('une carte moyenne avec de nombreux slots ne provoque pas de quasi ALL-IN', () => {
+  const game = makeGame('1v1-ai', [3, 3], 500)
+  const cardsByScore = listCardKnowledge().sort((left, right) => calculateCharacterOverallScore(left) - calculateCharacterOverallScore(right))
+  const middleCard = cardsByScore[Math.floor(cardsByScore.length / 2)]!
+  game.currentCardId = middleCard.id
+  game.phase = 'BIDDING'
+  game.currentTurnId = 2
+  const decision = evaluateTeamAuctionAi(game.gameId, 2)
+  assert.notEqual(decision?.action, 'allin')
+  assert.ok(decision?.action !== 'bid' || decision.amount < 400)
+})
+
+test('une carte ultra élite reçoit un plafond d’ouverture supérieur à une carte moyenne', () => {
+  const cardsByScore = listCardKnowledge().sort((left, right) => calculateCharacterOverallScore(right) - calculateCharacterOverallScore(left))
+  const elite = cardsByScore[0]!
+  const middle = cardsByScore[Math.floor(cardsByScore.length / 2)]!
+  const eliteGame = makeGame('1v1-ai', [3, 3], 500)
+  eliteGame.currentCardId = elite.id
+  eliteGame.phase = 'BIDDING'
+  eliteGame.currentTurnId = 2
+  const mediumGame = makeGame('1v1-ai', [3, 3], 500)
+  mediumGame.currentCardId = middle.id
+  mediumGame.phase = 'BIDDING'
+  mediumGame.currentTurnId = 2
+  const eliteDecision = evaluateTeamAuctionAi(eliteGame.gameId, 2)
+  const mediumDecision = evaluateTeamAuctionAi(mediumGame.gameId, 2)
+  assert.equal(eliteDecision?.action, 'bid')
+  assert.equal(mediumDecision?.action, 'bid')
+  assert.ok(eliteDecision.amount > mediumDecision.amount)
+  assert.ok(eliteDecision.amount <= eliteGame.players[1]!.budget)
+})
+
+test('une IA sans budget ne peut jamais enchérir', () => {
+  const game = makeGame('1v1-ai', [2], 500)
+  game.players[1]!.budget = 0
+  game.currentCardId = getCardKnowledgeBySlug('hagoromo')!.id
+  game.phase = 'BIDDING'
+  game.currentTurnId = 2
+  assert.equal(evaluateTeamAuctionAi(game.gameId, 2)?.action, 'pass')
 })
 
 test('l’IA peut choisir un placement de grosse carte dans une petite équipe', () => {

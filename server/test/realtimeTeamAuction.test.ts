@@ -8,6 +8,7 @@ import { Server } from 'socket.io'
 import { app } from '../src/app.js'
 import { requireJwtSecret } from '../src/config/env.js'
 import { attachRealtime } from '../src/realtime.js'
+import { prisma } from '../src/config/prisma.js'
 
 function tokenFor(userId: number) { return jwt.sign({}, requireJwtSecret(), { subject: String(userId), expiresIn: '1h' }) }
 
@@ -20,7 +21,8 @@ type TAState = {
   currentTurnId: number | string | null
   winnerId: number | string | null
   finalResults: { teams: Array<{ playerId: number | string; teamNumber: number; score: number; won: boolean }>; winnerId: number | string | null } | null
-  players: Array<{ id: number | string; budget: number; passedCurrentRound: boolean }>
+  currentCard?: { score: number } | null
+  players: Array<{ id: number | string; displayName: string; budget: number; passedCurrentRound: boolean }>
 }
 
 function nextTAState(socket: Socket, predicate: (state: TAState) => boolean) {
@@ -103,6 +105,30 @@ test('création, jointure, refus de salon plein et lancement avec joueurs insuff
   } finally { httpServer.close() }
 })
 
+test('les états Team Auction exposent les pseudonymes de profil et le score canonique', async () => {
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const users = await prisma.user.createManyAndReturn({ data: [
+    { email: `auction-lucas-${suffix}@example.test`, passwordHash: 'test', displayName: 'Lucas' },
+    { email: `auction-boubou-${suffix}@example.test`, passwordHash: 'test', displayName: 'Boubou' },
+  ], select: { id: true } })
+  const { httpServer, port } = await startServer()
+  try {
+    const [socketA, socketB] = await Promise.all(users.map((user) => connectAndWait(port, user!.id)))
+    try {
+      const created = await ack<{ ok: boolean; gameId?: string }>(socketA, 'team-auction:create', { mode: '1v1-real', teamSizes: [1], initialBudget: 500 })
+      await ack(socketB, 'team-auction:join', created.gameId!)
+      const statePromise = nextTAState(socketA, (state) => state.phase === 'BIDDING' && state.currentCard !== null)
+      socketA.emit('team-auction:start', created.gameId)
+      const state = await statePromise
+      assert.deepEqual(state.players.map((player) => player.displayName), ['Lucas', 'Boubou'])
+      assert.ok((state.currentCard?.score ?? 0) > 0)
+    } finally { socketA.disconnect(); socketB.disconnect() }
+  } finally {
+    httpServer.close()
+    await prisma.user.deleteMany({ where: { id: { in: users.map((user) => user!.id) } } })
+  }
+})
+
 test('bid, pass, placement, diffusion et résultat final sur une partie 1v1 réelle complète', async () => {
   const { httpServer, port } = await startServer()
   try {
@@ -144,7 +170,7 @@ test('bid, pass, placement, diffusion et résultat final sur une partie 1v1 rée
   } finally { httpServer.close() }
 })
 
-test('ALL-IN consomme le budget et force le passage du joueur suivant', async () => {
+test('ALL-IN consomme le budget et attribue immédiatement la carte sans surenchère possible', async () => {
   const { httpServer, port } = await startServer()
   try {
     const [socketA, socketB] = await Promise.all([90301, 90302].map((id) => connectAndWait(port, id)))
@@ -157,12 +183,8 @@ test('ALL-IN consomme le budget et force le passage du joueur suivant', async ()
       socketA.emit('team-auction:start', gameId)
       await biddingState
 
-      const afterAllIn = nextTAState(socketB, (state) => state.currentBid === 300 && state.currentBidderId === 90301)
+      const placementState = nextTAState(socketB, (state) => state.phase === 'PLACEMENT' && state.currentBid === 300 && state.winnerId === 90301)
       socketA.emit('team-auction:action', { gameId, action: 'allin' })
-      await afterAllIn
-
-      const placementState = nextTAState(socketA, (state) => state.phase === 'PLACEMENT' && state.winnerId === 90301)
-      socketB.emit('team-auction:action', { gameId, action: 'pass' })
       const placed = await placementState
       const winner = placed.players.find((player) => player.id === 90301)
       assert.equal(winner?.budget, 0)

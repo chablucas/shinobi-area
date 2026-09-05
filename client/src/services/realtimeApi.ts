@@ -12,7 +12,7 @@ export function connectGameSocket(token: string): GameSocket {
 }
 
 export type TeamAuctionMode = '1v1-ai' | '1v1-real' | '1v1v1-real'
-export type TeamAuctionCard = { id: number; name: string; slug: string; imageUrl: string | null; rarity: string; rarityScore: number; stats?: Record<string, number> }
+export type TeamAuctionCard = { id: number; name: string; slug: string; imageUrl: string | null; rarity: string; rarityScore: number; score: number; stats?: Record<string, number> }
 export type TeamAuctionState = {
   gameId: string
   hostId: number | null
