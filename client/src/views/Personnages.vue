@@ -508,9 +508,9 @@ function modifierText(modifier: CardModifier) {
 }
 .stats-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 2px 8px;
-  padding: 5px 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 10px;
+  padding: 8px 0;
   border-top: 1px solid var(--border-light);
   border-bottom: 1px solid var(--border-light);
 }
@@ -522,13 +522,11 @@ function modifierText(modifier: CardModifier) {
   min-width: 0;
   color: var(--text-muted);
   font-size: 9px;
-  line-height: 1.2;
+  line-height: 1.25;
 }
 .stats-grid > span > span {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .stats-grid strong {
   flex: 0 0 auto;
@@ -638,6 +636,10 @@ function modifierText(modifier: CardModifier) {
   .characters-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 5px;
   }
   .character-image {
     height: 160px;

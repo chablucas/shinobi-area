@@ -1683,6 +1683,39 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
   }
 }
 
+@media (min-width: 601px) and (max-width: 1023px) {
+  .vertical-battle-layout {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 18px;
+  }
+
+  .vertical-battle-layout > .player-one {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .vertical-battle-layout > .player-two {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .vertical-battle-layout > .battle-center-arena {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .vertical-battle-layout > .player-three {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+
+  .category-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 900px) {
   .category-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));

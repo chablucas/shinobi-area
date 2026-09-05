@@ -80,7 +80,7 @@ watch(query, (value) => {
 })
 
 function handleBrandClick(event: MouseEvent) {
-  if (typeof window !== 'undefined' && window.innerWidth <= 1024) {
+  if (typeof window !== 'undefined' && window.innerWidth <= 600) {
     event.preventDefault()
     sidebarOpen.value = true
   }
@@ -536,7 +536,7 @@ function statusLabel(player: SearchResult['players'][number]) { if (player.frien
 }
 
 /* Responsive Breakpoints */
-@media (max-width: 1024px) {
+@media (max-width: 600px) {
   .desktop-only {
     display: none !important;
   }
