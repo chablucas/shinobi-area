@@ -150,17 +150,10 @@ test('bid, pass, placement, diffusion et résultat final sur une partie 1v1 rée
       socketB.emit('team-auction:action', { gameId, action: 'pass' })
       await firstPlacement
 
-      const biddingRound2 = nextTAState(socketB, (state) => state.phase === 'BIDDING' && state.currentTurnId === 90202)
+      // A a désormais son unique équipe pleine : seul B peut encore recevoir la carte, attribution automatique sans enchère.
+      const secondPlacementAuto = nextTAState(socketB, (state) => state.phase === 'PLACEMENT' && state.winnerId === 90202 && state.currentBid === 0)
       socketA.emit('team-auction:action', { gameId, action: 'place', teamIndex: 0 })
-      await biddingRound2
-
-      const afterSecondBid = nextTAState(socketA, (state) => state.currentBid === 10 && state.currentBidderId === 90202)
-      socketB.emit('team-auction:action', { gameId, action: 'bid', amount: 10 })
-      await afterSecondBid
-
-      const secondPlacement = nextTAState(socketB, (state) => state.phase === 'PLACEMENT' && state.winnerId === 90202)
-      socketA.emit('team-auction:action', { gameId, action: 'pass' })
-      await secondPlacement
+      await secondPlacementAuto
 
       const finalState = nextTAState(socketA, (state) => state.phase === 'RESULTS' && Boolean(state.finalResults))
       socketB.emit('team-auction:action', { gameId, action: 'place', teamIndex: 0 })
@@ -227,18 +220,17 @@ test('1v1v1 réel diffuse rotation, PASS et résultats à trois joueurs', async 
 
       await actAndRequestTAState(socketC, gameId, { action: 'pass' }, (state) => state.phase === 'PLACEMENT' && state.winnerId === 90501)
 
+      // A a désormais son unique équipe pleine : la manche suivante n'oppose plus que B et C.
       await actAndRequestTAState(socketA, gameId, { action: 'place', teamIndex: 0 }, (state) => state.phase === 'BIDDING' && state.currentTurnId === 90502)
 
       await actAndRequestTAState(socketB, gameId, { action: 'pass' }, (state) => state.phase === 'BIDDING' && state.currentTurnId === 90503 && Boolean(state.players.find((player) => player.id === 90502)?.passedCurrentRound))
 
-      await actAndRequestTAState(socketC, gameId, { action: 'bid', amount: 10 }, (state) => state.phase === 'BIDDING' && state.currentTurnId === 90501 && state.currentBidderId === 90503)
-      await actAndRequestTAState(socketA, gameId, { action: 'pass' }, (state) => state.phase === 'PLACEMENT' && state.winnerId === 90503)
+      // C mise 10 : A (équipe pleine) est sauté de l'enchère, C gagne immédiatement.
+      await actAndRequestTAState(socketC, gameId, { action: 'bid', amount: 10 }, (state) => state.phase === 'PLACEMENT' && state.winnerId === 90503 && state.currentBidderId === 90503)
 
-      await actAndRequestTAState(socketC, gameId, { action: 'place', teamIndex: 0 }, (state) => state.phase === 'BIDDING' && state.currentTurnId === 90503)
+      // A et C ont désormais leur équipe pleine : seul B peut encore recevoir la carte, attribution automatique.
+      await actAndRequestTAState(socketC, gameId, { action: 'place', teamIndex: 0 }, (state) => state.phase === 'PLACEMENT' && state.winnerId === 90502 && state.currentBid === 0)
 
-      await actAndRequestTAState(socketC, gameId, { action: 'pass' }, (state) => state.phase === 'BIDDING' && state.currentTurnId === 90501 && Boolean(state.players.find((player) => player.id === 90503)?.passedCurrentRound))
-      await actAndRequestTAState(socketA, gameId, { action: 'pass' }, (state) => state.phase === 'BIDDING' && state.currentTurnId === 90502 && Boolean(state.players.find((player) => player.id === 90501)?.passedCurrentRound))
-      await actAndRequestTAState(socketB, gameId, { action: 'bid', amount: 10 }, (state) => state.phase === 'PLACEMENT' && state.winnerId === 90502)
       const result = await actAndRequestTAState(socketB, gameId, { action: 'place', teamIndex: 0 }, (state) => state.phase === 'RESULTS' && (state.finalResults?.teams.length ?? 0) === 3)
       assert.equal(result.finalResults?.teams.length, 3)
       assert.ok(result.finalResults?.winnerId === null || [90501, 90502, 90503].includes(Number(result.finalResults?.winnerId)))

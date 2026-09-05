@@ -397,3 +397,66 @@ test('rotation des openers TEST F (1v1v1) : la carte avance quand tout le monde 
   drawNextTeamCard(game.gameId)
   assert.equal(game.currentTurnId, 2, 'l’opener suivant doit être le joueur suivant même sans aucun bid')
 })
+
+test('équipes pleines TEST 1 : humain a des slots libres, IA pleine → carte auto attribuée à l’humain', () => {
+  const game = makeGame('1v1-ai', [1], 500)
+  game.players[1]!.teams[0] = [999]
+  startTeamAuctionGame(game.gameId)
+  drawNextTeamCard(game.gameId)
+  assert.equal(game.phase, 'PLACEMENT')
+  assert.equal(game.winnerId, 1)
+  assert.equal(game.currentBid, 0)
+})
+
+test('équipes pleines TEST 2 : humain plein, IA a des slots libres → carte auto attribuée à l’IA', () => {
+  const game = makeGame('1v1-ai', [1], 500)
+  game.players[0]!.teams[0] = [999]
+  startTeamAuctionGame(game.gameId)
+  drawNextTeamCard(game.gameId)
+  assert.equal(game.phase, 'PLACEMENT')
+  assert.equal(game.winnerId, 2)
+  assert.equal(game.currentBid, 0)
+})
+
+test('équipes pleines TEST 3 (1v1v1) : A plein → l’enchère n’oppose plus que B et C', () => {
+  const game = makeGame('1v1v1-real', [1], 500)
+  game.players[0]!.teams[0] = [999]
+  startTeamAuctionGame(game.gameId)
+  drawNextTeamCard(game.gameId)
+  assert.equal(game.phase, 'BIDDING')
+  assert.equal(game.currentTurnId, 2, 'A doit être sauté comme participant effectif à l’enchère')
+  assert.throws(() => submitTeamBid(game.gameId, 1, 10), /pleines/)
+})
+
+test('équipes pleines TEST 4 (1v1v1) : A et B pleins → auto-attribution à C', () => {
+  const game = makeGame('1v1v1-real', [1], 500)
+  game.players[0]!.teams[0] = [999]
+  game.players[1]!.teams[0] = [998]
+  startTeamAuctionGame(game.gameId)
+  drawNextTeamCard(game.gameId)
+  assert.equal(game.phase, 'PLACEMENT')
+  assert.equal(game.winnerId, 3)
+  assert.equal(game.currentBid, 0)
+})
+
+test('équipes pleines TEST 5 : aucun joueur ne peut recevoir de carte → la partie passe aux résultats', () => {
+  const game = makeGame('1v1-real', [1], 500)
+  game.players[0]!.teams[0] = [getCardKnowledgeBySlug('naruto')!.id]
+  game.players[1]!.teams[0] = [getCardKnowledgeBySlug('sasuke')!.id]
+  startTeamAuctionGame(game.gameId)
+  drawNextTeamCard(game.gameId)
+  assert.equal(game.phase, 'RESULTS')
+  assert.ok(game.finalResults)
+})
+
+test('équipes pleines TEST 6 : un joueur aux équipes pleines ne peut ni BID ni ALL-IN', () => {
+  const game = makeGame('1v1-real', [1], 500)
+  game.players[0]!.teams[0] = [999]
+  startTeamAuctionGame(game.gameId)
+  drawNextTeamCard(game.gameId)
+  game.phase = 'BIDDING'
+  game.currentTurnId = 1
+  game.currentCardId = 42
+  assert.throws(() => submitTeamBid(game.gameId, 1, 10), /pleines/)
+  assert.throws(() => allInTeamBid(game.gameId, 1), /pleines/)
+})

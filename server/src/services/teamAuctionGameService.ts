@@ -90,9 +90,23 @@ function totalRequiredCards(teamSizes: number[]) {
   return teamSizes.reduce((sum, size) => sum + size, 0)
 }
 
+/** Un joueur ne peut plus recevoir de carte si toutes ses équipes sont pleines. */
+export function canPlayerReceiveCard(player: Pick<TeamAuctionPlayer, 'teams'>, teamSizes: number[]): boolean {
+  return player.teams.some((team, index) => team.length < (teamSizes[index] ?? 0))
+}
+
+function nextEligibleOpenerIndex(game: TeamAuctionGame, startIndex: number) {
+  const playerCount = game.players.length
+  for (let offset = 0; offset < playerCount; offset += 1) {
+    const candidateIndex = (startIndex + offset) % playerCount
+    if (canPlayerReceiveCard(game.players[candidateIndex]!, game.teamSizes)) return candidateIndex
+  }
+  return null
+}
+
 function resetRoundState(game: TeamAuctionGame) {
   for (const player of game.players) {
-    player.activeCurrentRound = true
+    player.activeCurrentRound = canPlayerReceiveCard(player, game.teamSizes)
     player.passedCurrentRound = false
   }
   game.currentBid = 0
@@ -116,8 +130,11 @@ export function minimumNextTeamBid(game: Pick<TeamAuctionGame, 'currentBid'>) {
   return game.currentBid === 0 ? teamAuctionRules.openingBid : game.currentBid + teamAuctionRules.bidUnit
 }
 
-export function canPlayerRaise(player: TeamAuctionPlayer, game: Pick<TeamAuctionGame, 'currentBid'>) {
-  return !player.passedCurrentRound && player.activeCurrentRound && minimumNextTeamBid(game) <= player.budget
+export function canPlayerRaise(player: TeamAuctionPlayer, game: Pick<TeamAuctionGame, 'currentBid' | 'teamSizes'>) {
+  return !player.passedCurrentRound
+    && player.activeCurrentRound
+    && minimumNextTeamBid(game) <= player.budget
+    && canPlayerReceiveCard(player, game.teamSizes)
 }
 
 function refreshBiddingEligibility(game: TeamAuctionGame) {
@@ -269,6 +286,14 @@ export function drawNextTeamCard(gameId: string) {
   const game = games.get(gameId)
   if (!game) throw new Error('Partie introuvable.')
   if (game.phase !== 'DRAW') throw new Error('La phase actuelle n’autorise pas de piège.')
+
+  const eligiblePlayers = game.players.filter((player) => canPlayerReceiveCard(player, game.teamSizes))
+  if (!eligiblePlayers.length) {
+    game.phase = 'RESULTS'
+    computeFinalResults(game)
+    return game
+  }
+
   const nextCardId = game.deck.pop()
   if (!nextCardId) {
     game.phase = 'RESULTS'
@@ -278,7 +303,18 @@ export function drawNextTeamCard(gameId: string) {
   game.usedCardIds.push(nextCardId)
   game.currentCardId = nextCardId
   resetRoundState(game)
-  const openerIndex = game.openerIndex % game.players.length
+
+  if (eligiblePlayers.length === 1) {
+    const winner = eligiblePlayers[0]!
+    game.currentBid = 0
+    game.currentBidderId = null
+    game.winnerId = winner.id
+    game.currentTurnId = winner.id
+    game.phase = 'PLACEMENT'
+    return game
+  }
+
+  const openerIndex = nextEligibleOpenerIndex(game, game.openerIndex % game.players.length) ?? game.openerIndex % game.players.length
   game.currentTurnId = game.players[openerIndex]?.id ?? null
   game.phase = 'BIDDING'
   return game
@@ -290,6 +326,7 @@ export function submitTeamBid(gameId: string, playerId: TeamAuctionPlayerId, amo
   if (game.phase !== 'BIDDING') throw new Error('La phase actuelle ne permet pas d’enchérir.')
   const player = playerById(game, playerId)
   if (!player) throw new Error('Joueur introuvable.')
+  if (!canPlayerReceiveCard(player, game.teamSizes)) throw new Error('Ce joueur a déjà toutes ses équipes pleines.')
   if (game.currentTurnId !== playerId) throw new Error('Ce n’est pas ton tour.')
   const minimumBid = game.currentBid === 0 ? getMinimumOpenBid(player.budget) : game.currentBid + teamAuctionRules.bidUnit
   if (!isValidBid(amount, game.currentBid, player.budget)) {
@@ -315,6 +352,7 @@ export function passTeamBid(gameId: string, playerId: TeamAuctionPlayerId) {
   if (game.phase !== 'BIDDING') throw new Error('La phase actuelle ne permet pas de passer.')
   const player = playerById(game, playerId)
   if (!player) throw new Error('Joueur introuvable.')
+  if (!canPlayerReceiveCard(player, game.teamSizes)) throw new Error('Ce joueur a déjà toutes ses équipes pleines.')
   if (game.currentTurnId !== playerId) throw new Error('Ce n’est pas ton tour.')
   if (player.passedCurrentRound) throw new Error('Ce joueur a déjà passé cette carte.')
 
@@ -332,6 +370,7 @@ export function allInTeamBid(gameId: string, playerId: TeamAuctionPlayerId) {
   if (!teamAuctionRules.allowAllIn) throw new Error('Le ALL-IN est désactivé.')
   const player = playerById(game, playerId)
   if (!player) throw new Error('Joueur introuvable.')
+  if (!canPlayerReceiveCard(player, game.teamSizes)) throw new Error('Ce joueur a déjà toutes ses équipes pleines.')
   const allInAmount = Math.floor(player.budget / teamAuctionRules.bidUnit) * teamAuctionRules.bidUnit
   if (allInAmount < minimumNextTeamBid(game)) throw new Error('Le ALL-IN doit dépasser l’enchère actuelle.')
   return submitTeamBid(gameId, playerId, allInAmount)
