@@ -60,6 +60,7 @@ function scheduleNotificationRefresh() {
 
 onMounted(async () => {
   isMounted = true
+  await auth.loadCurrentUser()
   await refreshNotifications()
   scheduleNotificationRefresh()
 })

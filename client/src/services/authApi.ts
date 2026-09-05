@@ -4,10 +4,17 @@ export type User = { id: number; email: string; displayName: string; wins: numbe
 
 type AuthResponse = { token: string; user: User }
 
+export class AuthApiError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message)
+    this.name = 'AuthApiError'
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...(options.headers ?? {}) } })
   const payload = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(payload.error ?? 'Une erreur est survenue.')
+  if (!response.ok) throw new AuthApiError(payload.error ?? 'Une erreur est survenue.', response.status)
   return payload as T
 }
 
