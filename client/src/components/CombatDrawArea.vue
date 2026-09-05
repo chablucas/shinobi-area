@@ -85,11 +85,11 @@ const bonusRows = computed(() => props.bonuses ?? [])
 </template>
 
 <style scoped>
+/* MOBILE (par défaut) : layout compact mono-colonne */
 .combat-draw-area {
-  display: grid;
-  grid-template-columns: minmax(180px, 1.1fr) minmax(240px, 1.5fr) minmax(180px, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  align-items: stretch;
   padding: 12px;
   border: 1px solid rgba(240, 168, 78, 0.35);
   background: linear-gradient(135deg, rgba(24, 29, 35, 0.98), rgba(15, 19, 23, 0.94));
@@ -97,16 +97,31 @@ const bonusRows = computed(() => props.bonuses ?? [])
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
 }
 
+/* TABLETTE ET DESKTOP (min-width: 768px) : layout 3 colonnes */
+@media (min-width: 768px) {
+  .combat-draw-area {
+    display: grid;
+    grid-template-columns: 25% 1fr 25%;
+    gap: 16px;
+    align-items: start;
+  }
+}
+
 .draw-card-panel,
 .draw-stats-panel,
 .draw-bonus-panel {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
   border: 1px solid rgba(255,255,255,0.08);
   background: rgba(255,255,255,0.02);
   border-radius: 12px;
-  padding: 10px;
+  padding: 12px;
+  min-height: auto;
+  overflow: hidden;
+}
+
+.draw-card-panel {
   min-height: 160px;
 }
 
@@ -114,7 +129,7 @@ const bonusRows = computed(() => props.bonuses ?? [])
   display: grid;
   place-items: center;
   width: 100%;
-  min-height: 112px;
+  min-height: 100px;
   border-radius: 12px;
   overflow: hidden;
   background: rgba(0, 0, 0, 0.25);
@@ -137,6 +152,7 @@ const bonusRows = computed(() => props.bonuses ?? [])
 .draw-card-copy strong {
   font-size: 0.95rem;
   line-height: 1.2;
+  word-break: break-word;
 }
 
 .draw-card-placeholder {
@@ -146,7 +162,7 @@ const bonusRows = computed(() => props.bonuses ?? [])
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--text-muted);
-  min-height: 140px;
+  min-height: 120px;
 }
 
 .panel-header {
@@ -163,8 +179,14 @@ const bonusRows = computed(() => props.bonuses ?? [])
 .draw-stat-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 10px;
+  gap: 6px 8px;
   margin: 0;
+}
+
+@media (min-width: 768px) {
+  .draw-stat-list {
+    grid-template-columns: 1fr;
+  }
 }
 
 .draw-stat-row {
@@ -172,24 +194,27 @@ const bonusRows = computed(() => props.bonuses ?? [])
   justify-content: space-between;
   gap: 8px;
   border-bottom: 1px solid rgba(255,255,255,0.06);
-  padding-bottom: 5px;
+  padding-bottom: 4px;
 }
 
 .draw-stat-row dt {
   color: var(--text-muted);
-  font-size: 0.72rem;
+  font-size: 0.70rem;
+  flex-shrink: 0;
 }
 
 .draw-stat-row dd {
   margin: 0;
   font-weight: 700;
-  font-size: 0.82rem;
+  font-size: 0.75rem;
+  text-align: right;
+  flex-shrink: 0;
 }
 
 .draw-bonus-list {
   list-style: none;
   display: grid;
-  gap: 8px;
+  gap: 6px;
   padding: 0;
   margin: 0;
 }

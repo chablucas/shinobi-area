@@ -294,18 +294,25 @@ type DrawCardLike = Pick<Card, 'name' | 'imageUrl' | 'clans' | 'traits'> & {
 function drawStatsFor(card: DrawCardLike | null) {
   if (!card) return []
   const statsMap = card.stats ?? {}
-  const stats = [
+  const allStats = [
     ['Chakra', statsMap.chakra ?? 0],
     ['IQ', statsMap.iq ?? 0],
-    ['Ninjutsu', statsMap.ninjutsuAttack ?? 0],
+    ['Ninjutsu ATQ', statsMap.ninjutsuAttack ?? 0],
+    ['Ninjutsu DEF', statsMap.ninjutsuDefense ?? 0],
     ['Genjutsu', statsMap.genjutsu ?? 0],
     ['Taijutsu', statsMap.taijutsu ?? 0],
     ['Body', statsMap.body ?? 0],
+    ['Fūinjutsu', statsMap.fuinjutsu ?? 0],
+    ['Senjutsu', statsMap.senjutsu ?? 0],
+    ['Kenjutsu', statsMap.kenjutsu ?? 0],
     ['Vitesse', statsMap.speed ?? 0],
     ['Kekkei Genkai', statsMap.kekkeiGenkai ?? 0],
     ['Kekkei Mōra', statsMap.kekkeiMora ?? 0],
+    ['Avatar', statsMap.avatar ?? 0],
+    ['Invocation', statsMap.invocation ?? 0],
+    ['Sensoriel', statsMap.sensory ?? 0],
   ] as Array<[string, number]>
-  return stats.filter(([, value]) => Number(value) > 0).map(([label, value]) => ({ label, value: Number(value).toFixed(0) }))
+  return allStats.filter(([, value]) => Number(value) > 0).map(([label, value]) => ({ label, value: Number(value).toFixed(0) }))
 }
 
 function drawBonusesFor(card: DrawCardLike | null) {
@@ -512,6 +519,30 @@ function drawBonusesFor(card: DrawCardLike | null) {
 
       <!-- Phase 1: Construction des Shinobis (Local / Solo / 1v1v1) -->
       <template v-if="!props.lobbyId && phase === 'construction'">
+        <!-- BLOC PIOCHE GLOBAL (Desktop/Tablette: au-dessus des decks) -->
+        <div v-if="phase === 'construction'" class="global-draw-container">
+          <CombatDrawArea
+            :card="pendingCard"
+            title="Carte piochée"
+            :show-button="!pendingCard"
+            :button-disabled="loading || availableCardCount === 0 || allBuildsComplete"
+            :stats="drawStatsFor(pendingCard)"
+            :bonuses="drawBonusesFor(pendingCard)"
+            :button-label="`PIOCHER UNE CARTE (J${activePlayerId})`"
+            empty-text="Aucune carte"
+            :waiting-text="pendingCard ? 'Place ta carte' : `En attente du tour de Joueur ${activePlayerId}`"
+            @draw="drawCard"
+          />
+          <button
+            v-if="lastPlacement && (lastPlacement.playerId === activePlayerId || (activePlayerId === 2 && isComputerTurn))"
+            class="undo-action-btn"
+            type="button"
+            @click="undoLastPlacement"
+          >
+            ← Annuler le coup
+          </button>
+        </div>
+
         <section class="vertical-battle-layout">
           <!-- JOUEUR 1 -->
           <article class="build-panel player-one" :class="{ 'is-active': activePlayerId === 1 }">
@@ -522,31 +553,6 @@ function drawBonusesFor(card: DrawCardLike | null) {
               </div>
               <span class="build-count">{{ filledSlotCount(builds[0]!) }} <small>/ 15</small></span>
             </header>
-
-            <!-- Pioche du Joueur 1 : AU-DESSUS de son deck -->
-            <div class="player-draw-area draw-area-top">
-              <CombatDrawArea
-                v-if="activePlayerId === 1"
-                :card="pendingCard"
-                title="Carte piochée"
-                :show-button="!pendingCard"
-                :button-disabled="loading || availableCardCount === 0 || allBuildsComplete"
-                :stats="drawStatsFor(pendingCard)"
-                :bonuses="drawBonusesFor(pendingCard)"
-                button-label="PIOCHER UNE CARTE (J1)"
-                empty-text="Aucune carte"
-                :waiting-text="pendingCard ? 'Place ta carte' : 'En attente du tour de Joueur 1'"
-                @draw="drawCard"
-              />
-              <button
-                v-if="lastPlacement && lastPlacement.playerId === 1"
-                class="undo-action-btn"
-                type="button"
-                @click="undoLastPlacement"
-              >
-                ← Annuler le coup
-              </button>
-            </div>
 
             <!-- Grille des 15 cartes Joueur 1 -->
             <div class="category-grid">
@@ -652,34 +658,6 @@ function drawBonusesFor(card: DrawCardLike | null) {
                 </template>
               </button>
             </div>
-
-            <!-- Pioche du Joueur 2 : EN DESSOUS de son deck -->
-            <div class="player-draw-area draw-area-bottom">
-              <CombatDrawArea
-                v-if="activePlayerId === 2 && !isComputerTurn"
-                :card="pendingCard"
-                title="Carte piochée"
-                :show-button="!pendingCard"
-                :button-disabled="loading || availableCardCount === 0 || allBuildsComplete"
-                :stats="drawStatsFor(pendingCard)"
-                :bonuses="drawBonusesFor(pendingCard)"
-                button-label="PIOCHER UNE CARTE (J2)"
-                empty-text="Aucune carte"
-                :waiting-text="pendingCard ? 'Place ta carte' : isComputerTurn ? 'Ordinateur...' : 'En attente du tour de Joueur 2'"
-                @draw="drawCard"
-              />
-              <div v-else-if="isComputerTurn" class="ai-thinking-badge">
-                <span>L'ordinateur réfléchit et place son shinobi...</span>
-              </div>
-              <button
-                v-if="lastPlacement && lastPlacement.playerId === 2"
-                class="undo-action-btn"
-                type="button"
-                @click="undoLastPlacement"
-              >
-                ← Annuler le coup
-              </button>
-            </div>
           </article>
 
           <!-- JOUEUR 3 (si mode 1v1v1) -->
@@ -729,31 +707,6 @@ function drawBonusesFor(card: DrawCardLike | null) {
                   <span class="slot-empty">Libre</span>
                   <span class="slot-state">{{ activePlayerId === 3 && pendingCard ? 'Placer ici' : 'En attente' }}</span>
                 </template>
-              </button>
-            </div>
-
-            <!-- Pioche du Joueur 3 : EN DESSOUS de son deck -->
-            <div class="player-draw-area draw-area-bottom">
-              <CombatDrawArea
-                v-if="activePlayerId === 3"
-                :card="pendingCard"
-                title="Carte piochée"
-                :show-button="!pendingCard"
-                :button-disabled="loading || availableCardCount === 0 || allBuildsComplete"
-                :stats="drawStatsFor(pendingCard)"
-                :bonuses="drawBonusesFor(pendingCard)"
-                button-label="PIOCHER UNE CARTE (J3)"
-                empty-text="Aucune carte"
-                :waiting-text="pendingCard ? 'Place ta carte' : 'En attente du tour de Joueur 3'"
-                @draw="drawCard"
-              />
-              <button
-                v-if="lastPlacement && lastPlacement.playerId === 3"
-                class="undo-action-btn"
-                type="button"
-                @click="undoLastPlacement"
-              >
-                ← Annuler le coup
               </button>
             </div>
           </article>
@@ -1002,6 +955,21 @@ function drawBonusesFor(card: DrawCardLike | null) {
   box-shadow: 0 0 12px rgba(84, 196, 255, 0.8);
 }
 
+/* Global Draw Container - Bloc pioche indépendant */
+.global-draw-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 20px 0 0 0;
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .global-draw-container {
+    margin: 30px 0 0 0;
+  }
+}
+
 /* Vertical Battle Layout (Mobile & Tablet & Desktop responsive) */
 .vertical-battle-layout {
   display: flex;
@@ -1009,6 +977,23 @@ function drawBonusesFor(card: DrawCardLike | null) {
   gap: 20px;
   padding-bottom: 70px;
   margin-top: 10px;
+}
+
+@media (min-width: 1024px) {
+  .vertical-battle-layout {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .vertical-battle-layout > .player-one {
+    flex: 1 1 calc(50% - 10px);
+    margin-right: 0;
+  }
+
+  .vertical-battle-layout > .player-two {
+    flex: 1 1 calc(50% - 10px);
+    margin-left: 0;
+  }
 }
 
 .build-panel {
@@ -1067,32 +1052,6 @@ function drawBonusesFor(card: DrawCardLike | null) {
 .build-count small {
   color: var(--text-muted);
   font-size: 0.58rem;
-}
-
-/* Zone de pioche intégrée par joueur */
-.player-draw-area {
-  padding: 12px;
-  margin: 12px 0;
-  border: 1px dashed rgba(241, 212, 141, 0.4);
-  background: rgba(12, 15, 20, 0.65);
-  clip-path: var(--clip-soft);
-}
-
-.draw-area-top {
-  margin-top: 4px;
-  margin-bottom: 14px;
-}
-
-.draw-area-bottom {
-  margin-top: 14px;
-  margin-bottom: 4px;
-}
-
-.draw-cta-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
 }
 
 .draw-action-btn {
@@ -1666,44 +1625,41 @@ function drawBonusesFor(card: DrawCardLike | null) {
 
 /* Responsive Media Queries */
 @media (min-width: 1024px) {
-  .vertical-battle-layout {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-    align-items: start;
-    gap: 24px;
+  .global-draw-container {
+    width: 100%;
+    max-width: 100%;
   }
 
-  .battle-center-arena {
-    grid-column: 1 / -1;
-  }
-}
-
-@media (min-width: 601px) and (max-width: 1023px) {
   .vertical-battle-layout {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
-    gap: 18px;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 20px;
   }
 
   .vertical-battle-layout > .player-one {
-    grid-column: 1;
-    grid-row: 1;
+    flex: 1 1 calc(50% - 10px);
   }
 
   .vertical-battle-layout > .player-two {
-    grid-column: 2;
-    grid-row: 1;
+    flex: 1 1 calc(50% - 10px);
   }
 
-  .vertical-battle-layout > .battle-center-arena {
-    grid-column: 1 / -1;
-    grid-row: 2;
+  .battle-center-arena {
+    flex: 0 0 100%;
+    order: -1;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .global-draw-container {
+    width: 100%;
   }
 
-  .vertical-battle-layout > .player-three {
-    grid-column: 1 / -1;
-    grid-row: 3;
+  .vertical-battle-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
   }
 
   .category-grid {
@@ -1711,22 +1667,7 @@ function drawBonusesFor(card: DrawCardLike | null) {
   }
 }
 
-@media (max-width: 900px) {
-  .category-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .realtime-boards {
-    grid-template-columns: 1fr;
-  }
-
-  .combat-builds,
-  .result-builds {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 580px) {
+@media (max-width: 767px) {
   .category-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1751,6 +1692,17 @@ function drawBonusesFor(card: DrawCardLike | null) {
   .result-actions button,
   .result-actions a {
     width: 100%;
+  }
+}
+
+@media (max-width: 900px) {
+  .realtime-boards {
+    grid-template-columns: 1fr;
+  }
+
+  .combat-builds,
+  .result-builds {
+    grid-template-columns: 1fr;
   }
 }
 </style>
