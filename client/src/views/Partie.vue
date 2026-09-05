@@ -224,7 +224,7 @@ function manualResult(): CombatResult {
     finalStats.clan = 0
     return { baseStats: { ...finalStats }, finalStats, total: Object.entries(finalStats).filter(([key]) => key !== 'clan').reduce((total, [, value]) => total + value, 0), appliedRules: [], permissions: { sharingan: false, rinnegan: false, byakugan: false, tenseigan: false, otsutsuki: false, uzumaki: false }, validationErrors: [] }
   })
-  return { resolutionMode: 'manual', winner: 'draw', player1: results[0]!, player2: results[1]!, player1Total: results[0]!.total, player2Total: results[1]!.total }
+  return { resolutionMode: 'manual', winner: 'draw', player1: results[0]!, player2: results[1]!, player1Total: results[0]!.total, player2Total: results[1]!.total, scores: { player1: 0, player2: 0 }, categories: [] }
 }
 
 function chooseManualWinner(winner: 'player1' | 'player2' | 'draw') {

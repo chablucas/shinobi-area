@@ -5,10 +5,10 @@ export class CombatApiError extends Error {
   constructor(message: string, public readonly result?: CombatResult) { super(message); this.name = 'CombatApiError' }
 }
 
-export async function simulateFight(player1: CombatComposition, player2: CombatComposition): Promise<CombatResult> {
+export async function simulateFight(player1: CombatComposition, player2: CombatComposition, player3?: CombatComposition): Promise<CombatResult> {
   let response: Response
   try {
-    response = await fetch(`${API_BASE_URL}/game/simulate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player1, player2 }) })
+    response = await fetch(`${API_BASE_URL}/game/simulate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player1, player2, ...(player3 ? { player3 } : {}) }) })
   } catch {
     throw new CombatApiError('Le serveur de combat est indisponible.')
   }

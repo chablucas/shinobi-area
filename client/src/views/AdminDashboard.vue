@@ -17,6 +17,7 @@ const error = ref('')
 const uniqueRarities = computed(() => [...new Set(cards.value.map((card) => card.rarity))].sort())
 
 onMounted(async () => {
+  await auth.loadCurrentUser()
   if (!auth.token || auth.user?.role !== 'ADMIN') {
     await router.replace('/personnages')
     return

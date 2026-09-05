@@ -38,8 +38,7 @@ const currentCandidates = computed(() => {
 })
 
 const simulatorReady = computed(() => {
-  if (playerCount.value === 3) return false
-  return CATEGORY_DEFINITIONS.every(([, slug]) => buildOne.value.slots[slug] && buildTwo.value.slots[slug])
+  return selectedBuilds.value.every((build) => CATEGORY_DEFINITIONS.every(([, slug]) => build.slots[slug]))
 })
 
 onMounted(async () => {
@@ -87,7 +86,7 @@ function compositionFor(build: PlayerBuild) {
 async function runSimulation() {
   if (!simulatorReady.value) return
   try {
-    result.value = await simulateFight(compositionFor(buildOne.value), compositionFor(buildTwo.value))
+    result.value = await simulateFight(compositionFor(buildOne.value), compositionFor(buildTwo.value), playerCount.value === 3 ? compositionFor(buildThree.value) : undefined)
     error.value = ''
   } catch (exception) {
     error.value = exception instanceof Error ? exception.message : 'La simulation a échoué.'
@@ -114,7 +113,7 @@ function replay() {
         </div>
         <div class="mode-toggle" aria-label="Mode de simulation">
           <button type="button" :class="{ active: playerCount === 2 }" @click="playerCount = 2">1v1</button>
-          <button type="button" :class="{ active: playerCount === 3 }" @click="playerCount = 3" :disabled="true">1v1v1 · non supporté</button>
+          <button type="button" :class="{ active: playerCount === 3 }" @click="playerCount = 3">1v1v1</button>
         </div>
       </header>
 
@@ -168,20 +167,34 @@ function replay() {
 
         <section v-if="result" class="result-panel">
           <p class="eyebrow">Résultat</p>
-          <h2>
-            {{ result.winner === 'draw' ? 'Égalité' : `Vainqueur : Joueur ${result.winner === 'player1' ? 1 : 2}` }}
-          </h2>
+          <h2>{{ result.winner === 'draw' ? 'Égalité' : `Vainqueur : Joueur ${result.winner === 'player1' ? 1 : result.winner === 'player2' ? 2 : 3}` }}</h2>
           <div class="scoreboard">
             <article>
               <h3>Joueur 1</h3>
-              <strong>{{ result.player1.total }}</strong>
-              <span>{{ result.player1.validationErrors.length ? 'Erreurs de validation' : 'Total' }}</span>
+              <strong>{{ result.scores.player1 }} pt</strong>
+              <span>{{ result.player1.validationErrors.length ? 'Erreurs de validation' : 'Score par catégorie' }}</span>
             </article>
             <div class="versus">VS</div>
             <article>
               <h3>Joueur 2</h3>
-              <strong>{{ result.player2.total }}</strong>
-              <span>{{ result.player2.validationErrors.length ? 'Erreurs de validation' : 'Total' }}</span>
+              <strong>{{ result.scores.player2 }} pt</strong>
+              <span>{{ result.player2.validationErrors.length ? 'Erreurs de validation' : 'Score par catégorie' }}</span>
+            </article>
+            <article v-if="result.player3">
+              <h3>Joueur 3</h3>
+              <strong>{{ result.scores.player3 ?? 0 }} pt</strong>
+              <span>{{ result.player3.validationErrors.length ? 'Erreurs de validation' : 'Score par catégorie' }}</span>
+            </article>
+          </div>
+
+          <div class="category-results">
+            <h3>Résultats par catégorie</h3>
+            <article v-for="category in result.categories" :key="category.category">
+              <strong>{{ category.category }}</strong>
+              <span>J1 : {{ category.player1.card }} · {{ category.player1.value }}</span>
+              <span>J2 : {{ category.player2.card }} · {{ category.player2.value }}</span>
+              <span v-if="category.player3">J3 : {{ category.player3.card }} · {{ category.player3.value }}</span>
+              <b>{{ category.winner === 'draw' ? 'Égalité' : `Gagnant : Joueur ${category.winner === 'player1' ? 1 : category.winner === 'player2' ? 2 : 3}` }}</b>
             </article>
           </div>
 
@@ -202,7 +215,7 @@ function replay() {
         <header>
           <div>
             <p class="eyebrow">Choisir une carte</p>
-            <h3>{{ activeSelection.playerId === 1 ? 'Joueur 1' : 'Joueur 2' }} · {{ slotLabel(activeSelection.category) }}</h3>
+            <h3>Joueur {{ activeSelection.playerId }} · {{ slotLabel(activeSelection.category) }}</h3>
           </div>
           <button type="button" class="close-button" @click="activeSelection = null">Fermer</button>
         </header>
