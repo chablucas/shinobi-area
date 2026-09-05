@@ -2348,7 +2348,6 @@
             "field": "card.slug",
             "operator": "IN",
             "value": [
-              "tenten",
               "tenten-rikudo"
             ]
           }

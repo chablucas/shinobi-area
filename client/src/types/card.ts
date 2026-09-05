@@ -20,6 +20,10 @@ export type Card = {
   stats: Record<string, number | null>
   baseStats: Record<string, number>
   effectiveStats: Record<string, number>
+  powerIds: string[]
+  physicalTraitIds: string[]
+  transformationIds: string[]
+  avatars: Array<{ id: string; type: string; name: string }>
   traits?: CardTraits | null
   baseRarity: string
   effectiveRarity: string
@@ -27,6 +31,23 @@ export type Card = {
   modifiers: CardModifier[]
   hasStatOverrides: boolean
   hasRarityOverride: boolean
+  catalog?: {
+    powerCatalog: Record<string, { label: string }>
+    physicalTraitCatalog: Record<string, { label: string }>
+    transformationCatalog: Record<string, { label: string }>
+    clanCatalog: string[]
+    cardCatalog: Array<{ id: number; slug: string; name: string }>
+  }
+  relatedRules?: Array<{
+    id: string
+    name: string
+    enabled: boolean
+    phase: string
+    priority: number
+    active: boolean
+    conditionsSummary: string
+    effectsSummary: string
+  }>
 }
 
 export type CardModifier = {
