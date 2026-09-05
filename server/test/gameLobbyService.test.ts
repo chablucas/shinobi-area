@@ -138,3 +138,84 @@ test('start READY crée une Game unique liée au salon et autorise l’invité �
     await prisma.user.deleteMany({ where: { id: { in: users.map((user) => user.id) } } })
   }
 })
+
+test('l’invité Team Auction 1v1 accepte et rejoint le salon existant avec le bon mode', async () => {
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const users = await prisma.user.createManyAndReturn({
+    data: [
+      { email: `ta-join-a-${suffix}@example.test`, passwordHash: 'test', displayName: `TA Join A ${suffix}` },
+      { email: `ta-join-b-${suffix}@example.test`, passwordHash: 'test', displayName: `TA Join B ${suffix}` },
+    ],
+    select: { id: true },
+  })
+  const [creator, guest] = users
+
+  try {
+    const lobby = await createGameLobby(creator!.id, 'team-1v1', [guest!.id])
+    assert.ok(lobby!.id.startsWith('ta_'))
+    assert.equal(lobby!.mode, 'team-1v1')
+
+    const received = await listGameInvites(guest!.id)
+    assert.equal(received.length, 1)
+    assert.equal(received[0]!.mode, 'team-1v1')
+    assert.equal(received[0]!.lobbyId, lobby!.id)
+    assert.equal(received[0]!.status, 'PENDING')
+
+    // Rejoindre = accepter via le service existant, qui renvoie le lobby (gameId + mode)
+    const joined = await acceptGameInvite(guest!.id, received[0]!.id)
+    assert.equal(joined!.id, lobby!.id)
+    assert.equal(joined!.mode, 'team-1v1')
+    assert.equal(joined!.status, 'READY')
+    assert.equal(joined!.playerCount, 2)
+    assert.equal(joined!.canStart, true)
+
+    // L'invitation n'est plus en attente; l'invité accède toujours au même salon
+    assert.equal((await listGameInvites(guest!.id)).length, 0)
+    const reloaded = await getGameLobby(guest!.id, lobby!.id)
+    assert.equal(reloaded!.id, lobby!.id)
+    assert.equal(reloaded!.players.find((player) => player.id === guest!.id)?.status, 'ACCEPTED')
+  } finally {
+    await prisma.user.deleteMany({ where: { id: { in: users.map((user) => user.id) } } })
+  }
+})
+
+test('les deux invités Team Auction 1v1v1 rejoignent exactement le même salon', async () => {
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const users = await prisma.user.createManyAndReturn({
+    data: [
+      { email: `ta3-join-a-${suffix}@example.test`, passwordHash: 'test', displayName: `TA3 Join A ${suffix}` },
+      { email: `ta3-join-b-${suffix}@example.test`, passwordHash: 'test', displayName: `TA3 Join B ${suffix}` },
+      { email: `ta3-join-c-${suffix}@example.test`, passwordHash: 'test', displayName: `TA3 Join C ${suffix}` },
+    ],
+    select: { id: true },
+  })
+  const [creator, guestB, guestC] = users
+
+  try {
+    const lobby = await createGameLobby(creator!.id, 'team-1v1v1', [guestB!.id, guestC!.id])
+    assert.equal(lobby!.mode, 'team-1v1v1')
+    assert.equal(lobby!.expectedPlayers, 3)
+
+    const invitesB = await listGameInvites(guestB!.id)
+    const invitesC = await listGameInvites(guestC!.id)
+    assert.equal(invitesB.length, 1)
+    assert.equal(invitesC.length, 1)
+    assert.equal(invitesB[0]!.lobbyId, invitesC[0]!.lobbyId)
+
+    // Chaque invité accepte sa propre invitation: aucun nouveau salon n'est créé
+    const joinedB = await acceptGameInvite(guestB!.id, invitesB[0]!.id)
+    assert.equal(joinedB!.id, lobby!.id)
+    assert.equal(joinedB!.status, 'WAITING')
+    assert.equal(joinedB!.canStart, false)
+    assert.equal((await prisma.gameLobby.count({ where: { creatorId: creator!.id, id: { startsWith: 'ta_' } } })), 1)
+
+    const joinedC = await acceptGameInvite(guestC!.id, invitesC[0]!.id)
+    assert.equal(joinedC!.id, lobby!.id)
+    assert.equal(joinedC!.id, joinedB!.id)
+    assert.equal(joinedC!.playerCount, 3)
+    assert.equal(joinedC!.canStart, true)
+    assert.equal((await prisma.gameLobby.count({ where: { creatorId: creator!.id, id: { startsWith: 'ta_' } } })), 1)
+  } finally {
+    await prisma.user.deleteMany({ where: { id: { in: users.map((user) => user.id) } } })
+  }
+})

@@ -27,6 +27,8 @@ const open = ref(false)
 const notificationsOpen = ref(false)
 const sidebarOpen = ref(false)
 const loading = ref(false)
+const joiningInviteIds = ref<string[]>([])
+const inviteJoinErrors = ref<Record<string, string>>({})
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 let notificationTimer: ReturnType<typeof setTimeout> | undefined
 let notificationRefreshInFlight = false
@@ -103,20 +105,41 @@ function publicProfile(id: number) { open.value = false; void router.push(`/prof
 async function addFriend(id: number) { if (!auth.token) return; await sendFriendRequest(auth.token, id); const player = results.value.players.find((item) => item.id === id); if (player) { player.friendshipStatus = 'PENDING'; player.friendshipDirection = 'sent' } }
 async function acceptSearchRequest(player: SearchResult['players'][number]) { if (!auth.token || !player.friendshipRequestId) return; await acceptFriendRequest(auth.token, player.friendshipRequestId); player.friendshipStatus = 'ACCEPTED'; player.friendshipDirection = null }
 async function answer(request: FriendRequest, accepted: boolean) { if (!auth.token) return; requests.value = requests.value.filter((item) => item.id !== request.id); try { if (accepted) await acceptFriendRequest(auth.token, request.id); else await rejectFriendRequest(auth.token, request.id) } finally { await refreshNotifications() } }
-async function answerGameInvite(invite: GameInvite, accepted: boolean) {
-  if (!auth.token) return
-  gameInvites.value = gameInvites.value.filter((item) => item.id !== invite.id)
+function isTeamInvite(invite: GameInvite) { return invite.mode === 'team-1v1' || invite.mode === 'team-1v1v1' }
+function teamAuctionRoute(lobbyMode: string, lobbyId: string) {
+  const taMode = lobbyMode === 'team-1v1' ? '1v1-real' : '1v1v1-real'
+  return { path: '/team-game', query: { mode: taMode, gameId: lobbyId } }
+}
+async function joinGameInvite(invite: GameInvite) {
+  if (!auth.token || joiningInviteIds.value.includes(invite.id)) return
+  joiningInviteIds.value = [...joiningInviteIds.value, invite.id]
+  inviteJoinErrors.value = { ...inviteJoinErrors.value, [invite.id]: '' }
   try {
-    const lobby = accepted ? await acceptGameInvite(auth.token, invite.id) : await rejectGameInvite(auth.token, invite.id)
-    if (accepted) {
-      if (invite.mode.startsWith('team-')) {
-        const taMode = invite.mode === 'team-1v1' ? '1v1-real' : '1v1v1-real'
-        void router.push({ path: '/team-game', query: { mode: taMode, gameId: lobby.id } })
-      } else {
-        void router.push(`/lobby/${lobby.id}`)
-      }
+    const lobby = await acceptGameInvite(auth.token, invite.id)
+    gameInvites.value = gameInvites.value.filter((item) => item.id !== invite.id)
+    if (isTeamInvite(invite)) {
+      await router.push(teamAuctionRoute(lobby.mode, lobby.id))
+    } else {
+      await router.push(`/lobby/${lobby.id}`)
     }
+  } catch (error) {
+    inviteJoinErrors.value = { ...inviteJoinErrors.value, [invite.id]: error instanceof Error ? error.message : 'Impossible de rejoindre ce salon.' }
   } finally {
+    joiningInviteIds.value = joiningInviteIds.value.filter((id) => id !== invite.id)
+    await refreshNotifications()
+  }
+}
+async function declineGameInvite(invite: GameInvite) {
+  if (!auth.token || joiningInviteIds.value.includes(invite.id)) return
+  joiningInviteIds.value = [...joiningInviteIds.value, invite.id]
+  inviteJoinErrors.value = { ...inviteJoinErrors.value, [invite.id]: '' }
+  try {
+    await rejectGameInvite(auth.token, invite.id)
+    gameInvites.value = gameInvites.value.filter((item) => item.id !== invite.id)
+  } catch (error) {
+    inviteJoinErrors.value = { ...inviteJoinErrors.value, [invite.id]: error instanceof Error ? error.message : 'Impossible de refuser cette invitation.' }
+  } finally {
+    joiningInviteIds.value = joiningInviteIds.value.filter((id) => id !== invite.id)
     await refreshNotifications()
   }
 }
@@ -247,9 +270,22 @@ function statusLabel(player: SearchResult['players'][number]) { if (player.frien
           <b>{{ invite.creator.displayName }}</b> vous défie en {{ invite.mode === 'team-1v1' ? 'Team Auction 1v1' : invite.mode === 'team-1v1v1' ? 'Team Auction 1v1v1' : invite.mode }}
         </span>
         <div class="notif-actions">
-          <button type="button" class="btn-accept" @click="answerGameInvite(invite, true)">ACCEPTER</button>
-          <button type="button" class="btn-reject" @click="answerGameInvite(invite, false)">REFUSER</button>
+          <button
+            type="button"
+            class="btn-accept"
+            :disabled="joiningInviteIds.includes(invite.id)"
+            @click="joinGameInvite(invite)"
+          >
+            {{ joiningInviteIds.includes(invite.id) ? 'Connexion au salon...' : isTeamInvite(invite) ? 'REJOINDRE' : 'ACCEPTER' }}
+          </button>
+          <button
+            type="button"
+            class="btn-reject"
+            :disabled="joiningInviteIds.includes(invite.id)"
+            @click="declineGameInvite(invite)"
+          >REFUSER</button>
         </div>
+        <p v-if="inviteJoinErrors[invite.id]" class="notif-error">{{ inviteJoinErrors[invite.id] }}</p>
       </article>
     </div>
 
@@ -558,6 +594,18 @@ function statusLabel(player: SearchResult['players'][number]) { if (player.frien
 .btn-reject {
   background: rgba(255, 91, 91, 0.2);
   color: var(--accent-red);
+}
+
+.btn-accept:disabled,
+.btn-reject:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.notif-error {
+  font-size: 0.56rem;
+  color: var(--accent-red);
+  margin: 4px 0 0;
 }
 
 .social-muted {
