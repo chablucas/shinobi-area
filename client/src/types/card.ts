@@ -29,7 +29,20 @@ export type Card = {
   hasRarityOverride: boolean
 }
 
-export type CardModifier = { id: number; name: string; description: string; target: string; direction: 'BONUS' | 'MALUS'; operation: 'PERCENT' | 'POINTS'; value: number; condition: string | null; active: boolean }
+export type CardModifier = {
+  id: number
+  name: string
+  description: string
+  target: string
+  categories: string[]
+  direction: 'BONUS' | 'MALUS'
+  operation: 'PERCENT' | 'POINTS'
+  value: number
+  condition: string | null
+  conditionType: string | null
+  conditionValue: string | null
+  active: boolean
+}
 
 export type Category = {
   slug: string

@@ -113,8 +113,10 @@ function statusLabel(player: SearchResult['players'][number]) { if (player.frien
     <div class="header-links desktop-only">
       <a href="/personnages">Cartes</a>
       <a href="/jouer">Créer</a>
+      <a href="/simulation">Simulation</a>
       <a href="/partie">Combat</a>
       <a href="/regles">Règles</a>
+      <a v-if="auth.user?.role === 'ADMIN'" href="/admin">Admin</a>
     </div>
 
     <div v-if="auth.isAuthenticated" class="global-search">

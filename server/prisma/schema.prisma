@@ -238,17 +238,20 @@ model CardRarityOverride {
 }
 
 model CardModifier {
-  id          Int                     @id @default(autoincrement())
-  cardSlug    String
-  name        String
-  description String
-  target      CardModifierTarget
-  direction   CardModifierDirection
-  operation   CardModifierOperation
-  value       Int
-  condition   String?
-  active      Boolean                 @default(true)
-  createdAt   DateTime                @default(now())
-  updatedAt   DateTime                @updatedAt
+  id            Int                     @id @default(autoincrement())
+  cardSlug      String
+  name          String
+  description   String
+  target        CardModifierTarget
+  categories    String[]                @default([])
+  direction     CardModifierDirection
+  operation     CardModifierOperation
+  value         Int
+  condition     String?
+  conditionType String?
+  conditionValue String?
+  active        Boolean                 @default(true)
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
   @@index([cardSlug])
 }

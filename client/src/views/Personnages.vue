@@ -72,10 +72,13 @@ const modifierForm = ref({
   name: '',
   description: '',
   target: 'chakra',
+  categories: [] as string[],
   direction: 'BONUS' as CardModifier['direction'],
   operation: 'PERCENT' as CardModifier['operation'],
   value: 10,
   condition: '',
+  conditionType: 'always',
+  conditionValue: '',
   active: true,
 })
 const editingModifier = ref<number | null>(null)
@@ -155,7 +158,13 @@ async function addModifier() {
     !modifierForm.value.description.trim()
   )
     return
-  const payload = { ...modifierForm.value, condition: modifierForm.value.condition || null }
+  const payload = {
+    ...modifierForm.value,
+    categories: modifierForm.value.categories,
+    condition: modifierForm.value.condition || null,
+    conditionType: modifierForm.value.conditionType || null,
+    conditionValue: modifierForm.value.conditionValue || null,
+  }
   if (editingModifier.value) await updateCardModifier(auth.token, editingModifier.value, payload)
   else await createCardModifier(auth.token, selected.value.slug, payload)
   selected.value = await fetchAdminCard(auth.token, selected.value.slug)
@@ -169,10 +178,13 @@ function editModifier(modifier: CardModifier) {
     name: modifier.name,
     description: modifier.description,
     target: modifier.target,
+    categories: modifier.categories ?? [],
     direction: modifier.direction,
     operation: modifier.operation,
     value: modifier.value,
     condition: modifier.condition ?? '',
+    conditionType: modifier.conditionType ?? 'always',
+    conditionValue: modifier.conditionValue ?? '',
     active: modifier.active,
   }
 }
@@ -508,7 +520,7 @@ function modifierText(modifier: CardModifier) {
 }
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 4px 10px;
   padding: 8px 0;
   border-top: 1px solid var(--border-light);
@@ -517,16 +529,19 @@ function modifierText(modifier: CardModifier) {
 .stats-grid > span {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: baseline;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
   color: var(--text-muted);
   font-size: 9px;
   line-height: 1.25;
+  white-space: nowrap;
 }
 .stats-grid > span > span {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .stats-grid strong {
   flex: 0 0 auto;
@@ -534,6 +549,7 @@ function modifierText(modifier: CardModifier) {
   font-size: 9px;
   font-weight: 700;
   white-space: nowrap;
+  text-align: right;
 }
 .edit-button,
 .admin-panel button {

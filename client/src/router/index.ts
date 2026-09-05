@@ -10,6 +10,10 @@ import CarteDetail from '../views/CarteDetail.vue'
 import Lobby from '../views/Lobby.vue'
 import Personnages from '../views/Personnages.vue'
 import Regles from '../views/Regles.vue'
+import AdminDashboard from '../views/AdminDashboard.vue'
+import AdminCardEdit from '../views/AdminCardEdit.vue'
+import Simulation from '../views/Simulation.vue'
+import { useAuthStore } from '../stores/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -29,7 +33,34 @@ const router = createRouter({
     { path: '/lobby/:id', component: Lobby },
     { path: '/personnages', component: Personnages },
     { path: '/regles', component: Regles },
+    { path: '/simulation', component: Simulation },
+    {
+      path: '/admin',
+      component: AdminDashboard,
+      meta: { requiresAdmin: true },
+    },
+    {
+      path: '/admin/cards/:slug',
+      component: AdminCardEdit,
+      meta: { requiresAdmin: true },
+    },
   ],
+})
+
+router.beforeEach(async (to, _from, next) => {
+  if (!to.meta.requiresAdmin) {
+    next()
+    return
+  }
+
+  const auth = useAuthStore()
+  await auth.loadCurrentUser()
+  if (auth.user?.role === 'ADMIN') {
+    next()
+    return
+  }
+
+  next('/personnages')
 })
 
 export default router
