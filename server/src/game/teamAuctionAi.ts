@@ -86,7 +86,7 @@ export function teamAuctionAiDecision(game: TeamAuctionGame, playerId: TeamAucti
     return { action: 'pass' as const }
   }
 
-  if (isWeak && game.currentBid > 0) return { action: 'pass' as const }
+  if (isWeak) return { action: 'pass' as const }
 
   if (isElite && cardsStillNeeded <= 2 && placementImpact >= 15 && player.budget <= Math.max(aiMaxBid, spendableBudget)) {
     return { action: 'allin' as const }

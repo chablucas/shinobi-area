@@ -138,13 +138,10 @@ test('bid, pass, placement, diffusion et résultat final sur une partie 1v1 rée
       const gameId = createResponse.gameId!
       await ack(socketB, 'team-auction:join', gameId)
 
-      const biddingRound1 = nextTAState(socketA, (state) => state.phase === 'BIDDING' && state.currentTurnId === 90201)
+      // A (90201) ouvre automatiquement à 10 M. Le tour est immédiatement à B (90202).
+      const biddingRound1 = nextTAState(socketA, (state) => state.phase === 'BIDDING' && state.currentBid === 10 && state.currentBidderId === 90201 && state.currentTurnId === 90202)
       socketA.emit('team-auction:start', gameId)
       await biddingRound1
-
-      const afterFirstBid = nextTAState(socketB, (state) => state.currentBid === 10 && state.currentBidderId === 90201)
-      socketA.emit('team-auction:action', { gameId, action: 'bid', amount: 10 })
-      await afterFirstBid
 
       const firstPlacement = nextTAState(socketA, (state) => state.phase === 'PLACEMENT' && state.winnerId === 90201)
       socketB.emit('team-auction:action', { gameId, action: 'pass' })
@@ -172,14 +169,16 @@ test('ALL-IN consomme le budget et attribue immédiatement la carte sans surench
       const gameId = createResponse.gameId!
       await ack(socketB, 'team-auction:join', gameId)
 
-      const biddingState = nextTAState(socketA, (state) => state.phase === 'BIDDING')
+      // A ouvre auto à 10 M. Le tour est à B.
+      const biddingState = nextTAState(socketA, (state) => state.phase === 'BIDDING' && state.currentTurnId === 90302)
       socketA.emit('team-auction:start', gameId)
       await biddingState
 
-      const placementState = nextTAState(socketB, (state) => state.phase === 'PLACEMENT' && state.currentBid === 300 && state.winnerId === 90301)
-      socketA.emit('team-auction:action', { gameId, action: 'allin' })
+      // B fait ALL-IN à 300 M. A (budget 300 M) ne peut pas faire 310 M -> B gagne immédiatement.
+      const placementState = nextTAState(socketB, (state) => state.phase === 'PLACEMENT' && state.currentBid === 300 && state.winnerId === 90302)
+      socketB.emit('team-auction:action', { gameId, action: 'allin' })
       const placed = await placementState
-      const winner = placed.players.find((player) => player.id === 90301)
+      const winner = placed.players.find((player) => player.id === 90302)
       assert.equal(winner?.budget, 0)
     } finally { socketA.disconnect(); socketB.disconnect() }
   } finally { httpServer.close() }
@@ -212,26 +211,24 @@ test('1v1v1 réel diffuse rotation, PASS et résultats à trois joueurs', async 
       await ack(socketC, 'team-auction:join', gameId)
 
       socketA.emit('team-auction:start', gameId)
-      await requestTAState(socketA, gameId, (state) => state.phase === 'BIDDING' && state.currentTurnId === 90501 && state.players.length === 3)
-
-      await actAndRequestTAState(socketA, gameId, { action: 'bid', amount: 10 }, (state) => state.currentBid === 10 && state.currentTurnId === 90502)
+      // A ouvre auto à 10 M. Le tour est à B (90502).
+      await requestTAState(socketA, gameId, (state) => state.phase === 'BIDDING' && state.currentBid === 10 && state.currentBidderId === 90501 && state.currentTurnId === 90502 && state.players.length === 3)
 
       await actAndRequestTAState(socketB, gameId, { action: 'pass' }, (state) => state.currentTurnId === 90503 && Boolean(state.players.find((player) => player.id === 90502)?.passedCurrentRound))
 
       await actAndRequestTAState(socketC, gameId, { action: 'pass' }, (state) => state.phase === 'PLACEMENT' && state.winnerId === 90501)
 
       // A a désormais son unique équipe pleine : la manche suivante n'oppose plus que B et C.
-      await actAndRequestTAState(socketA, gameId, { action: 'place', teamIndex: 0 }, (state) => state.phase === 'BIDDING' && state.currentTurnId === 90502)
+      // B ouvre auto à 10 M. Le tour est à C (90503).
+      await actAndRequestTAState(socketA, gameId, { action: 'place', teamIndex: 0 }, (state) => state.phase === 'BIDDING' && state.currentBid === 10 && state.currentBidderId === 90502 && state.currentTurnId === 90503)
 
-      await actAndRequestTAState(socketB, gameId, { action: 'pass' }, (state) => state.phase === 'BIDDING' && state.currentTurnId === 90503 && Boolean(state.players.find((player) => player.id === 90502)?.passedCurrentRound))
+      // C passe -> B remporte la carte à 10 M.
+      await actAndRequestTAState(socketC, gameId, { action: 'pass' }, (state) => state.phase === 'PLACEMENT' && state.winnerId === 90502 && state.currentBid === 10)
 
-      // C mise 10 : A (équipe pleine) est sauté de l'enchère, C gagne immédiatement.
-      await actAndRequestTAState(socketC, gameId, { action: 'bid', amount: 10 }, (state) => state.phase === 'PLACEMENT' && state.winnerId === 90503 && state.currentBidderId === 90503)
+      // A et B ont désormais leur équipe pleine : seul C peut encore recevoir la carte, attribution automatique sans enchère.
+      await actAndRequestTAState(socketB, gameId, { action: 'place', teamIndex: 0 }, (state) => state.phase === 'PLACEMENT' && state.winnerId === 90503 && state.currentBid === 0)
 
-      // A et C ont désormais leur équipe pleine : seul B peut encore recevoir la carte, attribution automatique.
-      await actAndRequestTAState(socketC, gameId, { action: 'place', teamIndex: 0 }, (state) => state.phase === 'PLACEMENT' && state.winnerId === 90502 && state.currentBid === 0)
-
-      const result = await actAndRequestTAState(socketB, gameId, { action: 'place', teamIndex: 0 }, (state) => state.phase === 'RESULTS' && (state.finalResults?.teams.length ?? 0) === 3)
+      const result = await actAndRequestTAState(socketC, gameId, { action: 'place', teamIndex: 0 }, (state) => state.phase === 'RESULTS' && (state.finalResults?.teams.length ?? 0) === 3)
       assert.equal(result.finalResults?.teams.length, 3)
       assert.ok(result.finalResults?.winnerId === null || [90501, 90502, 90503].includes(Number(result.finalResults?.winnerId)))
     } finally { socketA.disconnect(); socketB.disconnect(); socketC.disconnect() }

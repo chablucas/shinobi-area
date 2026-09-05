@@ -29,27 +29,28 @@ test('la rotation de l’ouverture suit le bon ordre', () => {
   const game = makeGame('1v1v1-real', [2, 2], 500)
   startTeamAuctionGame(game.gameId)
   drawNextTeamCard(game.gameId)
-  assert.equal(game.currentTurnId, 1)
-  submitTeamBid(game.gameId, 1, 10)
+  assert.equal(game.currentBid, 10)
+  assert.equal(game.currentBidderId, 1)
   assert.equal(game.currentTurnId, 2)
   submitTeamBid(game.gameId, 2, 20)
   assert.equal(game.currentTurnId, 3)
+  submitTeamBid(game.gameId, 3, 30)
+  assert.equal(game.currentTurnId, 1)
 })
 
-test('l’ouverture obligatoire commence à 10 M', () => {
+test('l’ouverture obligatoire commence automatiquement à 10 M pour un joueur ayant assez de budget', () => {
   const game = makeGame('1v1-ai', [2], 500)
   startTeamAuctionGame(game.gameId)
   drawNextTeamCard(game.gameId)
-  assert.equal(game.currentBid, 0)
-  submitTeamBid(game.gameId, 1, 10)
   assert.equal(game.currentBid, 10)
+  assert.equal(game.currentBidderId, 1)
+  assert.equal(game.currentTurnId, 2)
 })
 
 test('une enchère valide est acceptée', () => {
   const game = makeGame('1v1-ai', [2], 500)
   startTeamAuctionGame(game.gameId)
   drawNextTeamCard(game.gameId)
-  submitTeamBid(game.gameId, 1, 10)
   submitTeamBid(game.gameId, 2, 20)
   assert.equal(game.currentBid, 20)
 })
@@ -58,24 +59,25 @@ test('une enchère non multiple de 10 est refusée', () => {
   const game = makeGame('1v1-ai', [2], 500)
   startTeamAuctionGame(game.gameId)
   drawNextTeamCard(game.gameId)
-  assert.throws(() => submitTeamBid(game.gameId, 1, 15), /Enchère invalide/)
+  assert.throws(() => submitTeamBid(game.gameId, 2, 25), /Enchère invalide/)
 })
 
 test('une enchère supérieure au budget est refusée', () => {
   const game = makeGame('1v1-ai', [2], 100)
+  game.players[1]!.budget = 50
   startTeamAuctionGame(game.gameId)
   drawNextTeamCard(game.gameId)
-  assert.throws(() => submitTeamBid(game.gameId, 1, 120), /Enchère invalide/)
+  assert.throws(() => submitTeamBid(game.gameId, 2, 60), /Enchère invalide/)
 })
 
 test('une enchère à 500 M est résolue sans proposer 510 M au concurrent', () => {
   const game = makeGame('1v1-ai', [2], 500)
   startTeamAuctionGame(game.gameId)
   drawNextTeamCard(game.gameId)
-  submitTeamBid(game.gameId, 1, 500)
+  submitTeamBid(game.gameId, 2, 500)
   assert.equal(game.phase, 'PLACEMENT')
-  assert.equal(game.winnerId, 1)
-  assert.equal(game.players[1]!.activeCurrentRound, false)
+  assert.equal(game.winnerId, 2)
+  assert.equal(game.players[0]!.activeCurrentRound, false)
 })
 
 test('une enchère à 420 M est résolue quand le concurrent a seulement 400 M', () => {
@@ -95,14 +97,13 @@ test('une action hors tour est refusée', () => {
   const game = makeGame('1v1-ai', [2], 500)
   startTeamAuctionGame(game.gameId)
   drawNextTeamCard(game.gameId)
-  assert.throws(() => submitTeamBid(game.gameId, 2, 10), /Ce n’est pas ton tour/)
+  assert.throws(() => submitTeamBid(game.gameId, 1, 20), /Ce n’est pas ton tour/)
 })
 
 test('PASS est définitif pour la carte courante', () => {
   const game = makeGame('1v1-ai', [2], 500)
   startTeamAuctionGame(game.gameId)
   drawNextTeamCard(game.gameId)
-  submitTeamBid(game.gameId, 1, 10)
   passTeamBid(game.gameId, 2)
   assert.equal(game.players[1]!.passedCurrentRound, true)
   assert.equal(game.phase, 'PLACEMENT')
@@ -113,7 +114,6 @@ test('un joueur passé est ignoré jusqu’à la carte suivante', () => {
   const game = makeGame('1v1-ai', [2], 500)
   startTeamAuctionGame(game.gameId)
   drawNextTeamCard(game.gameId)
-  submitTeamBid(game.gameId, 1, 10)
   passTeamBid(game.gameId, 2)
   assert.equal(game.currentTurnId, 1)
   assert.equal(game.players[1]!.passedCurrentRound, true)
@@ -123,7 +123,6 @@ test('le dernier joueur actif gagne immédiatement sans surenchère', () => {
   const game = makeGame('1v1-ai', [2], 500)
   startTeamAuctionGame(game.gameId)
   drawNextTeamCard(game.gameId)
-  submitTeamBid(game.gameId, 1, 10)
   passTeamBid(game.gameId, 2)
   assert.equal(game.phase, 'PLACEMENT')
   assert.equal(game.winnerId, 1)
@@ -131,29 +130,27 @@ test('le dernier joueur actif gagne immédiatement sans surenchère', () => {
 
 test('ALL-IN est autorisé et consomme bien le budget de la dernière offre', () => {
   const game = makeGame('1v1-ai', [2], 280)
+  game.players[1]!.budget = 280
   startTeamAuctionGame(game.gameId)
   drawNextTeamCard(game.gameId)
-  allInTeamBid(game.gameId, 1)
+  allInTeamBid(game.gameId, 2)
   assert.equal(game.currentBid, 280)
-  assert.equal(game.players[0]!.budget, 0)
-  assert.equal(game.currentBidderId, 1)
+  assert.equal(game.players[1]!.budget, 0)
+  assert.equal(game.currentBidderId, 2)
 })
 
 test('ALL-IN est refusé lorsqu’il ne dépasse pas l’enchère actuelle', () => {
   const game = makeGame('1v1-ai', [2], 100)
+  game.players[1]!.budget = 10
   startTeamAuctionGame(game.gameId)
   drawNextTeamCard(game.gameId)
-  game.currentBid = 100
-  game.currentBidderId = 2
-  game.currentTurnId = 1
-  assert.throws(() => allInTeamBid(game.gameId, 1), /doit dépasser/)
+  assert.throws(() => allInTeamBid(game.gameId, 2), /doit dépasser/)
 })
 
 test('seul le prix final est débité après une série de surenchères', () => {
   const game = makeGame('1v1-real', [2], 500)
   startTeamAuctionGame(game.gameId)
   drawNextTeamCard(game.gameId)
-  submitTeamBid(game.gameId, 1, 10)
   submitTeamBid(game.gameId, 2, 30)
   submitTeamBid(game.gameId, 1, 100)
   passTeamBid(game.gameId, 2)
@@ -321,13 +318,14 @@ test('rotation des openers TEST A : elle continue même si un joueur n’a presq
   game.players[1]!.budget = 5
   startTeamAuctionGame(game.gameId)
   drawNextTeamCard(game.gameId)
-  assert.equal(game.currentTurnId, 1)
-  submitTeamBid(game.gameId, 1, 10)
+  // J1 a ouvert auto 10. J2 a 5 M (< 20 M), donc J2 ne peut pas raise -> J1 gagne immédiatement à 10
   assert.equal(game.phase, 'PLACEMENT')
   assert.equal(game.winnerId, 1)
   placeTeamCard(game.gameId, 1, 0)
   drawNextTeamCard(game.gameId)
-  assert.equal(game.currentTurnId, 2, 'le joueur à faible budget doit rester opener de la carte suivante')
+  assert.equal(game.currentBidderId, 2, 'le joueur à faible budget est l’opener de la carte suivante')
+  assert.equal(game.currentBid, 0, 'le joueur à 5 M ouvre automatiquement à 0 M')
+  assert.equal(game.currentTurnId, 1, 'le tour passe au joueur suivant')
 })
 
 test('rotation des openers TEST B : A ouvre 10, B mise 20, A incapable de 30 → B gagne immédiatement à 20', () => {
@@ -335,7 +333,8 @@ test('rotation des openers TEST B : A ouvre 10, B mise 20, A incapable de 30 →
   game.players[0]!.budget = 25
   startTeamAuctionGame(game.gameId)
   drawNextTeamCard(game.gameId)
-  submitTeamBid(game.gameId, 1, 10)
+  assert.equal(game.currentBid, 10)
+  assert.equal(game.currentBidderId, 1)
   assert.equal(game.currentTurnId, 2)
   submitTeamBid(game.gameId, 2, 20)
   assert.equal(game.phase, 'PLACEMENT')
@@ -348,13 +347,13 @@ test('rotation des openers TEST C : un PASS résout la carte sans casser la rota
   const game = makeGame('1v1-real', [2, 2], 500)
   startTeamAuctionGame(game.gameId)
   drawNextTeamCard(game.gameId)
-  submitTeamBid(game.gameId, 1, 10)
   passTeamBid(game.gameId, 2)
   assert.equal(game.phase, 'PLACEMENT')
   assert.equal(game.winnerId, 1)
   placeTeamCard(game.gameId, 1, 0)
   drawNextTeamCard(game.gameId)
-  assert.equal(game.currentTurnId, 2)
+  assert.equal(game.currentBidderId, 2)
+  assert.equal(game.currentTurnId, 1)
 })
 
 test('rotation des openers TEST D (1v1v1) : B gagne immédiatement quand A et C sont incapables de 30', () => {
@@ -363,7 +362,7 @@ test('rotation des openers TEST D (1v1v1) : B gagne immédiatement quand A et C 
   game.players[2]!.budget = 25
   startTeamAuctionGame(game.gameId)
   drawNextTeamCard(game.gameId)
-  submitTeamBid(game.gameId, 1, 10)
+  assert.equal(game.currentBid, 10)
   assert.equal(game.currentTurnId, 2)
   submitTeamBid(game.gameId, 2, 20)
   assert.equal(game.phase, 'PLACEMENT')
@@ -371,31 +370,128 @@ test('rotation des openers TEST D (1v1v1) : B gagne immédiatement quand A et C 
   assert.equal(game.currentBid, 20)
 })
 
-test('rotation des openers TEST E (1v1) : la carte avance quand tout le monde PASS sans bid', () => {
+test('ouverture auto 1 : opener 0 M → ouverture auto 0 M', () => {
+  const game = makeGame('1v1-real', [2, 2], 500)
+  game.players[0]!.budget = 0
+  startTeamAuctionGame(game.gameId)
+  drawNextTeamCard(game.gameId)
+  assert.equal(game.currentBid, 0)
+  assert.equal(game.currentBidderId, 1)
+  assert.equal(game.currentTurnId, 2)
+})
+
+test('ouverture auto 2 : opener 0 M + adversaire PASS → opener gagne la carte à 0 M', () => {
+  const game = makeGame('1v1-real', [2, 2], 500)
+  game.players[0]!.budget = 0
+  startTeamAuctionGame(game.gameId)
+  drawNextTeamCard(game.gameId)
+  passTeamBid(game.gameId, 2)
+  assert.equal(game.phase, 'PLACEMENT')
+  assert.equal(game.winnerId, 1)
+  assert.equal(game.currentBid, 0)
+  assert.equal(game.players[0]!.budget, 0)
+})
+
+test('ouverture auto 3 : opener 0 M + adversaire BID 10 → adversaire gagne immédiatement à 10 M', () => {
+  const game = makeGame('1v1-real', [2, 2], 500)
+  game.players[0]!.budget = 0
+  startTeamAuctionGame(game.gameId)
+  drawNextTeamCard(game.gameId)
+  submitTeamBid(game.gameId, 2, 10)
+  assert.equal(game.phase, 'PLACEMENT')
+  assert.equal(game.winnerId, 2)
+  assert.equal(game.currentBid, 10)
+  assert.equal(game.players[1]!.budget, 490)
+  assert.equal(game.players[0]!.budget, 0)
+})
+
+test('ouverture auto 4 : opener 5 M → ouverture auto 0 M', () => {
+  const game = makeGame('1v1-real', [2, 2], 500)
+  game.players[0]!.budget = 5
+  startTeamAuctionGame(game.gameId)
+  drawNextTeamCard(game.gameId)
+  assert.equal(game.currentBid, 0)
+  assert.equal(game.currentBidderId, 1)
+  assert.equal(game.currentTurnId, 2)
+})
+
+test('ouverture auto 5 : opener 10 M → ouverture auto 10 M', () => {
+  const game = makeGame('1v1-real', [2, 2], 500)
+  game.players[0]!.budget = 10
+  startTeamAuctionGame(game.gameId)
+  drawNextTeamCard(game.gameId)
+  assert.equal(game.currentBid, 10)
+  assert.equal(game.currentBidderId, 1)
+  assert.equal(game.currentTurnId, 2)
+})
+
+test('ouverture auto 6 : opener 500 M → ouverture auto 10 M', () => {
   const game = makeGame('1v1-real', [2, 2], 500)
   startTeamAuctionGame(game.gameId)
   drawNextTeamCard(game.gameId)
-  assert.equal(game.currentTurnId, 1)
-  passTeamBid(game.gameId, 1)
+  assert.equal(game.currentBid, 10)
+  assert.equal(game.currentBidderId, 1)
   assert.equal(game.currentTurnId, 2)
-  passTeamBid(game.gameId, 2)
-  assert.equal(game.phase, 'DRAW')
-  assert.equal(game.currentCardId, null)
-  drawNextTeamCard(game.gameId)
-  assert.equal(game.currentTurnId, 2, 'l’opener suivant doit être le joueur suivant même sans aucun bid')
 })
 
-test('rotation des openers TEST F (1v1v1) : la carte avance quand tout le monde PASS sans bid', () => {
-  const game = makeGame('1v1v1-real', [2, 2, 2], 500)
+test('ouverture auto 7 : budget débité uniquement au prix final', () => {
+  const game = makeGame('1v1-real', [2, 2], 500)
   startTeamAuctionGame(game.gameId)
   drawNextTeamCard(game.gameId)
-  assert.equal(game.currentTurnId, 1)
-  passTeamBid(game.gameId, 1)
+  submitTeamBid(game.gameId, 2, 20)
+  submitTeamBid(game.gameId, 1, 30)
   passTeamBid(game.gameId, 2)
-  passTeamBid(game.gameId, 3)
-  assert.equal(game.phase, 'DRAW')
+  assert.equal(game.phase, 'PLACEMENT')
+  assert.equal(game.winnerId, 1)
+  assert.equal(game.players[0]!.budget, 470, 'seul le prix final de 30 M est débité')
+})
+
+test('ouverture auto 8 : 1v1v1 avec opener 0 M', () => {
+  const game = makeGame('1v1v1-real', [2, 2], 500)
+  game.players[0]!.budget = 0
+  game.players[1]!.budget = 100
+  game.players[2]!.budget = 100
+  startTeamAuctionGame(game.gameId)
   drawNextTeamCard(game.gameId)
-  assert.equal(game.currentTurnId, 2, 'l’opener suivant doit être le joueur suivant même sans aucun bid')
+  assert.equal(game.currentBid, 0)
+  assert.equal(game.currentBidderId, 1)
+  assert.equal(game.currentTurnId, 2)
+  submitTeamBid(game.gameId, 2, 10)
+  assert.equal(game.currentBid, 10)
+  assert.equal(game.currentTurnId, 3)
+  passTeamBid(game.gameId, 3)
+  assert.equal(game.phase, 'PLACEMENT')
+  assert.equal(game.winnerId, 2)
+  assert.equal(game.currentBid, 10)
+})
+
+test('ouverture auto 9 : IA peut PASS face à ouverture 0 sur carte faible', () => {
+  const game = makeGame('1v1-ai', [2, 2], 500)
+  game.players[0]!.budget = 0
+  const weak = getCardKnowledgeBySlug('naruto-sj')!
+  startTeamAuctionGame(game.gameId)
+  game.deck.push(weak.id)
+  drawNextTeamCard(game.gameId)
+  assert.equal(game.currentBid, 0)
+  assert.equal(game.currentBidderId, 1)
+  assert.equal(game.currentTurnId, 2)
+  const decision = evaluateTeamAuctionAi(game.gameId, 2)
+  assert.equal(decision?.action, 'pass')
+})
+
+test('ouverture auto 10 : IA peut BID 10 face à ouverture 0 si elle veut la carte', () => {
+  const game = makeGame('1v1-ai', [2, 2], 500)
+  game.players[0]!.budget = 0
+  const strong = getCardKnowledgeBySlug('kaguya')!
+  startTeamAuctionGame(game.gameId)
+  game.deck.push(strong.id)
+  drawNextTeamCard(game.gameId)
+  assert.equal(game.currentBid, 0)
+  assert.equal(game.currentBidderId, 1)
+  assert.equal(game.currentTurnId, 2)
+  const decision = evaluateTeamAuctionAi(game.gameId, 2)
+  assert.equal(decision?.action, 'bid')
+  assert.ok(decision.amount >= 10)
 })
 
 test('équipes pleines TEST 1 : humain a des slots libres, IA pleine → carte auto attribuée à l’humain', () => {
@@ -419,12 +515,14 @@ test('équipes pleines TEST 2 : humain plein, IA a des slots libres → carte au
 })
 
 test('équipes pleines TEST 3 (1v1v1) : A plein → l’enchère n’oppose plus que B et C', () => {
-  const game = makeGame('1v1v1-real', [1], 500)
+  const game = makeGame('1v1v1-real', [1, 1], 500)
   game.players[0]!.teams[0] = [999]
+  game.players[0]!.teams[1] = [998]
   startTeamAuctionGame(game.gameId)
   drawNextTeamCard(game.gameId)
   assert.equal(game.phase, 'BIDDING')
-  assert.equal(game.currentTurnId, 2, 'A doit être sauté comme participant effectif à l’enchère')
+  assert.equal(game.currentBidderId, 2, 'B doit être le premier opener éligible')
+  assert.equal(game.currentTurnId, 3, 'C doit recevoir le tour pour répondre à B')
   assert.throws(() => submitTeamBid(game.gameId, 1, 10), /pleines/)
 })
 

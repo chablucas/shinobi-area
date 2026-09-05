@@ -127,7 +127,7 @@ function nextNonPassedPlayerIndex(game: TeamAuctionGame, startIndex: number) {
 }
 
 export function minimumNextTeamBid(game: Pick<TeamAuctionGame, 'currentBid'>) {
-  return game.currentBid === 0 ? teamAuctionRules.openingBid : game.currentBid + teamAuctionRules.bidUnit
+  return game.currentBid + teamAuctionRules.bidUnit
 }
 
 export function canPlayerRaise(player: TeamAuctionPlayer, game: Pick<TeamAuctionGame, 'currentBid' | 'teamSizes'>) {
@@ -177,7 +177,7 @@ function allTeamsComplete(game: TeamAuctionGame) {
 }
 
 function finishRound(game: TeamAuctionGame) {
-  const hasBid = game.currentBid > 0 && game.currentBidderId !== null
+  const hasBid = game.currentBidderId !== null
   const winner = hasBid ? playerById(game, game.currentBidderId!) : null
 
   if (!winner) {
@@ -315,8 +315,17 @@ export function drawNextTeamCard(gameId: string) {
   }
 
   const openerIndex = nextEligibleOpenerIndex(game, game.openerIndex % game.players.length) ?? game.openerIndex % game.players.length
-  game.currentTurnId = game.players[openerIndex]?.id ?? null
+  const opener = game.players[openerIndex]!
+
+  const openingBid = opener.budget >= teamAuctionRules.openingBid ? teamAuctionRules.openingBid : 0
+  game.currentBid = openingBid
+  game.currentBidderId = opener.id
+  opener.activeCurrentRound = true
+  opener.passedCurrentRound = false
+
   game.phase = 'BIDDING'
+
+  advanceOrResolveBidding(game, openerIndex)
   return game
 }
 
@@ -328,7 +337,7 @@ export function submitTeamBid(gameId: string, playerId: TeamAuctionPlayerId, amo
   if (!player) throw new Error('Joueur introuvable.')
   if (!canPlayerReceiveCard(player, game.teamSizes)) throw new Error('Ce joueur a déjà toutes ses équipes pleines.')
   if (game.currentTurnId !== playerId) throw new Error('Ce n’est pas ton tour.')
-  const minimumBid = game.currentBid === 0 ? getMinimumOpenBid(player.budget) : game.currentBid + teamAuctionRules.bidUnit
+  const minimumBid = minimumNextTeamBid(game)
   if (!isValidBid(amount, game.currentBid, player.budget)) {
     throw new Error('Enchère invalide.')
   }

@@ -56,8 +56,13 @@ const canBid = computed(() =>
   localBidAmount.value % bidStep.value === 0,
 )
 const canRaise = computed(() => minimumNextBid.value <= budget.value)
+const isOpeningPhase = computed(() => Boolean(
+  state.value &&
+  state.value.currentBidderId !== null &&
+  ((state.value.currentBid === 0) || (state.value.currentBid === 10 && state.value.players.every((player) => !player.passedCurrentRound))),
+))
 const bidHint = computed(() => {
-  if (!canRaise.value) return 'Budget insuffisant pour surenchérir : la carte est attribuée automatiquement.'
+  if (!canRaise.value) return 'Budget insuffisant pour surenchérir.'
   if (canBid.value) return ''
   if (!Number.isFinite(localBidAmount.value) || localBidAmount.value % bidStep.value !== 0) return `Le montant doit être un multiple de ${bidStep.value}.`
   if (localBidAmount.value <= currentBid.value) return `Le montant doit dépasser ${currentBid.value} M.`
@@ -292,7 +297,14 @@ onUnmounted(() => {
               <p class="ta-rarity">{{ state.currentCard.rarity }} · Note {{ state.currentCard.score.toFixed(2) }}</p>
             </div>
             <div class="ta-bid-info">
-              <p>Meilleure enchère : <strong>{{ state.currentBid }} M</strong><span v-if="currentBidderName"> — {{ currentBidderName }}</span></p>
+              <p v-if="state.currentBidderId !== null">
+                <template v-if="isOpeningPhase">
+                  <strong>{{ currentBidderName }}</strong> ouvre à <strong>{{ state.currentBid }} M</strong>
+                </template>
+                <template v-else>
+                  Meilleure enchère : <strong>{{ state.currentBid }} M</strong><span v-if="currentBidderName"> — {{ currentBidderName }}</span>
+                </template>
+              </p>
               <p class="ta-turn-status">{{ turnStatusLabel }}</p>
             </div>
             <ul class="ta-player-status">
