@@ -150,6 +150,52 @@ test('une reconnexion ne duplique pas le participant du lobby', async () => {
   }
 })
 
+test('un invité reconnecté après le lancement retrouve la même partie et ne peut pas la relancer', async () => {
+  const [host, guest] = await createUsers(['Chabou', 'Boubou'])
+  const lobby = await createGameLobby(host!.id, 'team-1v1', [guest!.id])
+  await acceptGameInvite(guest!.id, lobby!.players[1]!.inviteId!)
+  const { httpServer, io, port } = await startServer()
+  try {
+    const socketA = await connectAndWait(port, host!.id)
+    let socketB = await connectAndWait(port, guest!.id)
+    try {
+      // Les deux entrent dans le salon AVANT le lancement (même gameId, aucun nouveau salon)
+      const hostLobby = nextState(socketA, (state) => state.gameId === lobby!.id)
+      socketA.emit('team-auction:request-state', lobby!.id)
+      assert.equal((await hostLobby).playerCount, 2)
+
+      const guestLobby = nextState(socketB, (state) => state.gameId === lobby!.id)
+      socketB.emit('team-auction:request-state', lobby!.id)
+      assert.equal((await guestLobby).playerCount, 2)
+
+      // L'invité ne peut pas démarrer la partie
+      const guestStartRefused = nextError(socketB)
+      socketB.emit('team-auction:start', lobby!.id)
+      assert.match(await guestStartRefused, /hôte/)
+
+      // L'hôte lance: les deux reçoivent le nouvel état dans la même room
+      const hostStarted = nextState(socketA, (state) => state.phase !== 'LOBBY')
+      const guestStarted = nextState(socketB, (state) => state.phase !== 'LOBBY')
+      socketA.emit('team-auction:start', lobby!.id)
+      const [hostState, guestState] = await Promise.all([hostStarted, guestStarted])
+      assert.equal(hostState.gameId, lobby!.id)
+      assert.equal(guestState.gameId, lobby!.id)
+
+      // Reconnexion de l'invité après le lancement: même gameId, même phase, aucune recréation
+      socketB.disconnect()
+      socketB = await connectAndWait(port, guest!.id)
+      const reconnected = nextState(socketB, (state) => state.gameId === lobby!.id)
+      socketB.emit('team-auction:request-state', lobby!.id)
+      const resumed = await reconnected
+      assert.equal(resumed.gameId, lobby!.id)
+      assert.equal(resumed.phase, hostState.phase)
+      assert.equal(resumed.playerCount, 2)
+    } finally { socketA.disconnect(); socketB.disconnect() }
+  } finally {
+    await closeTestServer(io, httpServer)
+  }
+})
+
 test('un salon 1v1v1 atteint 3/3 avant de pouvoir démarrer', async () => {
   const [host, guest, third] = await createUsers(['Chabou', 'Boubou', 'Lucas'])
   const { httpServer, io, port } = await startServer()
