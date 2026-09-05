@@ -32,6 +32,18 @@ let notificationTimer: ReturnType<typeof setTimeout> | undefined
 let notificationRefreshInFlight = false
 let isMounted = false
 
+onMounted(async () => {
+  isMounted = true
+  await auth.loadCurrentUser()
+  refreshNotifications()
+  notificationTimer = setInterval(refreshNotifications, 30000)
+})
+
+onUnmounted(() => {
+  isMounted = false
+  if (notificationTimer) clearInterval(notificationTimer)
+})
+
 async function refreshNotifications() {
   if (!auth.token || notificationRefreshInFlight) return
   notificationRefreshInFlight = true
