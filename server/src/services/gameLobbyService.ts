@@ -4,6 +4,11 @@ import { prisma } from '../config/prisma.js'
 import { createOrGetGame } from './realtimeGameService.js'
 
 const userSelect = { id: true, displayName: true } as const
+let gameLobbyChangeHandler: ((lobbyId: string) => Promise<void>) | null = null
+
+export function setGameLobbyChangeHandler(handler: ((lobbyId: string) => Promise<void>) | null) {
+  gameLobbyChangeHandler = handler
+}
 
 function invalid(message: string, statusCode = 400) {
   return Object.assign(new Error(message), { statusCode })
@@ -35,16 +40,29 @@ function formatLobby(lobby: Awaited<ReturnType<typeof findLobby>>) {
     id: lobby.id,
     mode: modeLabel,
     creatorId: lobby.creatorId,
+    hostUserId: lobby.creatorId,
     status: lobby.status,
     includesAi: lobby.includesAi,
     createdAt: lobby.createdAt,
     updatedAt: lobby.updatedAt,
+    expectedPlayers: expectedGameLobbyPlayers(lobby.mode, lobby.includesAi),
+    playerCount: 1 + lobby.invites.filter((invite) => invite.status === GameInviteStatus.ACCEPTED).length + (lobby.includesAi ? 1 : 0),
+    canStart: gameLobbyCanStart(lobby),
     players: [
       { ...publicUser(lobby.creator), status: 'ACCEPTED', inviteId: null, isAi: false },
       ...lobby.invites.map((invite) => ({ ...publicUser(invite.invitee), status: invite.status, inviteId: invite.id, isAi: false })),
       ...(lobby.includesAi ? [AI_PLAYER] : []),
     ],
   }
+}
+
+export function expectedGameLobbyPlayers(mode: GameMode, includesAi: boolean) {
+  return mode === GameMode.ONE_V_ONE ? 2 : 3
+}
+
+export function gameLobbyCanStart(lobby: { mode: GameMode; includesAi: boolean; status: GameLobbyStatus; invites: Array<{ status: GameInviteStatus }> }) {
+  const acceptedPlayers = 1 + lobby.invites.filter((invite) => invite.status === GameInviteStatus.ACCEPTED).length + (lobby.includesAi ? 1 : 0)
+  return acceptedPlayers === expectedGameLobbyPlayers(lobby.mode, lobby.includesAi)
 }
 
 async function findLobby(id: string) {
@@ -103,6 +121,7 @@ async function updateInvite(userId: number, inviteId: string, status: GameInvite
     }
   })
   const updatedLobby = await findLobby(invite.lobbyId)
+  await gameLobbyChangeHandler?.(invite.lobbyId)
   return formatLobby(updatedLobby)
 }
 

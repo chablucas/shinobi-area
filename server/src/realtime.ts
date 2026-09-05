@@ -7,6 +7,7 @@ import { getCardKnowledgeById } from './game/cardKnowledge.js'
 import { teamAuctionRules } from './game/teamAuctionRules.js'
 import { calculateTeamAuctionScore } from './game/teamMode.js'
 import { getTeamAuctionPowerScore } from './game/teamAuctionPower.js'
+import { setGameLobbyChangeHandler } from './services/gameLobbyService.js'
 import { allInTeamBid, chooseAiPlacement, createTeamAuctionGame, drawNextTeamCard, evaluateTeamAuctionAi, getTeamAuctionGame, passTeamBid, placeTeamCard, startTeamAuctionGame, submitTeamBid, type TeamAuctionGame, type TeamAuctionMode } from './services/teamAuctionGameService.js'
 
 type SocketData = { userId?: number; gameId?: string }
@@ -191,6 +192,26 @@ export function attachRealtime(io: Server) {
     if (!game) return
     io.in(`team-auction:${gameId}`).emit('team-auction:state', await teamAuctionPublicState(game))
   }
+
+  async function syncTeamAuctionLobby(gameId: string) {
+    const game = getTeamAuctionGame(gameId)
+    if (!game || game.phase !== 'LOBBY') return
+    const lobby = await prisma.gameLobby.findUnique({
+      where: { id: gameId },
+      include: { invites: { where: { status: 'ACCEPTED' }, include: { invitee: { select: { id: true, displayName: true } } } } },
+    })
+    if (!lobby) return
+    const existing = new Set(game.players.map((player) => String(player.id)))
+    for (const invite of lobby.invites) {
+      if (existing.has(String(invite.invitee.id))) continue
+      game.players.push({ id: invite.invitee.id, displayName: invite.invitee.displayName, isAi: false, budget: game.initialBudget, teams: game.teamSizes.map(() => []), passedCurrentRound: false, activeCurrentRound: true })
+    }
+    await emitTeamAuctionState(gameId)
+  }
+
+  setGameLobbyChangeHandler(async (gameId) => {
+    if (gameId.startsWith('ta_')) await syncTeamAuctionLobby(gameId)
+  })
 
   /** Enregistre le participant (une seule fois par userId), rattache le socket au salon. */
   async function joinTeamAuctionLobby(socket: { join: (room: string) => Promise<void> | void; data: SocketData }, gameId: string, userId: number) {

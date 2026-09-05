@@ -43,14 +43,27 @@ function ack<T>(socket: Socket, event: string, payload: unknown): Promise<T> {
   return new Promise((resolve) => socket.emit(event, payload, resolve))
 }
 
-async function startServer(): Promise<{ httpServer: HttpServer; port: number }> {
+async function startServer(): Promise<{ httpServer: HttpServer; io: Server; port: number }> {
   const httpServer = createServer(app)
   const io = new Server(httpServer, { cors: { origin: true } })
   attachRealtime(io)
   await new Promise<void>((resolve) => httpServer.listen(0, resolve))
   const address = httpServer.address()
   assert.ok(address && typeof address !== 'string')
-  return { httpServer, port: address.port }
+  return { httpServer, io, port: address.port }
+}
+
+async function closeTestServer(io: Server, httpServer: HttpServer) {
+  try {
+    await new Promise<void>((resolve, reject) => io.close((error) => error ? reject(error) : resolve()))
+  } catch (error) {
+    const nodeError = error as NodeJS.ErrnoException
+    if (nodeError.code !== 'ERR_SERVER_NOT_RUNNING') throw error
+  }
+
+  if (httpServer.listening) {
+    await new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve()))
+  }
 }
 
 function connectAndWait(port: number, userId: number) {
@@ -71,7 +84,7 @@ async function createUsers(names: string[]) {
 
 test('le lobby 1v1 passe de 1/2 à 2/2 et l’hôte reçoit l’état mis à jour', async () => {
   const [host, guest] = await createUsers(['Chabou', 'Boubou'])
-  const { httpServer, port } = await startServer()
+  const { httpServer, io, port } = await startServer()
   try {
     const [socketA, socketB] = await Promise.all([host!.id, guest!.id].map((id) => connectAndWait(port, id)))
     try {
@@ -106,12 +119,14 @@ test('le lobby 1v1 passe de 1/2 à 2/2 et l’hôte reçoit l’état mis à jou
       socketA.emit('team-auction:start', gameId)
       await started
     } finally { socketA.disconnect(); socketB.disconnect() }
-  } finally { httpServer.close() }
+  } finally {
+    await closeTestServer(io, httpServer)
+  }
 })
 
 test('une reconnexion ne duplique pas le participant du lobby', async () => {
   const [host, guest] = await createUsers(['Chabou', 'Boubou'])
-  const { httpServer, port } = await startServer()
+  const { httpServer, io, port } = await startServer()
   try {
     const socketA = await connectAndWait(port, host!.id)
     let socketB = await connectAndWait(port, guest!.id)
@@ -130,12 +145,14 @@ test('une reconnexion ne duplique pas le participant du lobby', async () => {
       assert.equal(state.players.length, 2)
       assert.equal(state.canStart, true)
     } finally { socketA.disconnect(); socketB.disconnect() }
-  } finally { httpServer.close() }
+  } finally {
+    await closeTestServer(io, httpServer)
+  }
 })
 
 test('un salon 1v1v1 atteint 3/3 avant de pouvoir démarrer', async () => {
   const [host, guest, third] = await createUsers(['Chabou', 'Boubou', 'Lucas'])
-  const { httpServer, port } = await startServer()
+  const { httpServer, io, port } = await startServer()
   try {
     const [socketA, socketB, socketC] = await Promise.all([host!.id, guest!.id, third!.id].map((id) => connectAndWait(port, id)))
     try {
@@ -153,13 +170,15 @@ test('un salon 1v1v1 atteint 3/3 avant de pouvoir démarrer', async () => {
       assert.equal(state.canStart, true)
       assert.deepEqual(state.players.map((player) => player.displayName), ['Chabou', 'Boubou', 'Lucas'])
     } finally { socketA.disconnect(); socketB.disconnect(); socketC.disconnect() }
-  } finally { httpServer.close() }
+  } finally {
+    await closeTestServer(io, httpServer)
+  }
 })
 
 test('l’invitation acceptée propage immédiatement le participant à l’hôte', async () => {
   const [host, guest] = await createUsers(['Chabou', 'Boubou'])
   const lobby = await createGameLobby(host!.id, 'team-1v1', [guest!.id])
-  const { httpServer, port } = await startServer()
+  const { httpServer, io, port } = await startServer()
   try {
     const [socketA, socketB] = await Promise.all([host!.id, guest!.id].map((id) => connectAndWait(port, id)))
     try {
@@ -171,20 +190,20 @@ test('l’invitation acceptée propage immédiatement le participant à l’hôt
 
       await acceptGameInvite(guest!.id, lobby!.players[1]!.inviteId!)
 
-      const hostSeesGuest = nextState(socketA, (state) => state.playerCount === 2)
-      socketB.emit('team-auction:request-state', lobby!.id)
-      const state = await hostSeesGuest
+      const state = await nextState(socketA, (value) => value.playerCount === 2)
 
       assert.equal(state.canStart, true)
       assert.deepEqual(state.players.map((player) => player.displayName), ['Chabou', 'Boubou'])
     } finally { socketA.disconnect(); socketB.disconnect() }
-  } finally { httpServer.close() }
+  } finally {
+    await closeTestServer(io, httpServer)
+  }
 })
 
 test('un joueur étranger ne peut pas entrer dans un salon issu d’une invitation', async () => {
   const [host, guest, outsider] = await createUsers(['Chabou', 'Boubou', 'Intrus'])
   const lobby = await createGameLobby(host!.id, 'team-1v1', [guest!.id])
-  const { httpServer, port } = await startServer()
+  const { httpServer, io, port } = await startServer()
   try {
     const [socketA, socketC] = await Promise.all([host!.id, outsider!.id].map((id) => connectAndWait(port, id)))
     try {
@@ -196,5 +215,7 @@ test('un joueur étranger ne peut pas entrer dans un salon issu d’une invitati
       assert.equal(refused.ok, false)
       assert.match(refused.message ?? '', /participes pas|introuvable/)
     } finally { socketA.disconnect(); socketC.disconnect() }
-  } finally { httpServer.close() }
+  } finally {
+    await closeTestServer(io, httpServer)
+  }
 })
