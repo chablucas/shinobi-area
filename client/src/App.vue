@@ -5,12 +5,6 @@ import { createGameLobby, listFriends, type ChallengeMode, type Friend } from '.
 import { useAuthStore } from './stores/auth'
 import SocialHeader from './components/SocialHeader.vue'
 
-const modes: Array<{ number: string; eyebrow: string; title: string; description: string; accent: string; action: 'solo' | ChallengeMode }> = [
-  { number: '01', eyebrow: 'Forge ta légende', title: 'Défier l’IA', description: 'Construis ton shinobi et mesure-le à un rival stratégique.', accent: 'coral', action: 'solo' },
-  { number: '02', eyebrow: 'Combat social', title: 'Invite un ami', description: 'Lance un duel 1v1 avec un ami et retrouvez-vous dans le salon.', accent: 'mint', action: '1v1' },
-  { number: '03', eyebrow: 'Combat social', title: 'Envie d’un plaisir à 3 ?', description: 'Choisis deux amis distincts pour un combat 1v1v1.', accent: 'gold', action: '1v1v1' },
-]
-
 const auth = useAuthStore()
 const router = useRouter()
 const friends = ref<Friend[]>([])
@@ -25,16 +19,24 @@ onMounted(async () => {
   await auth.loadCurrentUser()
 })
 
-async function chooseMode(action: 'solo' | ChallengeMode) {
-  if (action === 'solo') { await router.push('/solo'); return }
+async function openInviteDialog(mode: ChallengeMode) {
   await auth.loadCurrentUser()
-  if (!auth.token) { await router.push('/connexion'); return }
-  inviteMode.value = action
+  if (!auth.token) {
+    await router.push('/connexion')
+    return
+  }
+  inviteMode.value = mode
   selectedFriendIds.value = []
   completeWithAi.value = false
   inviteError.value = ''
   friendsLoading.value = true
-  try { friends.value = await listFriends(auth.token) } catch (exception) { inviteError.value = exception instanceof Error ? exception.message : 'Impossible de charger vos amis.' } finally { friendsLoading.value = false }
+  try {
+    friends.value = await listFriends(auth.token)
+  } catch (exception) {
+    inviteError.value = exception instanceof Error ? exception.message : 'Impossible de charger vos amis.'
+  } finally {
+    friendsLoading.value = false
+  }
 }
 
 function requiredFriendCount() {
@@ -44,12 +46,18 @@ function requiredFriendCount() {
 
 function toggleFriend(id: number) {
   const maximum = requiredFriendCount()
-  selectedFriendIds.value = selectedFriendIds.value.includes(id) ? selectedFriendIds.value.filter((friendId) => friendId !== id) : selectedFriendIds.value.length < maximum ? [...selectedFriendIds.value, id] : selectedFriendIds.value
+  selectedFriendIds.value = selectedFriendIds.value.includes(id)
+    ? selectedFriendIds.value.filter((friendId) => friendId !== id)
+    : selectedFriendIds.value.length < maximum
+      ? [...selectedFriendIds.value, id]
+      : selectedFriendIds.value
 }
 
 function toggleCompleteWithAi() {
   completeWithAi.value = !completeWithAi.value
-  if (completeWithAi.value && selectedFriendIds.value.length > 1) selectedFriendIds.value = selectedFriendIds.value.slice(0, 1)
+  if (completeWithAi.value && selectedFriendIds.value.length > 1) {
+    selectedFriendIds.value = selectedFriendIds.value.slice(0, 1)
+  }
 }
 
 async function createInvite() {
@@ -58,7 +66,20 @@ async function createInvite() {
   if (selectedFriendIds.value.length !== required) return
   sendingInvite.value = true
   inviteError.value = ''
-  try { const lobby = await createGameLobby(auth.token, inviteMode.value, selectedFriendIds.value, inviteMode.value === '1v1v1' && completeWithAi.value); inviteMode.value = null; await router.push(`/lobby/${lobby.id}`) } catch (exception) { inviteError.value = exception instanceof Error ? exception.message : 'Invitation impossible.' } finally { sendingInvite.value = false }
+  try {
+    const lobby = await createGameLobby(
+      auth.token,
+      inviteMode.value,
+      selectedFriendIds.value,
+      inviteMode.value === '1v1v1' && completeWithAi.value,
+    )
+    inviteMode.value = null
+    await router.push(`/lobby/${lobby.id}`)
+  } catch (exception) {
+    inviteError.value = exception instanceof Error ? exception.message : 'Invitation impossible.'
+  } finally {
+    sendingInvite.value = false
+  }
 }
 </script>
 
@@ -70,30 +91,171 @@ async function createInvite() {
     <section id="accueil" class="hero">
       <div class="hero-copy">
         <p class="kicker"><span class="kicker-dot"></span>La voie commence ici</p>
-        <h1>Trace ta voie.<br /><span>Défie le monde.</span></h1>
-        <p class="intro">Shinobi Area est un jeu de stratégie où chaque choix forge ta légende. Crée ton guerrier, maîtrise tes cartes et impose ton style.</p>
-        <div id="creer" class="hero-actions"><a class="button button-primary" href="/jouer">Créer ton perso <span>→</span></a></div>
-        <div class="hero-meta"><div><strong>03</strong><span>voies à<br />explorer</span></div><div><strong>∞</strong><span>combats<br />possibles</span></div><div><strong>01</strong><span>légende<br />à écrire</span></div></div>
+        <h1>Shinobi Area<br /><span>Trace ta voie.</span></h1>
+        <p class="intro">
+          Shinobi Area est un jeu de cartes et de stratégie ninja où chaque choix forge ton combattant.
+          Tire tes cartes, construis les 15 catégories de ton shinobi et triomphe dans l'arène.
+        </p>
+
+        <!-- 3 CTA Principaux bien visibles -->
+        <div class="main-cta-group" aria-label="Modes de combat principaux">
+          <!-- 1. Combat contre l'ordinateur -->
+          <button
+            type="button"
+            class="cta-card cta-solo"
+            @click="router.push('/solo')"
+          >
+            <div class="cta-card-header">
+              <span class="cta-badge">MODE 01</span>
+              <span class="cta-arrow" aria-hidden="true">→</span>
+            </div>
+            <div class="cta-card-body">
+              <span class="cta-icon">◈</span>
+              <div class="cta-text">
+                <h2>Combat contre l’ordinateur</h2>
+                <p>Mesure ton build shinobi face à une intelligence artificielle stratégique.</p>
+              </div>
+            </div>
+            <div class="cta-card-footer">
+              <span class="cta-action-label">Lancer le combat solo <span>→</span></span>
+            </div>
+          </button>
+
+          <!-- 2. Combat contre un joueur réel -->
+          <div class="cta-card cta-duel">
+            <div class="cta-card-header">
+              <span class="cta-badge">MODE 02</span>
+              <span class="cta-arrow" aria-hidden="true">⚔</span>
+            </div>
+            <div class="cta-card-body">
+              <span class="cta-icon">✦</span>
+              <div class="cta-text">
+                <h2>Combat contre un joueur réel</h2>
+                <p>Affronte un rival en duel 1v1 en local sur le même écran ou invite un ami en salon.</p>
+              </div>
+            </div>
+            <div class="cta-actions-dual">
+              <button
+                type="button"
+                class="cta-sub-btn primary"
+                @click="router.push('/partie')"
+              >
+                Duel local 1v1
+              </button>
+              <button
+                type="button"
+                class="cta-sub-btn secondary"
+                @click="openInviteDialog('1v1')"
+              >
+                Inviter un ami
+              </button>
+            </div>
+          </div>
+
+          <!-- 3. Combat 1v1v1 -->
+          <div class="cta-card cta-triple">
+            <div class="cta-card-header">
+              <span class="cta-badge">MODE 03</span>
+              <span class="cta-arrow" aria-hidden="true">⌘</span>
+            </div>
+            <div class="cta-card-body">
+              <span class="cta-icon">⌘</span>
+              <div class="cta-text">
+                <h2>Combat 1v1v1</h2>
+                <p>Arène à trois combattants. Chacun forge son shinobi pour une bataille à 3.</p>
+              </div>
+            </div>
+            <div class="cta-actions-dual">
+              <button
+                type="button"
+                class="cta-sub-btn primary"
+                @click="router.push('/3-joueurs')"
+              >
+                Combat 1v1v1 local
+              </button>
+              <button
+                type="button"
+                class="cta-sub-btn secondary"
+                @click="openInviteDialog('1v1v1')"
+              >
+                Inviter 2 amis
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-meta">
+          <div><strong>15</strong><span>catégories<br />par shinobi</span></div>
+          <div><strong>163</strong><span>cartes<br />légendaires</span></div>
+          <div><strong>∞</strong><span>combats<br />possibles</span></div>
+        </div>
       </div>
-      <div class="hero-art" aria-label="Logo Shinobi Area"><img src="/logo.png" alt="Logo Shinobi Area" /></div>
+
+      <div class="hero-art" aria-label="Emblème Shinobi Area">
+        <img src="/logo.png" alt="Logo Shinobi Area" />
+      </div>
     </section>
 
-    <section id="modes" class="modes-section"><div class="section-heading" id="univers"><p class="kicker"><span class="kicker-dot"></span>Choisis ton terrain</p><h2>Trois façons<br /><i>de devenir légende.</i></h2><span class="section-index">/ 03</span></div>
-      <div class="mode-grid"><button v-for="mode in modes" :id="mode.number === '02' ? 'combat' : undefined" :key="mode.number" type="button" class="mode-card" :class="`mode-${mode.accent}`" @click="chooseMode(mode.action)"><div class="card-top"><span>{{ mode.number }}</span><span class="arrow">↗</span></div><div class="card-symbol" aria-hidden="true"><span v-if="mode.number === '01'">◈</span><span v-else-if="mode.number === '02'">✦</span><span v-else>⌘</span></div><p>{{ mode.eyebrow }}</p><h3>{{ mode.title }}</h3><span class="card-description">{{ mode.description }}</span></button></div>
-    </section>
+    <!-- Modal d'invitation d'amis -->
     <div v-if="inviteMode" class="invite-overlay" role="presentation" @click.self="inviteMode = null">
-      <section class="invite-dialog" role="dialog" aria-modal="true" :aria-labelledby="'invite-title'">
-        <div class="invite-heading"><div><p class="kicker">Combat social</p><h2 id="invite-title">{{ inviteMode === '1v1' ? 'Invite un ami' : 'Envie d’un plaisir à 3 ?' }}</h2></div><button class="invite-close" type="button" aria-label="Fermer" @click="inviteMode = null">×</button></div>
-        <p class="invite-copy">{{ inviteMode === '1v1' ? 'Sélectionne un ami pour lancer le salon 1v1.' : completeWithAi ? 'Sélectionne un ami, l’IA complètera le combat.' : 'Sélectionne deux amis distincts pour lancer le salon 1v1v1.' }}</p>
-        <div v-if="inviteMode === '1v1v1'" class="invite-ai-toggle"><button type="button" class="friend-choice" :class="{ selected: completeWithAi }" @click="toggleCompleteWithAi">{{ completeWithAi ? '✓ Compléter avec l’IA' : 'Compléter avec l’IA' }}</button></div>
+      <section class="invite-dialog" role="dialog" aria-modal="true" aria-labelledby="invite-title">
+        <div class="invite-heading">
+          <div>
+            <p class="kicker">Combat social</p>
+            <h2 id="invite-title">{{ inviteMode === '1v1' ? 'Invite un ami' : 'Envie d’un plaisir à 3 ?' }}</h2>
+          </div>
+          <button class="invite-close" type="button" aria-label="Fermer" @click="inviteMode = null">×</button>
+        </div>
+        <p class="invite-copy">
+          {{
+            inviteMode === '1v1'
+              ? 'Sélectionne un ami pour lancer le salon 1v1.'
+              : completeWithAi
+                ? 'Sélectionne un ami, l’IA complètera le combat.'
+                : 'Sélectionne deux amis distincts pour lancer le salon 1v1v1.'
+          }}
+        </p>
+        <div v-if="inviteMode === '1v1v1'" class="invite-ai-toggle">
+          <button
+            type="button"
+            class="friend-choice"
+            :class="{ selected: completeWithAi }"
+            @click="toggleCompleteWithAi"
+          >
+            {{ completeWithAi ? '✓ Compléter avec l’IA' : 'Compléter avec l’IA' }}
+          </button>
+        </div>
         <p v-if="friendsLoading" class="invite-copy">Chargement des amis...</p>
         <p v-else-if="inviteError" class="invite-error">{{ inviteError }}</p>
-        <div v-else class="friend-picker"><button v-for="friend in friends" :key="friend.id" class="friend-choice" :class="{ selected: selectedFriendIds.includes(friend.id) }" type="button" @click="toggleFriend(friend.id)"><span>{{ friend.displayName.slice(0, 1) }}</span>{{ friend.displayName }}</button><p v-if="!friends.length" class="invite-copy">Aucun ami disponible.</p></div>
-        <button class="invite-submit" type="button" :disabled="friendsLoading || sendingInvite || selectedFriendIds.length !== requiredFriendCount()" @click="createInvite">{{ sendingInvite ? 'Création...' : 'Créer le salon' }}</button>
+        <div v-else class="friend-picker">
+          <button
+            v-for="friend in friends"
+            :key="friend.id"
+            class="friend-choice"
+            :class="{ selected: selectedFriendIds.includes(friend.id) }"
+            type="button"
+            @click="toggleFriend(friend.id)"
+          >
+            <span>{{ friend.displayName.slice(0, 1) }}</span>{{ friend.displayName }}
+          </button>
+          <p v-if="!friends.length" class="invite-copy">Aucun ami disponible.</p>
+        </div>
+        <button
+          class="invite-submit"
+          type="button"
+          :disabled="friendsLoading || sendingInvite || selectedFriendIds.length !== requiredFriendCount()"
+          @click="createInvite"
+        >
+          {{ sendingInvite ? 'Création...' : 'Créer le salon' }}
+        </button>
       </section>
     </div>
 
-    <footer><span>SHINOBI AREA</span><span>La nuit appartient à ceux qui osent.</span><span>© 2026</span></footer>
+    <footer>
+      <span>SHINOBI AREA</span>
+      <span>La nuit appartient à ceux qui osent.</span>
+      <span>© 2026</span>
+    </footer>
   </main>
 </template>
 
@@ -104,7 +266,7 @@ async function createInvite() {
   position: relative;
   min-height: 100vh;
   background: var(--bg-main);
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 .site-shell::before {
@@ -124,145 +286,40 @@ async function createInvite() {
 }
 
 .hero,
-.modes-section,
 footer {
   position: relative;
   z-index: 1;
   max-width: 1320px;
   margin: 0 auto;
-  padding-left: max(20px, calc((100vw - 1320px) / 2));
-  padding-right: max(20px, calc((100vw - 1320px) / 2));
-}
-
-.topbar {
-  display: flex;
-  max-width: none;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 78px;
-  border-bottom: 1px solid rgba(84, 48, 12, 0.35);
-  padding-top: 10px;
-  padding-bottom: 10px;
-  background: var(--accent-orange);
-}
-
-.brand {
-  display: inline-flex;
-  align-items: center;
-}
-
-.brand-logo {
-  display: block;
-  width: auto;
-  height: 52px;
-  object-fit: contain;
-}
-
-.create-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 42px;
-  padding: 0.75rem 1.2rem;
-  border: 1px solid rgba(76, 48, 15, 0.42);
-  background: #fff0bd;
-  color: #2b2113;
-  clip-path: var(--clip-soft);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-size: 0.64rem;
-  font-weight: 700;
-}
-
-.nav-links {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #2b2113;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 0.68rem;
-}
-
-.nav-links a {
-  padding: 0.75rem 1.15rem;
-  border: 1px solid rgba(76, 48, 15, 0.35);
-  background: rgba(255, 214, 102, 0.34);
-  clip-path: var(--clip-soft);
-  transition: background 0.2s ease, transform 0.2s ease;
-}
-
-.nav-links a:hover,
-.nav-links a:focus-visible {
-  background: rgba(255, 236, 174, 0.58);
-  transform: translateY(-1px);
-}
-
-.nav-tab.active {
-  background: #fff0bd;
-  font-weight: 700;
-}
-
-.profile-link,
-.button,
-.button-primary,
-.button-quiet {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.9rem;
-  min-height: 42px;
-  padding: 0.75rem 1.25rem;
-  border: 1px solid rgba(76, 48, 15, 0.42);
-  background: #2b2113;
-  color: #fff0bd;
-  clip-path: var(--clip-soft);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 0.64rem;
-  transition: transform 0.2s ease, background 0.2s ease;
-}
-
-.profile-link:hover,
-.profile-link:focus-visible,
-.button:hover,
-.button-primary:hover,
-.button-quiet:hover {
-  transform: translateY(-1px);
-  background: #473316;
-}
-
-.button span,
-.button-primary span,
-.button-quiet span {
-  color: var(--accent-orange);
+  padding-left: max(16px, calc((100vw - 1320px) / 2));
+  padding-right: max(16px, calc((100vw - 1320px) / 2));
+  box-sizing: border-box;
 }
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 7fr) minmax(260px, 3fr);
-  align-items: center;
-  gap: 36px;
-  min-height: 560px;
-  padding-top: 34px;
-  padding-bottom: 34px;
+  grid-template-columns: minmax(0, 7.5fr) minmax(260px, 3.5fr);
+  align-items: start;
+  gap: 32px;
+  padding-top: 32px;
+  padding-bottom: 50px;
 }
 
 .hero-copy {
   position: relative;
   z-index: 1;
-  padding: 42px 42px 46px;
+  padding: 36px 36px 40px;
   border: 1px solid var(--border-light);
   background: var(--bg-panel-soft);
   clip-path: var(--clip-soft);
-  animation: rise 0.7s ease both;
+  animation: rise 0.6s ease both;
 }
 
 .kicker {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 22px;
+  margin-bottom: 18px;
   color: var(--accent-gold);
   font-size: 0.62rem;
   letter-spacing: 0.18em;
@@ -278,11 +335,12 @@ footer {
 }
 
 .hero h1 {
-  font-size: clamp(3.2rem, 6vw, 6rem);
-  line-height: 0.88;
-  letter-spacing: -0.08em;
+  font-size: clamp(2.4rem, 5vw, 4.8rem);
+  line-height: 0.92;
+  letter-spacing: -0.06em;
   font-weight: 800;
   text-transform: uppercase;
+  margin: 0 0 16px;
 }
 
 .hero h1 span {
@@ -290,54 +348,198 @@ footer {
 }
 
 .intro {
-  max-width: 460px;
-  margin-top: 22px;
+  max-width: 620px;
   color: var(--text-muted);
-  line-height: 1.8;
+  line-height: 1.7;
   font-size: 0.76rem;
+  margin: 0 0 28px;
 }
 
-.hero-actions {
+/* 3 Main CTA Cards */
+.main-cta-group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.cta-card {
+  display: flex;
+  flex-direction: column;
+  padding: 20px 22px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-panel-strong);
+  clip-path: var(--clip-soft);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  text-align: left;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cta-card:hover {
+  transform: translateY(-2px);
+}
+
+.cta-solo {
+  background: linear-gradient(135deg, rgba(46, 26, 18, 0.95), rgba(26, 28, 32, 0.9));
+  border-color: rgba(246, 128, 72, 0.45);
+  cursor: pointer;
+}
+
+.cta-solo:hover {
+  border-color: var(--accent-orange);
+  box-shadow: 0 8px 24px rgba(246, 128, 72, 0.25);
+}
+
+.cta-duel {
+  background: linear-gradient(135deg, rgba(16, 32, 42, 0.95), rgba(26, 28, 32, 0.9));
+  border-color: rgba(84, 196, 255, 0.4);
+}
+
+.cta-duel:hover {
+  border-color: var(--accent-blue);
+  box-shadow: 0 8px 24px rgba(84, 196, 255, 0.2);
+}
+
+.cta-triple {
+  background: linear-gradient(135deg, rgba(20, 36, 28, 0.95), rgba(26, 28, 32, 0.9));
+  border-color: rgba(138, 217, 184, 0.4);
+}
+
+.cta-triple:hover {
+  border-color: var(--accent-green);
+  box-shadow: 0 8px 24px rgba(138, 217, 184, 0.2);
+}
+
+.cta-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.cta-badge {
+  color: var(--accent-gold);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.cta-arrow {
+  color: var(--accent-gold);
+  font-size: 1.1rem;
+}
+
+.cta-card-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.cta-icon {
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--accent-orange);
+  flex-shrink: 0;
+}
+
+.cta-duel .cta-icon {
+  color: var(--accent-blue);
+}
+
+.cta-triple .cta-icon {
+  color: var(--accent-green);
+}
+
+.cta-text h2 {
+  font-size: clamp(1.15rem, 2.5vw, 1.45rem);
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+  margin: 0 0 6px;
+  color: var(--text-main);
+}
+
+.cta-text p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  line-height: 1.6;
+}
+
+.cta-card-footer {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-light);
+}
+
+.cta-action-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent-gold);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.cta-actions-dual {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
-  margin-top: 32px;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-light);
 }
 
-.button-primary {
-  background: linear-gradient(135deg, var(--accent-gold), var(--accent-orange));
-  color: #151614;
-  border-color: rgba(241, 212, 141, 0.8);
-  box-shadow: 0 18px 40px rgba(246, 128, 72, 0.2);
+.cta-sub-btn {
+  flex: 1 1 calc(50% - 5px);
+  min-height: 46px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-light);
+  font-size: 0.65rem;
   font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  clip-path: var(--clip-soft);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 
-.button-primary:hover,
-.button-primary:focus-visible {
-  box-shadow: 0 18px 52px rgba(246, 128, 72, 0.38);
+.cta-sub-btn.primary {
+  background: linear-gradient(135deg, var(--accent-gold), var(--accent-orange));
+  color: #181a1b;
+  border-color: transparent;
 }
 
-.button-quiet {
-  background: rgba(12, 18, 23, 0.82);
+.cta-sub-btn.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(246, 128, 72, 0.4);
 }
 
-.play-icon {
-  display: inline-grid;
-  place-items: center;
-  width: 1.3rem;
-  height: 1.3rem;
-  border-radius: 999px;
-  background: rgba(246, 128, 72, 0.14);
-  color: var(--accent-orange);
+.cta-sub-btn.secondary {
+  background: rgba(14, 18, 22, 0.8);
+  color: var(--text-soft);
+}
+
+.cta-sub-btn.secondary:hover {
+  background: rgba(30, 34, 40, 0.95);
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
 }
 
 .hero-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 32px;
-  max-width: 520px;
-  margin-top: 44px;
-  padding-top: 18px;
+  gap: 28px;
+  margin-top: 36px;
+  padding-top: 20px;
   border-top: 1px solid var(--border-light);
 }
 
@@ -349,7 +551,7 @@ footer {
 
 .hero-meta strong {
   color: var(--accent-gold);
-  font-size: clamp(1.5rem, 2vw, 2rem);
+  font-size: clamp(1.4rem, 2vw, 1.8rem);
   font-family: 'Syne', 'Segoe UI', sans-serif;
 }
 
@@ -358,207 +560,155 @@ footer {
   font-size: 0.58rem;
   line-height: 1.4;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
 }
 
 .hero-art {
-  position: relative;
+  position: sticky;
+  top: 90px;
   display: grid;
   place-items: center;
-  min-height: 420px;
+  min-height: 380px;
   border: 1px solid var(--border-light);
   background: var(--bg-panel);
   clip-path: var(--clip-strong);
+  padding: 24px;
 }
 
 .hero-art img {
-  width: min(82%, 360px);
-  height: min(82%, 360px);
+  width: min(85%, 320px);
+  height: auto;
   object-fit: contain;
 }
 
-.modes-section {
-  border-top: 1px solid var(--border-light);
-  padding-top: 70px;
-  padding-bottom: 78px;
-}
-
-.section-heading {
-  position: relative;
-  padding-left: 4%;
-  margin-bottom: 36px;
-}
-
-.section-heading h2 {
-  margin-top: 18px;
-  font-size: clamp(2.1rem, 4vw, 4rem);
-  line-height: 0.94;
-  letter-spacing: -0.08em;
-  text-transform: uppercase;
-}
-
-.section-heading h2 i {
-  color: var(--text-muted);
-  font-style: normal;
-}
-
-.section-index {
-  position: absolute;
-  right: 4%;
-  bottom: 0;
-  color: rgba(154, 167, 163, 0.9);
-  font-size: 0.64rem;
-  letter-spacing: 0.12em;
-}
-
-.mode-grid {
+/* Modal dialog */
+.invite-overlay {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--grid-gap);
+  place-items: center;
+  padding: 16px;
+  background: rgba(5, 9, 15, 0.8);
+  backdrop-filter: blur(4px);
 }
 
-.mode-card {
+.invite-dialog {
+  width: min(100%, 520px);
+  padding: 26px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-dark);
+  clip-path: var(--clip-soft);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.invite-heading {
   display: flex;
-  flex-direction: column;
-  width: 100%;
-  min-height: 310px;
-  padding: 20px 22px 18px;
-  background: rgba(18, 24, 31, 0.86);
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.invite-heading .kicker {
+  margin-bottom: 6px;
+}
+
+.invite-heading h2 {
+  font-size: clamp(1.4rem, 3.5vw, 2.2rem);
+  line-height: 1;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.invite-close {
+  width: 40px;
+  height: 40px;
   border: 1px solid var(--border-light);
+  background: transparent;
+  color: var(--text-main);
+  font-size: 1.6rem;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.invite-copy {
+  margin: 18px 0 12px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.6;
+}
+
+.friend-picker {
+  display: grid;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.friend-choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 46px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-panel-soft);
   color: var(--text-main);
   text-align: left;
   font: inherit;
+  font-size: 0.72rem;
   cursor: pointer;
-  clip-path: var(--clip-strong);
-  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
-.mode-card:hover,
-.mode-card:focus-visible {
-  transform: translateY(-5px);
-  border-color: rgba(241, 212, 141, 0.7);
-  box-shadow: 0 16px 35px rgba(5, 9, 15, 0.45);
-}
-
-.mode-coral {
-  background: linear-gradient(135deg, rgba(43, 25, 18, 0.96), rgba(20, 24, 27, 0.9));
-}
-
-.mode-mint {
-  background: linear-gradient(135deg, rgba(15, 27, 26, 0.96), rgba(20, 24, 27, 0.9));
-}
-
-.mode-gold {
-  background: linear-gradient(135deg, rgba(34, 31, 21, 0.98), rgba(20, 24, 27, 0.9));
-}
-
-.card-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 0.58rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.arrow {
-  color: var(--accent-gold);
-  font-size: 1.1rem;
-}
-
-.card-symbol {
-  margin: 34px 0 24px;
-  font-size: 2.8rem;
-  color: var(--accent-orange);
-}
-
-.mode-mint .card-symbol {
-  color: var(--accent-green);
-}
-
-.mode-gold .card-symbol {
-  color: var(--accent-gold);
-}
-
-.mode-card p {
-  margin-top: auto;
-  color: var(--text-muted);
-  font-size: 0.58rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.mode-card h3 {
-  margin: 10px 0 12px;
-  font-size: clamp(1.2rem, 2vw, 2rem);
-  letter-spacing: -0.05em;
-  text-transform: uppercase;
-}
-
-.card-description {
-  display: block;
-  color: rgba(218, 224, 219, 0.8);
-  font-size: 0.68rem;
-  line-height: 1.7;
-}
-
-.invite-overlay { position: fixed; z-index: 30; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(5, 9, 15, 0.72); }
-.invite-dialog { width: min(100%, 560px); padding: 28px; border: 1px solid var(--border-strong); background: var(--bg-panel); box-shadow: var(--shadow-dark); clip-path: var(--clip-soft); }
-.invite-heading { display: flex; justify-content: space-between; gap: 20px; }.invite-heading .kicker { margin-bottom: 8px; }.invite-heading h2 { font-size: clamp(1.7rem, 4vw, 2.8rem); line-height: 1; text-transform: uppercase; }.invite-close { width: 42px; height: 42px; border: 1px solid var(--border-light); background: transparent; color: var(--text-main); font-size: 1.8rem; cursor: pointer; }.invite-copy { margin: 22px 0 14px; color: var(--text-muted); font-size: .72rem; line-height: 1.6; }.friend-picker { display: grid; gap: 8px; max-height: 250px; overflow-y: auto; }.friend-choice { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 8px; border: 1px solid var(--border-light); background: var(--bg-panel-soft); color: var(--text-main); text-align: left; font: inherit; font-size: .72rem; cursor: pointer; }.friend-choice span { display: grid; place-items: center; flex: 0 0 30px; width: 30px; height: 30px; background: var(--accent-orange); color: #2b2113; font-weight: 700; }.friend-choice.selected { border-color: var(--accent-gold); background: rgba(241, 212, 141, .12); }.invite-error { margin: 22px 0 14px; color: var(--accent-red); font-size: .72rem; }.invite-submit { width: 100%; min-height: 46px; margin-top: 18px; border: 1px solid rgba(241, 212, 141, .8); background: var(--accent-gold); color: #151614; text-transform: uppercase; font: 700 .65rem 'DM Mono', monospace; letter-spacing: .08em; cursor: pointer; }.invite-submit:disabled { opacity: .5; cursor: not-allowed; }
-
-.cards-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: var(--grid-gap);
-}
-
-.character-card {
-  overflow: hidden;
-  background: rgba(15, 20, 27, 0.86);
-  border: 1px solid var(--border-light);
-  transition: transform 0.25s ease, border-color 0.25s ease;
-}
-
-.character-card:hover {
-  transform: translateY(-3px);
-  border-color: rgba(84, 196, 255, 0.5);
-}
-
-.character-card-media {
-  aspect-ratio: 2 / 3;
-}
-
-.character-card img,
-.image-fallback {
-  width: calc(100% - 6px);
-  height: calc(100% - 2px);
-  object-fit: cover;
-}
-
-.image-fallback {
+.friend-choice span {
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, rgba(29, 38, 41, 0.9), rgba(20, 24, 27, 0.9));
-  color: var(--accent-gold);
-  font-family: 'Syne', 'Segoe UI', sans-serif;
-  font-size: 2.8rem;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  background: var(--accent-orange);
+  color: #2b2113;
   font-weight: 700;
 }
 
-.character-card h3 {
-  padding: 12px 14px 16px;
+.friend-choice.selected {
+  border-color: var(--accent-gold);
+  background: rgba(241, 212, 141, 0.12);
+}
+
+.invite-error {
+  margin: 16px 0 10px;
+  color: var(--accent-red);
   font-size: 0.72rem;
-  line-height: 1.5;
-  letter-spacing: -0.03em;
+}
+
+.invite-submit {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 18px;
+  border: 1px solid rgba(241, 212, 141, 0.8);
+  background: var(--accent-gold);
+  color: #151614;
+  text-transform: uppercase;
+  font: 700 0.68rem 'DM Mono', monospace;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.invite-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  min-height: 92px;
+  gap: 16px;
+  min-height: 80px;
   border-top: 1px solid var(--border-light);
   color: rgba(154, 167, 163, 0.8);
   font-size: 0.58rem;
@@ -573,7 +723,7 @@ footer span:first-child {
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(18px);
+    transform: translateY(16px);
   }
   to {
     opacity: 1;
@@ -581,101 +731,55 @@ footer span:first-child {
   }
 }
 
-@media (max-width: 960px) {
-  .topbar {
-    gap: 12px;
-  }
-
-  .nav-links {
-    gap: 4px;
-  }
-
-  .nav-links a {
-    padding-inline: 0.75rem;
-  }
-
-  .hero-copy {
-    padding-inline: 28px;
-  }
-
-  .hero-art {
-    min-height: 360px;
-  }
-
-  .mode-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .cards-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 720px) {
+/* Tablet / Responsive */
+@media (max-width: 992px) {
   .hero {
     grid-template-columns: 1fr;
-  }
-
-  .hero-copy {
-    padding-top: 36px;
-    padding-bottom: 38px;
+    gap: 24px;
+    padding-top: 20px;
   }
 
   .hero-art {
-    min-height: 300px;
+    position: static;
+    min-height: 240px;
+    order: -1;
   }
 
-  .mode-grid {
-    grid-template-columns: 1fr;
+  .hero-art img {
+    width: min(60%, 220px);
+  }
+
+  .hero-copy {
+    padding: 26px 20px 30px;
   }
 }
 
-@media (max-width: 560px) {
-  .topbar {
-    min-height: 78px;
+@media (max-width: 580px) {
+  .hero-art {
+    min-height: 180px;
   }
 
-  .brand-logo {
-    height: 44px;
-  }
-
-  .nav-links a {
-    padding: 0.55rem 0.45rem;
-    font-size: 0.55rem;
-    letter-spacing: 0.06em;
-  }
-
-  .profile-link {
-    min-height: 42px;
-    padding-inline: 0.65rem;
-    font-size: 0.55rem;
-    letter-spacing: 0.06em;
+  .hero-art img {
+    width: min(50%, 160px);
   }
 
   .hero h1 {
-    font-size: clamp(2.6rem, 14vw, 4rem);
+    font-size: clamp(2rem, 10vw, 3rem);
   }
 
-  .invite-dialog { padding: 22px; }
+  .cta-sub-btn {
+    flex: 1 1 100%;
+  }
 
   .hero-meta {
-    gap: 18px 24px;
-  }
-
-  .section-heading {
-    padding-left: 0;
-  }
-
-  .section-index {
-    right: 0;
+    gap: 16px;
   }
 
   footer {
     flex-direction: column;
-    align-items: flex-start;
-    justify-content: center;
-    padding-top: 24px;
-    padding-bottom: 24px;
+    text-align: center;
+    padding: 20px 16px;
+    gap: 8px;
   }
 }
 </style>

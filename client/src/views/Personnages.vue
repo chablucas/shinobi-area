@@ -388,7 +388,7 @@ function modifierText(modifier: CardModifier) {
 }
 .characters-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 16px;
 }
 .flip-card {
@@ -629,10 +629,29 @@ function modifierText(modifier: CardModifier) {
   min-height: 40px;
 }
 @media (max-width: 700px) {
+  .characters-content {
+    padding: 32px 14px 60px;
+  }
   .characters-toolbar {
     grid-template-columns: 1fr;
   }
+  .characters-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .character-image {
+    height: 160px;
+  }
+  .flip-card {
+    min-height: 270px;
+  }
   .admin-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 380px) {
+  .characters-grid {
     grid-template-columns: 1fr;
   }
 }

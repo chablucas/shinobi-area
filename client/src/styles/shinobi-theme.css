@@ -34,11 +34,13 @@
 
 html {
   scroll-behavior: smooth;
+  overflow-x: hidden;
 }
 
 body {
   margin: 0;
   min-width: 320px;
+  overflow-x: hidden;
   font-family: 'DM Mono', 'SFMono-Regular', 'Consolas', monospace;
   color: var(--text-main);
   background: #303236;

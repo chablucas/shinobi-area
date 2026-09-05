@@ -289,190 +289,656 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
     <header class="page-heading">
       <div>
         <p class="eyebrow">{{ props.mode === 'solo' ? 'Solo · joueur contre ordinateur' : props.mode === 'local3' ? 'Local · 3 joueurs' : 'Local · 2 joueurs' }}</p>
-        <h1>Fight</h1>
+        <h1>Arène de combat</h1>
       </div>
       <div v-if="phase === 'construction'" class="turn-status" :class="{ active: !pendingCard }">
         <span class="status-dot"></span>
-        <strong>{{ pendingCard ? `Joueur ${activePlayerId} choisit une catégorie` : `Tour du Joueur ${activePlayerId}` }}</strong>
-        <small>{{ availableCardCount }} cartes disponibles</small>
+        <strong>
+          {{ isComputerTurn ? 'Tour de l’ordinateur...' : pendingCard ? `Joueur ${activePlayerId} : place ta carte` : `Tour du Joueur ${activePlayerId} : pioche une carte` }}
+        </strong>
+        <small>{{ availableCardCount }} cartes restantes dans le deck</small>
       </div>
     </header>
 
     <p v-if="lobbyAccessError" class="error-message">{{ lobbyAccessError }}</p>
     <template v-else>
-    <p v-if="loading" class="loading-message">Chargement des 163 cartes...</p>
-    <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
+      <p v-if="loading" class="loading-message">Chargement des 163 cartes...</p>
+      <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
 
-    <section v-if="props.lobbyId && realtimeState" class="realtime-game">
-      <div class="realtime-turn" :class="{ active: realtimeMyTurn }">
-        <strong>{{ realtimeMyTurn ? 'À TON TOUR' : `AU TOUR DE JOUEUR ${realtimeState.currentPlayerNumber}` }}</strong>
-        <span>Tour {{ realtimeState.turnNumber }}</span>
-      </div>
-      <div class="realtime-boards">
-          <article v-for="player in realtimeState.players" :key="player.playerNumber" class="realtime-board" :class="{ 'is-current': player.playerNumber === realtimeState.currentPlayerNumber }">
-          <header><div><p class="eyebrow">Joueur {{ player.playerNumber }}</p><h2>{{ player.userId === auth.user?.id ? 'Toi' : player.displayName }}</h2></div><span>{{ player.cardsRemaining }} cartes</span></header>
-          <div class="realtime-slots"><button v-for="[label, category] in CATEGORY_DEFINITIONS" :key="category" type="button" :disabled="!realtimeCanPlaceCategory(category) && !(player.playerNumber === realtimePlayerNumber && player.slots[category] === null && !realtimeMyTurn)" :class="{ filled: !!player.slots[category], selectable: player.playerNumber === realtimePlayerNumber && realtimeCanPlaceCategory(category) && !player.slots[category] }" @click="realtimePlace(category)"><span>{{ label }}</span><template v-if="player.slots[category]"><div class="realtime-slot-art"><img v-if="player.slots[category]?.imageUrl" :src="player.slots[category]?.imageUrl ?? undefined" :alt="`Carte ${player.slots[category]?.name}`" /><span v-else>{{ player.slots[category]?.name.slice(0, 1) }}</span></div><strong>{{ player.slots[category]?.name }}</strong><small v-if="category === 'ninjutsu'">{{ player.slots[category]?.stats.ninjutsuAttack }} / {{ player.slots[category]?.stats.ninjutsuDefense }}</small><small v-else-if="category === 'clan'">{{ player.slots[category]?.clans.join(' · ') || 'Aucun' }}</small><small v-else>{{ player.slots[category]?.stats[category] ?? 'Présente' }}</small></template><small v-else>VIDE</small></button></div>
-        </article>
-      </div>
-      <div class="realtime-draw-zone"><div><p class="eyebrow">Pioche joueur {{ realtimePlayerNumber }}</p><div v-if="realtimeMyPlayer?.pendingCard" class="realtime-drawn-card"><div class="realtime-drawn-card-art"><img v-if="realtimeMyPlayer.pendingCard.imageUrl" :src="realtimeMyPlayer.pendingCard.imageUrl" :alt="`Carte ${realtimeMyPlayer.pendingCard.name}`" /><span v-else>{{ realtimeMyPlayer.pendingCard.name.slice(0, 1) }}</span></div><div class="realtime-drawn-card-copy"><strong>{{ realtimeMyPlayer.pendingCard.name }}</strong><span>Carte piochée</span></div></div><div v-else class="realtime-empty-draw">{{ realtimeMyTurn ? 'PIOCHER' : 'EN ATTENTE' }}</div><button type="button" :disabled="!canDraw" @click="realtimeDraw">PIOCHER</button></div><p v-if="realtimeCurrentPlayer" class="realtime-current">{{ realtimeMyTurn ? 'Choisis une catégorie pour poser ta carte.' : `Joueur ${realtimeState.currentPlayerNumber} prépare son action.` }}</p></div>
-      <section v-if="realtimeState.status === 'AWAITING_RESULT'" class="realtime-result"><p class="eyebrow">Combat terminé</p><h2>Les deux shinobis sont complets.</h2><div class="combat-actions"><button type="button" :disabled="resultLoading" @click="calculateRealtimeWinner">{{ resultLoading ? 'CALCUL EN COURS...' : 'CALCULER LE VAINQUEUR' }}</button><button v-if="isRealtimeHost" type="button" :disabled="resultLoading" @click="manualResultOpen = true">CHOISIR LE VAINQUEUR</button></div></section>
-      <section v-if="realtimeState.status === 'FINISHED' && realtimeState.result" class="realtime-result"><p class="eyebrow">Résultat du combat</p><template v-if="autoRealtimeResult"><div class="combat-score"><article><h3>Joueur 1</h3><strong>{{ autoRealtimeResult.player1Total }}</strong><span>pts</span></article><b>VS</b><article><h3>Joueur 2</h3><strong>{{ autoRealtimeResult.player2Total }}</strong><span>pts</span></article></div><h2>{{ autoRealtimeResult.isDraw ? 'ÉGALITÉ' : `VAINQUEUR : ${realtimeWinnerName}` }}</h2><p>Résultat calculé par le moteur officiel.</p><details><summary>RÈGLES APPLIQUÉES</summary><p v-for="rule in [...autoRealtimeResult.player1.appliedRules, ...autoRealtimeResult.player2.appliedRules]" :key="rule.ruleId + rule.target + rule.after" class="rule-row">{{ rule.label }} · {{ rule.target }} : {{ rule.before }} → {{ rule.after }}</p></details></template><template v-else><h2>{{ realtimeResultIsDraw ? 'ÉGALITÉ' : `VAINQUEUR : ${realtimeWinnerName}` }}</h2><p>Résultat choisi manuellement par l’hôte.</p></template></section>
-      <div v-if="manualResultOpen" class="manual-result-modal" role="dialog" aria-modal="true"><section><p class="eyebrow">Qui a gagné ?</p><button type="button" :disabled="resultLoading" @click="submitManualRealtimeWinner(1)">JOUEUR 1 — {{ realtimeState.players[0]?.displayName }}</button><button type="button" :disabled="resultLoading" @click="submitManualRealtimeWinner(2)">JOUEUR 2 — {{ realtimeState.players[1]?.displayName }}</button><button type="button" :disabled="resultLoading" @click="submitManualRealtimeWinner(null, true)">ÉGALITÉ</button><button type="button" :disabled="resultLoading" @click="manualResultOpen = false">ANNULER</button></section></div>
-    </section>
+      <!-- Combat multijoueur temps réel -->
+      <section v-if="props.lobbyId && realtimeState" class="realtime-game">
+        <div class="realtime-turn" :class="{ active: realtimeMyTurn }">
+          <strong>{{ realtimeMyTurn ? 'À TON TOUR' : `AU TOUR DE JOUEUR ${realtimeState.currentPlayerNumber}` }}</strong>
+          <span>Tour {{ realtimeState.turnNumber }}</span>
+        </div>
 
-    <template v-if="!props.lobbyId && phase === 'construction'">
-      <section class="construction-layout">
-        <div class="builds-column">
-          <article v-for="build in builds" :key="build.playerId" class="build-panel" :class="{ 'is-active': build.playerId === activePlayerId, 'player-one': build.playerId === 1, 'player-two': build.playerId === 2, 'player-three': build.playerId === 3 }">
-            <header class="build-header">
-              <div><p class="eyebrow">Composition</p><h2>Joueur {{ build.playerId }}</h2></div>
-              <span class="build-count">{{ filledSlotCount(build) }} <small>/ 15</small></span>
+        <div class="realtime-boards">
+          <article
+            v-for="player in realtimeState.players"
+            :key="player.playerNumber"
+            class="realtime-board"
+            :class="{ 'is-current': player.playerNumber === realtimeState.currentPlayerNumber }"
+          >
+            <header>
+              <div>
+                <p class="eyebrow">Joueur {{ player.playerNumber }}</p>
+                <h2>{{ player.userId === auth.user?.id ? 'Toi' : player.displayName }}</h2>
+              </div>
+              <span>{{ player.cardsRemaining }} cartes</span>
             </header>
-            <div class="category-grid">
-              <button v-for="[label, slug] in CATEGORY_DEFINITIONS" :key="slug" class="category-slot" :class="{ filled: slotCard(build, slug), selectable: build.playerId === activePlayerId && !!pendingCard && !slotCard(build, slug) }" type="button" :disabled="isComputerTurn || build.playerId !== activePlayerId || !pendingCard || !!slotCard(build, slug)" @click="placePendingCard(slug)">
-                <span class="slot-label">{{ label }}</span>
-                <template v-if="slotCard(build, slug)"><span class="slot-card-preview"><img v-if="slotCard(build, slug)?.imageUrl" :src="slotCard(build, slug)?.imageUrl ?? undefined" :alt="`Miniature de ${slotCard(build, slug)?.name}`" /><span v-else class="slot-card-fallback">{{ slotCard(build, slug)?.name.slice(0, 1) }}</span></span><span class="slot-card-details"><span class="slot-card-name">{{ slotCard(build, slug)?.name }}</span><span class="slot-state">Remplie</span></span></template>
-                <template v-else><span class="slot-empty">Libre</span><span class="slot-state">{{ build.playerId === activePlayerId && pendingCard ? 'Placer ici' : 'En attente' }}</span></template>
+
+            <!-- Pioche si Joueur 1 (au-dessus) -->
+            <div
+              v-if="player.playerNumber === 1 && player.playerNumber === realtimePlayerNumber"
+              class="realtime-draw-zone player-one-draw"
+            >
+              <div v-if="player.pendingCard" class="realtime-drawn-card">
+                <div class="realtime-drawn-card-art">
+                  <img v-if="player.pendingCard.imageUrl" :src="player.pendingCard.imageUrl" :alt="player.pendingCard.name" />
+                  <span v-else>{{ player.pendingCard.name.slice(0, 1) }}</span>
+                </div>
+                <div class="realtime-drawn-card-copy">
+                  <strong>{{ player.pendingCard.name }}</strong>
+                  <span>Carte piochée</span>
+                </div>
+              </div>
+              <div v-else class="realtime-empty-draw">
+                {{ realtimeMyTurn ? 'PIOCHER' : 'EN ATTENTE' }}
+              </div>
+              <button type="button" :disabled="!canDraw" @click="realtimeDraw">PIOCHER</button>
+            </div>
+
+            <div class="realtime-slots">
+              <button
+                v-for="[label, category] in CATEGORY_DEFINITIONS"
+                :key="category"
+                type="button"
+                :disabled="!realtimeCanPlaceCategory(category) && !(player.playerNumber === realtimePlayerNumber && player.slots[category] === null && !realtimeMyTurn)"
+                :class="{
+                  filled: !!player.slots[category],
+                  selectable: player.playerNumber === realtimePlayerNumber && realtimeCanPlaceCategory(category) && !player.slots[category],
+                }"
+                @click="realtimePlace(category)"
+              >
+                <span>{{ label }}</span>
+                <template v-if="player.slots[category]">
+                  <div class="realtime-slot-art">
+                    <img v-if="player.slots[category]?.imageUrl" :src="player.slots[category]?.imageUrl ?? undefined" :alt="`Carte ${player.slots[category]?.name}`" />
+                    <span v-else>{{ player.slots[category]?.name.slice(0, 1) }}</span>
+                  </div>
+                  <strong>{{ player.slots[category]?.name }}</strong>
+                  <small v-if="category === 'ninjutsu'">{{ player.slots[category]?.stats.ninjutsuAttack }} / {{ player.slots[category]?.stats.ninjutsuDefense }}</small>
+                  <small v-else-if="category === 'clan'">{{ player.slots[category]?.clans.join(' · ') || 'Aucun' }}</small>
+                  <small v-else>{{ player.slots[category]?.stats[category] ?? 'Présente' }}</small>
+                </template>
+                <small v-else>VIDE</small>
               </button>
+            </div>
+
+            <!-- Pioche si Joueur 2 (en-dessous) -->
+            <div
+              v-if="player.playerNumber === 2 && player.playerNumber === realtimePlayerNumber"
+              class="realtime-draw-zone player-two-draw"
+            >
+              <div v-if="player.pendingCard" class="realtime-drawn-card">
+                <div class="realtime-drawn-card-art">
+                  <img v-if="player.pendingCard.imageUrl" :src="player.pendingCard.imageUrl" :alt="player.pendingCard.name" />
+                  <span v-else>{{ player.pendingCard.name.slice(0, 1) }}</span>
+                </div>
+                <div class="realtime-drawn-card-copy">
+                  <strong>{{ player.pendingCard.name }}</strong>
+                  <span>Carte piochée</span>
+                </div>
+              </div>
+              <div v-else class="realtime-empty-draw">
+                {{ realtimeMyTurn ? 'PIOCHER' : 'EN ATTENTE' }}
+              </div>
+              <button type="button" :disabled="!canDraw" @click="realtimeDraw">PIOCHER</button>
             </div>
           </article>
         </div>
 
-        <aside class="draw-panel">
-          <p class="eyebrow">Zone de pioche</p>
-          <h2>{{ pendingCard ? 'Carte piochée' : 'À toi de jouer' }}</h2>
-          <div v-if="pendingCard" class="drawn-card"><GameCard :card="pendingCard" :revealed="true" active /></div>
-          <div v-else class="draw-placeholder"><span>?</span><small>Une carte à la fois</small></div>
-          <div class="draw-actions"><button class="draw-button" type="button" :disabled="loading || !!pendingCard || availableCardCount === 0 || allBuildsComplete" @click="drawCard">PIOCHER <span>↓</span></button><button class="back-button" type="button" :disabled="!lastPlacement || !!pendingCard" @click="undoLastPlacement">← Retour</button></div>
-          <p class="draw-hint">{{ pendingCard ? 'Choisis une case libre dans la composition active.' : `Joueur ${activePlayerId}, pioche une carte.` }}</p>
-        </aside>
+        <section v-if="realtimeState.status === 'AWAITING_RESULT'" class="realtime-result">
+          <p class="eyebrow">Combat terminé</p>
+          <h2>Les deux shinobis sont complets.</h2>
+          <div class="combat-actions">
+            <button type="button" :disabled="resultLoading" @click="calculateRealtimeWinner">
+              {{ resultLoading ? 'CALCUL EN COURS...' : 'CALCULER LE VAINQUEUR' }}
+            </button>
+            <button v-if="isRealtimeHost" type="button" :disabled="resultLoading" @click="manualResultOpen = true">
+              CHOISIR LE VAINQUEUR
+            </button>
+          </div>
+        </section>
+
+        <section v-if="realtimeState.status === 'FINISHED' && realtimeState.result" class="realtime-result">
+          <p class="eyebrow">Résultat du combat</p>
+          <template v-if="autoRealtimeResult">
+            <div class="combat-score">
+              <article>
+                <h3>Joueur 1</h3>
+                <strong>{{ autoRealtimeResult.player1Total }}</strong>
+                <span>pts</span>
+              </article>
+              <b>VS</b>
+              <article>
+                <h3>Joueur 2</h3>
+                <strong>{{ autoRealtimeResult.player2Total }}</strong>
+                <span>pts</span>
+              </article>
+            </div>
+            <h2>{{ autoRealtimeResult.isDraw ? 'ÉGALITÉ' : `VAINQUEUR : ${realtimeWinnerName}` }}</h2>
+            <p>Résultat calculé par le moteur officiel.</p>
+            <details>
+              <summary>RÈGLES APPLIQUÉES</summary>
+              <p
+                v-for="rule in [...autoRealtimeResult.player1.appliedRules, ...autoRealtimeResult.player2.appliedRules]"
+                :key="rule.ruleId + rule.target + rule.after"
+                class="rule-row"
+              >
+                {{ rule.label }} · {{ rule.target }} : {{ rule.before }} → {{ rule.after }}
+              </p>
+            </details>
+          </template>
+          <template v-else>
+            <h2>{{ realtimeResultIsDraw ? 'ÉGALITÉ' : `VAINQUEUR : ${realtimeWinnerName}` }}</h2>
+            <p>Résultat choisi manuellement par l’hôte.</p>
+          </template>
+        </section>
+
+        <div v-if="manualResultOpen" class="manual-result-modal" role="dialog" aria-modal="true">
+          <section>
+            <p class="eyebrow">Qui a gagné ?</p>
+            <button type="button" :disabled="resultLoading" @click="submitManualRealtimeWinner(1)">
+              JOUEUR 1 — {{ realtimeState.players[0]?.displayName }}
+            </button>
+            <button type="button" :disabled="resultLoading" @click="submitManualRealtimeWinner(2)">
+              JOUEUR 2 — {{ realtimeState.players[1]?.displayName }}
+            </button>
+            <button type="button" :disabled="resultLoading" @click="submitManualRealtimeWinner(null, true)">
+              ÉGALITÉ
+            </button>
+            <button type="button" :disabled="resultLoading" @click="manualResultOpen = false">
+              ANNULER
+            </button>
+          </section>
+        </div>
       </section>
-    </template>
 
-    <section v-else-if="!props.lobbyId && phase === 'combat'" class="combat-panel">
-      <div class="combat-intro"><p class="eyebrow">Étape suivante</p><h2>Simuler le combat</h2><p>Les deux compositions sont complètes. Le serveur calcule le résultat.</p></div>
-      <div class="combat-actions"><button type="button" :disabled="simulating" @click="runSimulation">{{ simulating ? 'Simulation en cours...' : 'Simuler le combat' }} <span>→</span></button><button type="button" :disabled="simulating" @click="chooseManualWinner('player1')">Joueur 1 gagne</button><button type="button" :disabled="simulating" @click="chooseManualWinner('player2')">Joueur 2 gagne</button><button type="button" :disabled="simulating" @click="chooseManualWinner('draw')">Égalité</button></div>
-      <div class="combat-builds"><article v-for="build in builds" :key="build.playerId" class="build-panel" :class="{ 'player-one': build.playerId === 1, 'player-two': build.playerId === 2 }"><header class="build-header"><h3>Joueur {{ build.playerId }}</h3><span class="build-count">15 <small>/ 15</small></span></header><div class="category-grid"><div v-for="[label, slug] in CATEGORY_DEFINITIONS" :key="slug" class="category-slot filled"><span class="slot-label">{{ label }}</span><span class="slot-card-preview"><img v-if="slotCard(build, slug)?.imageUrl" :src="slotCard(build, slug)?.imageUrl ?? undefined" :alt="`Miniature de ${slotCard(build, slug)?.name}`" /><span v-else class="slot-card-fallback">{{ slotCard(build, slug)?.name.slice(0, 1) }}</span></span><span class="slot-card-details"><span class="slot-card-name">{{ slotCard(build, slug)?.name }}</span><span class="slot-state">Remplie</span></span></div></div></article></div>
-    </section>
+      <!-- Phase 1: Construction des Shinobis (Local / Solo / 1v1v1) -->
+      <template v-if="!props.lobbyId && phase === 'construction'">
+        <section class="vertical-battle-layout">
+          <!-- JOUEUR 1 -->
+          <article class="build-panel player-one" :class="{ 'is-active': activePlayerId === 1 }">
+            <header class="build-header">
+              <div>
+                <p class="eyebrow">Composition 01</p>
+                <h2>{{ props.mode === 'solo' ? 'Ton Shinobi' : 'Joueur 1' }}</h2>
+              </div>
+              <span class="build-count">{{ filledSlotCount(builds[0]!) }} <small>/ 15</small></span>
+            </header>
 
-    <section v-else-if="!props.lobbyId" class="result-panel">
-      <p class="eyebrow">Combat terminé</p>
-      <template v-if="combatResult && combatBlocked">
-        <h2>Composition invalide</h2>
-        <div class="validation-errors"><p v-for="error in [...combatResult.player1.validationErrors, ...combatResult.player2.validationErrors]" :key="error.ruleId + error.message">{{ error.message }}</p></div>
+            <!-- Pioche du Joueur 1 : AU-DESSUS de son deck -->
+            <div class="player-draw-area draw-area-top">
+              <div v-if="activePlayerId === 1 && pendingCard" class="active-draw-preview">
+                <div class="card-preview-compact">
+                  <div class="preview-img-box">
+                    <img v-if="pendingCard.imageUrl" :src="pendingCard.imageUrl" :alt="pendingCard.name" />
+                    <span v-else class="preview-letter">{{ pendingCard.name.slice(0, 1) }}</span>
+                  </div>
+                  <div class="preview-info">
+                    <span class="preview-badge">Carte piochée</span>
+                    <strong>{{ pendingCard.name }}</strong>
+                    <span class="preview-instruction">Touche une case libre ci-dessous</span>
+                  </div>
+                </div>
+              </div>
+
+              <div v-else-if="activePlayerId === 1 && !pendingCard" class="draw-cta-container">
+                <button
+                  class="draw-action-btn"
+                  type="button"
+                  :disabled="loading || availableCardCount === 0 || allBuildsComplete"
+                  @click="drawCard"
+                >
+                  <span>PIOCHER UNE CARTE (J1)</span>
+                  <span class="btn-icon">↓</span>
+                </button>
+                <button
+                  v-if="lastPlacement && lastPlacement.playerId === 1"
+                  class="undo-action-btn"
+                  type="button"
+                  @click="undoLastPlacement"
+                >
+                  ← Annuler le coup
+                </button>
+              </div>
+
+              <div v-else class="draw-waiting-badge">
+                <span>En attente du tour de Joueur 1</span>
+              </div>
+            </div>
+
+            <!-- Grille des 15 cartes Joueur 1 -->
+            <div class="category-grid">
+              <button
+                v-for="[label, slug] in CATEGORY_DEFINITIONS"
+                :key="slug"
+                class="category-slot"
+                :class="{
+                  filled: slotCard(builds[0]!, slug),
+                  selectable: activePlayerId === 1 && !!pendingCard && !slotCard(builds[0]!, slug),
+                }"
+                type="button"
+                :disabled="activePlayerId !== 1 || !pendingCard || !!slotCard(builds[0]!, slug)"
+                @click="placePendingCard(slug)"
+              >
+                <span class="slot-label">{{ label }}</span>
+                <template v-if="slotCard(builds[0]!, slug)">
+                  <span class="slot-card-preview">
+                    <img
+                      v-if="slotCard(builds[0]!, slug)?.imageUrl"
+                      :src="slotCard(builds[0]!, slug)?.imageUrl ?? undefined"
+                      :alt="`Miniature de ${slotCard(builds[0]!, slug)?.name}`"
+                      loading="lazy"
+                    />
+                    <span v-else class="slot-card-fallback">{{ slotCard(builds[0]!, slug)?.name.slice(0, 1) }}</span>
+                  </span>
+                  <span class="slot-card-details">
+                    <span class="slot-card-name">{{ slotCard(builds[0]!, slug)?.name }}</span>
+                    <span class="slot-state">Posée</span>
+                  </span>
+                </template>
+                <template v-else>
+                  <span class="slot-empty">Libre</span>
+                  <span class="slot-state">{{ activePlayerId === 1 && pendingCard ? 'Placer ici' : 'En attente' }}</span>
+                </template>
+              </button>
+            </div>
+          </article>
+
+          <!-- ZONE CENTRALE DE COMBAT -->
+          <div class="battle-center-arena">
+            <div class="arena-badge">
+              <span class="arena-icon">⚔</span>
+              <span class="arena-text">ZONE DE COMBAT</span>
+              <span class="arena-icon">⚔</span>
+            </div>
+            <p class="arena-status">
+              {{
+                allBuildsComplete
+                  ? 'Compositions complètes ! Prêt pour le combat.'
+                  : isComputerTurn
+                    ? 'L’ordinateur analyse la pioche...'
+                    : pendingCard
+                      ? `Joueur ${activePlayerId} : choisis l'emplacement de ta carte`
+                      : `Joueur ${activePlayerId} : tire une carte`
+              }}
+            </p>
+          </div>
+
+          <!-- JOUEUR 2 -->
+          <article class="build-panel player-two" :class="{ 'is-active': activePlayerId === 2 }">
+            <header class="build-header">
+              <div>
+                <p class="eyebrow">Composition 02</p>
+                <h2>{{ props.mode === 'solo' ? 'IA Adversaire' : 'Joueur 2' }}</h2>
+              </div>
+              <span class="build-count">{{ filledSlotCount(builds[1]!) }} <small>/ 15</small></span>
+            </header>
+
+            <!-- Grille des 15 cartes Joueur 2 -->
+            <div class="category-grid">
+              <button
+                v-for="[label, slug] in CATEGORY_DEFINITIONS"
+                :key="slug"
+                class="category-slot"
+                :class="{
+                  filled: slotCard(builds[1]!, slug),
+                  selectable: activePlayerId === 2 && !!pendingCard && !slotCard(builds[1]!, slug),
+                }"
+                type="button"
+                :disabled="isComputerTurn || activePlayerId !== 2 || !pendingCard || !!slotCard(builds[1]!, slug)"
+                @click="placePendingCard(slug)"
+              >
+                <span class="slot-label">{{ label }}</span>
+                <template v-if="slotCard(builds[1]!, slug)">
+                  <span class="slot-card-preview">
+                    <img
+                      v-if="slotCard(builds[1]!, slug)?.imageUrl"
+                      :src="slotCard(builds[1]!, slug)?.imageUrl ?? undefined"
+                      :alt="`Miniature de ${slotCard(builds[1]!, slug)?.name}`"
+                      loading="lazy"
+                    />
+                    <span v-else class="slot-card-fallback">{{ slotCard(builds[1]!, slug)?.name.slice(0, 1) }}</span>
+                  </span>
+                  <span class="slot-card-details">
+                    <span class="slot-card-name">{{ slotCard(builds[1]!, slug)?.name }}</span>
+                    <span class="slot-state">Posée</span>
+                  </span>
+                </template>
+                <template v-else>
+                  <span class="slot-empty">Libre</span>
+                  <span class="slot-state">{{ activePlayerId === 2 && pendingCard ? 'Placer ici' : 'En attente' }}</span>
+                </template>
+              </button>
+            </div>
+
+            <!-- Pioche du Joueur 2 : EN DESSOUS de son deck -->
+            <div class="player-draw-area draw-area-bottom">
+              <div v-if="isComputerTurn" class="ai-thinking-badge">
+                <span>L'ordinateur réfléchit et place son shinobi...</span>
+              </div>
+
+              <div v-else-if="activePlayerId === 2 && pendingCard" class="active-draw-preview">
+                <div class="card-preview-compact">
+                  <div class="preview-img-box">
+                    <img v-if="pendingCard.imageUrl" :src="pendingCard.imageUrl" :alt="pendingCard.name" />
+                    <span v-else class="preview-letter">{{ pendingCard.name.slice(0, 1) }}</span>
+                  </div>
+                  <div class="preview-info">
+                    <span class="preview-badge">Carte piochée</span>
+                    <strong>{{ pendingCard.name }}</strong>
+                    <span class="preview-instruction">Touche une case libre ci-dessus</span>
+                  </div>
+                </div>
+              </div>
+
+              <div v-else-if="activePlayerId === 2 && !pendingCard" class="draw-cta-container">
+                <button
+                  class="draw-action-btn"
+                  type="button"
+                  :disabled="loading || availableCardCount === 0 || allBuildsComplete"
+                  @click="drawCard"
+                >
+                  <span>PIOCHER UNE CARTE (J2)</span>
+                  <span class="btn-icon">↓</span>
+                </button>
+                <button
+                  v-if="lastPlacement && lastPlacement.playerId === 2"
+                  class="undo-action-btn"
+                  type="button"
+                  @click="undoLastPlacement"
+                >
+                  ← Annuler le coup
+                </button>
+              </div>
+
+              <div v-else class="draw-waiting-badge">
+                <span>En attente du tour de Joueur 2</span>
+              </div>
+            </div>
+          </article>
+
+          <!-- JOUEUR 3 (si mode 1v1v1) -->
+          <article
+            v-if="props.mode === 'local3' && builds[2]"
+            class="build-panel player-three"
+            :class="{ 'is-active': activePlayerId === 3 }"
+          >
+            <header class="build-header">
+              <div>
+                <p class="eyebrow">Composition 03</p>
+                <h2>Joueur 3</h2>
+              </div>
+              <span class="build-count">{{ filledSlotCount(builds[2]!) }} <small>/ 15</small></span>
+            </header>
+
+            <div class="category-grid">
+              <button
+                v-for="[label, slug] in CATEGORY_DEFINITIONS"
+                :key="slug"
+                class="category-slot"
+                :class="{
+                  filled: slotCard(builds[2]!, slug),
+                  selectable: activePlayerId === 3 && !!pendingCard && !slotCard(builds[2]!, slug),
+                }"
+                type="button"
+                :disabled="activePlayerId !== 3 || !pendingCard || !!slotCard(builds[2]!, slug)"
+                @click="placePendingCard(slug)"
+              >
+                <span class="slot-label">{{ label }}</span>
+                <template v-if="slotCard(builds[2]!, slug)">
+                  <span class="slot-card-preview">
+                    <img
+                      v-if="slotCard(builds[2]!, slug)?.imageUrl"
+                      :src="slotCard(builds[2]!, slug)?.imageUrl ?? undefined"
+                      :alt="`Miniature de ${slotCard(builds[2]!, slug)?.name}`"
+                      loading="lazy"
+                    />
+                    <span v-else class="slot-card-fallback">{{ slotCard(builds[2]!, slug)?.name.slice(0, 1) }}</span>
+                  </span>
+                  <span class="slot-card-details">
+                    <span class="slot-card-name">{{ slotCard(builds[2]!, slug)?.name }}</span>
+                    <span class="slot-state">Posée</span>
+                  </span>
+                </template>
+                <template v-else>
+                  <span class="slot-empty">Libre</span>
+                  <span class="slot-state">{{ activePlayerId === 3 && pendingCard ? 'Placer ici' : 'En attente' }}</span>
+                </template>
+              </button>
+            </div>
+
+            <!-- Pioche du Joueur 3 : EN DESSOUS de son deck -->
+            <div class="player-draw-area draw-area-bottom">
+              <div v-if="activePlayerId === 3 && pendingCard" class="active-draw-preview">
+                <div class="card-preview-compact">
+                  <div class="preview-img-box">
+                    <img v-if="pendingCard.imageUrl" :src="pendingCard.imageUrl" :alt="pendingCard.name" />
+                    <span v-else class="preview-letter">{{ pendingCard.name.slice(0, 1) }}</span>
+                  </div>
+                  <div class="preview-info">
+                    <span class="preview-badge">Carte piochée</span>
+                    <strong>{{ pendingCard.name }}</strong>
+                    <span class="preview-instruction">Touche une case libre ci-dessus</span>
+                  </div>
+                </div>
+              </div>
+
+              <div v-else-if="activePlayerId === 3 && !pendingCard" class="draw-cta-container">
+                <button
+                  class="draw-action-btn"
+                  type="button"
+                  :disabled="loading || availableCardCount === 0 || allBuildsComplete"
+                  @click="drawCard"
+                >
+                  <span>PIOCHER UNE CARTE (J3)</span>
+                  <span class="btn-icon">↓</span>
+                </button>
+                <button
+                  v-if="lastPlacement && lastPlacement.playerId === 3"
+                  class="undo-action-btn"
+                  type="button"
+                  @click="undoLastPlacement"
+                >
+                  ← Annuler le coup
+                </button>
+              </div>
+
+              <div v-else class="draw-waiting-badge">
+                <span>En attente du tour de Joueur 3</span>
+              </div>
+            </div>
+          </article>
+        </section>
       </template>
-      <template v-else-if="combatResult">
-        <h2>{{ combatResult.resolutionMode === 'manual' ? (combatResult.winner === 'draw' ? 'Égalité' : `Vainqueur choisi : Joueur ${combatResult.winner === 'player1' ? 1 : 2}`) : (combatResult.winner === 'draw' ? 'Égalité' : `Gagnant : Joueur ${combatResult.winner === 'player1' ? 1 : 2}`) }}</h2>
-        <div class="combat-score"><article><h3>Joueur 1</h3><strong>{{ combatResult.player1.total }}</strong><span>Total</span></article><b>VS</b><article><h3>Joueur 2</h3><strong>{{ combatResult.player2.total }}</strong><span>Total</span></article></div>
-        <div class="result-builds final-builds"><article v-for="(player, index) in [combatResult.player1, combatResult.player2]" :key="index" class="build-panel" :class="{ 'player-one': index === 0, 'player-two': index === 1 }"><header class="build-header"><h3>Joueur {{ index + 1 }} · Statistiques finales</h3></header><div class="category-grid"><div v-for="[label, slug] in CATEGORY_DEFINITIONS" :key="slug" class="category-slot filled"><span class="slot-label">{{ label }}</span><span class="slot-card-preview"><img v-if="cardFor(builds[index]!, slug)?.imageUrl" :src="cardFor(builds[index]!, slug)?.imageUrl ?? undefined" :alt="`Miniature de ${cardFor(builds[index]!, slug)?.name}`" /><span v-else class="slot-card-fallback">{{ cardFor(builds[index]!, slug)?.name.slice(0, 1) }}</span></span><span class="slot-card-details"><span class="slot-card-name">{{ cardFor(builds[index]!, slug)?.name }}</span><span v-if="slug === 'ninjutsu'" class="final-stat-pair">ATQ {{ player.finalStats.ninjutsuAttack }} · DEF {{ player.finalStats.ninjutsuDefense }}</span><span v-else-if="slug === 'clan'" class="final-stat-pair">{{ cardFor(builds[index]!, slug)?.name }}</span><span v-else-if="slug === 'kekkei-mora'" class="final-stat-pair">Carte sélectionnée</span><span v-else class="final-stat-value">{{ finalValue(player, slug) }}</span></span></div></div><h4>Règles appliquées</h4><p v-for="rule in player.appliedRules" :key="rule.ruleId + rule.target + rule.after" class="rule-row">{{ rule.label }} · {{ rule.target }} : {{ rule.before }} → {{ rule.after }}<small>({{ rule.operation }} {{ rule.value }})</small></p></article></div>
-      </template>
-      <div v-else class="error-message">Aucun résultat de combat disponible.</div>
-      <div class="result-actions"><button v-if="auth.isAuthenticated" class="primary-button" type="button" :disabled="saved" @click="saveHumanBuild">{{ saved ? 'Perso sauvegardé' : 'Sauvegarder mon perso' }} <span>↓</span></button><a v-else class="secondary-button" href="/connexion">Connecte-toi pour sauvegarder</a><button class="primary-button" type="button" @click="replay">Rejouer <span>↻</span></button><a class="secondary-button" href="/">Retour à l’accueil <span>↗</span></a></div>
-    </section>
+
+      <!-- Phase 2: Étape de combat -->
+      <section v-else-if="!props.lobbyId && phase === 'combat'" class="combat-panel">
+        <div class="combat-intro">
+          <p class="eyebrow">Arène finale</p>
+          <h2>Simuler le combat</h2>
+          <p>Les deux shinobis sont complets. Lance la confrontation officielle ou choisis le dénouement.</p>
+        </div>
+
+        <div class="combat-actions">
+          <button type="button" class="btn-simulate" :disabled="simulating" @click="runSimulation">
+            <span>{{ simulating ? 'Simulation en cours...' : '⚡ SIMULER LE COMBAT' }}</span>
+            <span>→</span>
+          </button>
+          <div class="manual-choices">
+            <button type="button" :disabled="simulating" @click="chooseManualWinner('player1')">
+              Victoire J1
+            </button>
+            <button type="button" :disabled="simulating" @click="chooseManualWinner('player2')">
+              Victoire J2
+            </button>
+            <button type="button" :disabled="simulating" @click="chooseManualWinner('draw')">
+              Égalité
+            </button>
+          </div>
+        </div>
+
+        <div class="combat-builds">
+          <article
+            v-for="build in builds"
+            :key="build.playerId"
+            class="build-panel"
+            :class="{ 'player-one': build.playerId === 1, 'player-two': build.playerId === 2, 'player-three': build.playerId === 3 }"
+          >
+            <header class="build-header">
+              <h3>Joueur {{ build.playerId }}</h3>
+              <span class="build-count">15 <small>/ 15</small></span>
+            </header>
+            <div class="category-grid">
+              <div v-for="[label, slug] in CATEGORY_DEFINITIONS" :key="slug" class="category-slot filled">
+                <span class="slot-label">{{ label }}</span>
+                <span class="slot-card-preview">
+                  <img
+                    v-if="slotCard(build, slug)?.imageUrl"
+                    :src="slotCard(build, slug)?.imageUrl ?? undefined"
+                    :alt="`Miniature de ${slotCard(build, slug)?.name}`"
+                  />
+                  <span v-else class="slot-card-fallback">{{ slotCard(build, slug)?.name.slice(0, 1) }}</span>
+                </span>
+                <span class="slot-card-details">
+                  <span class="slot-card-name">{{ slotCard(build, slug)?.name }}</span>
+                  <span class="slot-state">Prête</span>
+                </span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- Phase 3: Résultats du combat -->
+      <section v-else-if="!props.lobbyId" class="result-panel">
+        <p class="eyebrow">Dénouement de l'arène</p>
+
+        <template v-if="combatResult && combatBlocked">
+          <h2>Composition invalide</h2>
+          <div class="validation-errors">
+            <p v-for="error in [...combatResult.player1.validationErrors, ...combatResult.player2.validationErrors]" :key="error.ruleId + error.message">
+              {{ error.message }}
+            </p>
+          </div>
+        </template>
+
+        <template v-else-if="combatResult">
+          <h2>
+            {{
+              combatResult.resolutionMode === 'manual'
+                ? combatResult.winner === 'draw'
+                  ? 'Égalité'
+                  : `Vainqueur choisi : Joueur ${combatResult.winner === 'player1' ? 1 : 2}`
+                : combatResult.winner === 'draw'
+                  ? 'Égalité'
+                  : `Gagnant : Joueur ${combatResult.winner === 'player1' ? 1 : 2}`
+            }}
+          </h2>
+
+          <div class="combat-score">
+            <article class="score-card player-one">
+              <h3>Joueur 1</h3>
+              <strong>{{ combatResult.player1.total }}</strong>
+              <span>Total Points</span>
+            </article>
+            <b class="score-vs">VS</b>
+            <article class="score-card player-two">
+              <h3>Joueur 2</h3>
+              <strong>{{ combatResult.player2.total }}</strong>
+              <span>Total Points</span>
+            </article>
+          </div>
+
+          <div class="result-builds final-builds">
+            <article
+              v-for="(player, index) in [combatResult.player1, combatResult.player2]"
+              :key="index"
+              class="build-panel"
+              :class="{ 'player-one': index === 0, 'player-two': index === 1 }"
+            >
+              <header class="build-header">
+                <h3>Joueur {{ index + 1 }} · Statistiques finales</h3>
+              </header>
+              <div class="category-grid">
+                <div v-for="[label, slug] in CATEGORY_DEFINITIONS" :key="slug" class="category-slot filled">
+                  <span class="slot-label">{{ label }}</span>
+                  <span class="slot-card-preview">
+                    <img
+                      v-if="cardFor(builds[index]!, slug)?.imageUrl"
+                      :src="cardFor(builds[index]!, slug)?.imageUrl ?? undefined"
+                      :alt="`Miniature de ${cardFor(builds[index]!, slug)?.name}`"
+                    />
+                    <span v-else class="slot-card-fallback">{{ cardFor(builds[index]!, slug)?.name.slice(0, 1) }}</span>
+                  </span>
+                  <span class="slot-card-details">
+                    <span class="slot-card-name">{{ cardFor(builds[index]!, slug)?.name }}</span>
+                    <span v-if="slug === 'ninjutsu'" class="final-stat-pair">ATQ {{ player.finalStats.ninjutsuAttack }} · DEF {{ player.finalStats.ninjutsuDefense }}</span>
+                    <span v-else-if="slug === 'clan'" class="final-stat-pair">{{ cardFor(builds[index]!, slug)?.name }}</span>
+                    <span v-else-if="slug === 'kekkei-mora'" class="final-stat-pair">Active</span>
+                    <span v-else class="final-stat-value">{{ finalValue(player, slug) }}</span>
+                  </span>
+                </div>
+              </div>
+
+              <div v-if="player.appliedRules.length" class="rules-applied-section">
+                <h4>Règles appliquées</h4>
+                <p v-for="rule in player.appliedRules" :key="rule.ruleId + rule.target + rule.after" class="rule-row">
+                  {{ rule.label }} · {{ rule.target }} : {{ rule.before }} → {{ rule.after }}
+                  <small>({{ rule.operation }} {{ rule.value }})</small>
+                </p>
+              </div>
+            </article>
+          </div>
+        </template>
+
+        <div v-else class="error-message">Aucun résultat de combat disponible.</div>
+
+        <div class="result-actions">
+          <button v-if="auth.isAuthenticated" class="primary-button" type="button" :disabled="saved" @click="saveHumanBuild">
+            {{ saved ? '✓ Perso sauvegardé' : '💾 Sauvegarder mon perso' }}
+          </button>
+          <a v-else class="secondary-button" href="/connexion">Connecte-toi pour sauvegarder</a>
+          <button class="primary-button" type="button" @click="replay">
+            Rejouer <span>↻</span>
+          </button>
+          <a class="secondary-button" href="/">Retour à l’accueil <span>↗</span></a>
+        </div>
+      </section>
     </template>
   </main>
 </template>
 
-<style>
+<style scoped>
 .game-shell {
   min-height: 100vh;
   background: var(--bg-main);
+  overflow-x: hidden;
 }
 
 .game-shell > * {
   max-width: 1360px;
   margin-inline: auto;
-  padding-inline: max(20px, calc((100vw - 1360px) / 2));
-}
-
-.game-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  max-width: none !important;
-  min-height: 78px;
-  border-bottom: 1px solid rgba(84, 48, 12, 0.35);
-  background: var(--accent-orange);
-}
-
-.game-nav .brand {
-  font-size: 1rem;
-}
-
-.game-nav .brand-logo {
-  display: block;
-  width: auto;
-  height: 48px;
-  object-fit: contain;
-}
-
-.game-nav .create-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 42px;
-  padding: 0.75rem 1.2rem;
-  border: 1px solid rgba(76, 48, 15, 0.42);
-  background: #fff0bd;
-  color: #2b2113;
-  clip-path: var(--clip-soft);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-size: 0.64rem;
-  font-weight: 700;
-}
-
-.game-nav-links {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: #2b2113;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-size: 0.68rem;
-}
-
-.game-nav-tab {
-  padding: 0.75rem 1.15rem;
-  border: 1px solid rgba(76, 48, 15, 0.35);
-  background: rgba(255, 214, 102, 0.34);
-  clip-path: var(--clip-soft);
-}
-
-.game-nav-tab.active {
-  background: #fff0bd;
-  font-weight: 700;
-}
-
-.game-nav-tab:hover,
-.game-nav-tab:focus-visible {
-  background: rgba(255, 236, 174, 0.58);
-}
-
-.game-nav .profile-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 42px;
-  padding: 0.75rem 1.25rem;
-  border: 1px solid rgba(76, 48, 15, 0.42);
-  background: #2b2113;
-  color: #fff0bd;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 0.64rem;
-  clip-path: var(--clip-soft);
-}
-
-.game-nav .profile-link:hover,
-.game-nav .profile-link:focus-visible {
-  background: #473316;
+  padding-inline: max(16px, calc((100vw - 1360px) / 2));
+  box-sizing: border-box;
 }
 
 .page-heading {
   display: block;
   text-align: center;
-  padding: 52px 0 26px;
+  padding: 32px 0 20px;
 }
 
 .eyebrow {
@@ -480,34 +946,30 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
   font-size: 0.6rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
+  margin: 0;
 }
 
 .page-heading h1 {
-  margin-top: 18px;
-  font-size: clamp(2.4rem, 5vw, 4.7rem);
+  margin: 8px 0 0;
+  font-size: clamp(2rem, 5vw, 3.8rem);
   line-height: 0.96;
-  letter-spacing: -0.08em;
+  letter-spacing: -0.06em;
   text-transform: uppercase;
 }
 
-.page-heading h1 i {
-  color: var(--accent-orange);
-  font-style: normal;
-}
-
 .turn-status {
-  max-width: 360px;
-  margin: 22px auto 0;
+  max-width: 420px;
+  margin: 18px auto 0;
   text-align: left;
-  min-width: 270px;
-  padding: 14px 18px;
+  padding: 12px 18px;
   border: 1px solid rgba(246, 128, 72, 0.6);
   background: linear-gradient(135deg, rgba(41, 23, 16, 0.92), rgba(17, 20, 22, 0.9));
   box-shadow: var(--shadow-glow-orange);
+  clip-path: var(--clip-soft);
 }
 
 .turn-status.active {
-  border-color: rgba(84, 196, 255, 0.5);
+  border-color: rgba(84, 196, 255, 0.6);
   background: linear-gradient(135deg, rgba(18, 31, 40, 0.95), rgba(14, 19, 25, 0.9));
   box-shadow: var(--shadow-glow-blue);
 }
@@ -518,17 +980,16 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
 }
 
 .turn-status strong {
-  font-size: 0.76rem;
-  letter-spacing: 0.1em;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .turn-status small {
-  margin-top: 8px;
+  margin-top: 6px;
   color: var(--text-muted);
   font-size: 0.58rem;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .status-dot {
@@ -546,142 +1007,333 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
   box-shadow: 0 0 12px rgba(84, 196, 255, 0.8);
 }
 
-.construction-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(220px, 0.62fr);
-  align-items: start;
-  gap: 18px;
-  padding-bottom: 72px;
-}
-
-.builds-column {
-  display: contents;
+/* Vertical Battle Layout (Mobile & Tablet & Desktop responsive) */
+.vertical-battle-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-bottom: 70px;
+  margin-top: 10px;
 }
 
 .build-panel {
   min-width: 0;
-  padding: 16px;
+  padding: 18px 16px;
   background: rgba(17, 20, 24, 0.88);
   border: 1px solid rgba(160, 174, 175, 0.18);
   box-shadow: var(--shadow-dark);
+  clip-path: var(--clip-soft);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .build-panel.player-one {
-  border-color: rgba(246, 128, 72, 0.35);
+  border-color: rgba(246, 128, 72, 0.4);
   background: #353033;
 }
 
 .build-panel.player-two {
-  border-color: rgba(84, 196, 255, 0.35);
+  border-color: rgba(84, 196, 255, 0.4);
   background: #30363b;
 }
 
 .build-panel.player-three {
-  border-color: rgba(138, 217, 184, 0.42);
+  border-color: rgba(138, 217, 184, 0.45);
   background: #303936;
 }
 
 .build-panel.is-active {
-  border-color: rgba(241, 212, 141, 0.8);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 20px rgba(241, 212, 141, 0.25);
 }
 
 .build-header {
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 12px;
   margin-bottom: 14px;
-}
-
-.build-header .eyebrow {
-  margin-bottom: 7px;
 }
 
 .build-header h2,
 .build-header h3 {
-  margin: 0;
-  font-size: clamp(1.35rem, 2vw, 2rem);
-  letter-spacing: -0.06em;
+  margin: 4px 0 0;
+  font-size: clamp(1.2rem, 3vw, 1.8rem);
+  letter-spacing: -0.04em;
   text-transform: uppercase;
 }
 
 .build-count {
   color: var(--accent-gold);
-  font-family: 'Syne', 'Segoe UI', sans-serif;
-  font-size: clamp(1.7rem, 2vw, 2.3rem);
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(1.4rem, 2.5vw, 1.9rem);
   font-weight: 700;
 }
 
 .build-count small {
   color: var(--text-muted);
-  font-size: 0.6rem;
+  font-size: 0.58rem;
+}
+
+/* Zone de pioche intégrée par joueur */
+.player-draw-area {
+  padding: 12px;
+  margin: 12px 0;
+  border: 1px dashed rgba(241, 212, 141, 0.4);
+  background: rgba(12, 15, 20, 0.65);
+  clip-path: var(--clip-soft);
+}
+
+.draw-area-top {
+  margin-top: 4px;
+  margin-bottom: 14px;
+}
+
+.draw-area-bottom {
+  margin-top: 14px;
+  margin-bottom: 4px;
+}
+
+.draw-cta-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.draw-action-btn {
+  flex: 1;
+  min-height: 46px;
+  padding: 10px 16px;
+  border: 0;
+  background: linear-gradient(135deg, var(--accent-gold), var(--accent-orange));
+  color: #181a1b;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  clip-path: var(--clip-soft);
+  cursor: pointer;
+  touch-action: manipulation;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.draw-action-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(246, 128, 72, 0.4);
+}
+
+.draw-action-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.undo-action-btn {
+  min-height: 46px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-light);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-soft);
+  font-size: 0.62rem;
+  cursor: pointer;
+  clip-path: var(--clip-soft);
+}
+
+.draw-waiting-badge {
+  text-align: center;
+  padding: 8px;
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
-.category-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 7px;
+.ai-thinking-badge {
+  text-align: center;
+  padding: 10px;
+  color: var(--accent-cyan);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  animation: pulse 1.5s infinite ease-in-out;
 }
 
-.category-slot {
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.active-draw-preview {
+  padding: 4px;
+}
+
+.card-preview-compact {
   display: flex;
-  min-width: 0;
-  min-height: 76px;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
   padding: 8px;
-  border: 1px solid rgba(150, 170, 167, 0.18);
-  background: rgba(11, 14, 18, 0.78);
-  color: var(--text-muted);
-  text-align: left;
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  background: rgba(246, 128, 72, 0.12);
+  border: 1px solid var(--accent-orange);
+  clip-path: var(--clip-soft);
 }
 
-.category-slot.selectable {
-  border-color: rgba(241, 212, 141, 0.32);
-  background: rgba(32, 28, 19, 0.72);
-}
-
-.category-slot.selectable:hover,
-.category-slot.selectable:focus-visible {
-  transform: translateY(-1px);
-  border-color: rgba(241, 212, 141, 0.8);
-  box-shadow: 0 0 0 1px rgba(241, 212, 141, 0.15);
-}
-
-.category-slot.filled {
+.preview-img-box {
+  width: 48px;
+  height: 64px;
+  flex-shrink: 0;
+  background: #000;
+  border: 1px solid var(--accent-gold);
+  overflow: hidden;
   display: grid;
-  grid-template-columns: 46px minmax(0, 1fr);
-  column-gap: 8px;
-  row-gap: 6px;
-  padding: 8px 7px 7px;
-  background: rgba(27, 18, 17, 0.9);
-  border-color: rgba(246, 128, 72, 0.38);
+  place-items: center;
 }
 
-.player-two .category-slot.filled {
-  background: rgba(15, 24, 34, 0.92);
-  border-color: rgba(84, 196, 255, 0.38);
+.preview-img-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.slot-label,
-.slot-card-name,
-.slot-state,
-.slot-empty {
-  display: block;
+.preview-letter {
+  font-family: 'Syne', sans-serif;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--accent-gold);
+}
+
+.preview-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.preview-badge {
+  color: var(--accent-gold);
+  font-size: 0.52rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.preview-info strong {
+  font-size: 0.85rem;
+  color: var(--text-main);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.preview-instruction {
+  color: var(--accent-orange);
+  font-size: 0.58rem;
+  font-weight: 600;
+}
+
+/* Zone centrale de combat */
+.battle-center-arena {
+  text-align: center;
+  padding: 16px 20px;
+  border: 1px solid rgba(241, 212, 141, 0.5);
+  background: linear-gradient(135deg, rgba(34, 28, 20, 0.95), rgba(18, 22, 28, 0.95));
+  clip-path: var(--clip-soft);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+.arena-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--accent-gold);
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 0.85rem;
+  letter-spacing: 0.14em;
+}
+
+.arena-icon {
+  color: var(--accent-orange);
+  font-size: 1.1rem;
+}
+
+.arena-status {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+/* Grille des catégories (Deck) */
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.category-slot {
+  display: flex;
+  min-width: 0;
+  min-height: 68px;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  padding: 6px;
+  border: 1px solid rgba(150, 170, 167, 0.2);
+  background: rgba(11, 14, 18, 0.75);
+  color: var(--text-muted);
+  text-align: left;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+.category-slot.selectable {
+  border-color: rgba(241, 212, 141, 0.8);
+  background: rgba(48, 38, 22, 0.8);
+  box-shadow: 0 0 10px rgba(241, 212, 141, 0.3);
+  animation: pulse-border 1.2s infinite alternate ease-in-out;
+}
+
+@keyframes pulse-border {
+  from { border-color: rgba(241, 212, 141, 0.5); }
+  to { border-color: rgba(241, 212, 141, 1); }
+}
+
+.category-slot.selectable:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-gold);
+}
+
+.category-slot.filled {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  column-gap: 6px;
+  row-gap: 4px;
+  padding: 6px;
+  background: rgba(27, 18, 17, 0.9);
+  border-color: rgba(246, 128, 72, 0.4);
+}
+
+.player-two .category-slot.filled {
+  background: rgba(15, 24, 34, 0.92);
+  border-color: rgba(84, 196, 255, 0.4);
+}
+
+.player-three .category-slot.filled {
+  background: rgba(18, 32, 26, 0.92);
+  border-color: rgba(138, 217, 184, 0.4);
+}
+
 .slot-label {
   color: var(--accent-gold);
-  font-size: 0.54rem;
-  letter-spacing: 0.1em;
+  font-size: 0.5rem;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .category-slot.filled .slot-label {
@@ -692,9 +1344,9 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 46px;
-  height: 66px;
-  min-width: 46px;
+  width: 36px;
+  height: 50px;
+  min-width: 36px;
   overflow: hidden;
   border: 1px solid rgba(246, 128, 72, 0.4);
   background: rgba(8, 12, 16, 0.8);
@@ -704,28 +1356,26 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
   border-color: rgba(84, 196, 255, 0.45);
 }
 
-.slot-card-preview img,
-.slot-card-fallback {
+.player-three .slot-card-preview {
+  border-color: rgba(138, 217, 184, 0.45);
+}
+
+.slot-card-preview img {
   display: block;
-  width: calc(100% - 6px);
-  height: calc(100% - 2px);
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  margin: 0;
 }
 
 .slot-card-fallback {
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, rgba(50, 31, 20, 0.8), rgba(17, 20, 24, 0.8));
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
   color: var(--accent-gold);
-  font-family: 'Syne', 'Segoe UI', sans-serif;
-  font-size: 1rem;
   font-weight: 700;
-}
-
-.player-two .slot-card-fallback {
-  background: linear-gradient(135deg, rgba(15, 39, 48, 0.8), rgba(17, 20, 24, 0.8));
-  color: var(--accent-cyan);
+  font-size: 0.8rem;
 }
 
 .slot-card-details {
@@ -733,19 +1383,21 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
   min-width: 0;
   flex-direction: column;
   justify-content: center;
-  gap: 4px;
+  gap: 2px;
 }
 
 .slot-card-name {
   color: var(--text-main);
-  font-size: 0.6rem;
-  line-height: 1.3;
+  font-size: 0.55rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .slot-state,
 .slot-empty {
-  font-size: 0.54rem;
-  letter-spacing: 0.08em;
+  font-size: 0.5rem;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -761,479 +1413,316 @@ function slotCard(build: PlayerBuild, slug: CategorySlug) {
   color: var(--accent-cyan);
 }
 
-.draw-panel {
-  position: sticky;
-  grid-column: 3;
-  top: 16px;
-  padding: 18px 18px 16px;
-  border: 1px solid rgba(241, 212, 141, 0.5);
-  background: linear-gradient(180deg, rgba(30, 27, 20, 0.95), rgba(14, 18, 22, 0.9));
-  box-shadow: var(--shadow-dark);
+.player-three .slot-state {
+  color: var(--accent-green);
 }
 
-.draw-panel .eyebrow {
-  margin: 0;
-}
-
-.draw-panel h2 {
-  margin: 12px 0 16px;
-  font-size: 1.6rem;
-  letter-spacing: -0.05em;
-  text-transform: uppercase;
-}
-
-.drawn-card,
-.draw-placeholder {
-  margin-bottom: 16px;
-}
-
-.drawn-card {
-  max-width: 246px;
-  margin-inline: auto;
-}
-
-.draw-placeholder {
-  display: grid;
-  place-items: center;
-  min-height: 230px;
-  border: 1px dashed rgba(241, 212, 141, 0.5);
-  background: rgba(17, 20, 24, 0.7);
-  color: var(--accent-gold);
-}
-
-.draw-placeholder span {
-  font-family: 'Syne', 'Segoe UI', sans-serif;
-  font-size: 3.8rem;
-  font-weight: 800;
-}
-
-.draw-placeholder small {
-  display: block;
-  color: var(--text-muted);
-  font-size: 0.58rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.draw-actions {
-  display: grid;
-  gap: 10px;
-}
-
-.draw-button,
-.back-button,
-.primary-button,
-.secondary-button,
-.combat-actions button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  min-height: 48px;
-  padding: 0.9rem 1rem;
-  border: 1px solid transparent;
-  color: #181a1b;
-  background: linear-gradient(135deg, var(--accent-gold), var(--accent-orange));
-  font-size: 0.64rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.draw-button:hover:not(:disabled),
-.back-button:hover:not(:disabled),
-.primary-button:hover,
-.secondary-button:hover,
-.combat-actions button:hover {
-  transform: translateY(-1px);
-}
-
-.draw-button:disabled,
-.back-button:disabled {
-  opacity: 0.42;
-}
-
-.back-button,
-.secondary-button {
-  color: var(--text-main);
-  background: rgba(14, 18, 22, 0.7);
-  border-color: rgba(157, 173, 170, 0.24);
-}
-
-.draw-button span,
-.back-button span,
-.primary-button span,
-.secondary-button span,
-.combat-actions button span {
-  font-size: 1.15rem;
-}
-
-.draw-hint {
-  margin-top: 12px;
-  color: var(--text-muted);
-  font-size: 0.58rem;
-  line-height: 1.6;
-  min-height: 36px;
-}
-
-.loading-message,
-.error-message {
-  font-size: 0.7rem;
-  line-height: 1.7;
-}
-
-.error-message {
-  color: var(--accent-red);
-}
-
+/* Phase Combat & Results */
 .combat-panel,
 .result-panel {
   max-width: 1100px;
-  padding: 32px 0 84px;
-}
-
-.combat-intro p,
-.result-panel > p {
-  max-width: 600px;
-  color: var(--text-muted);
-  font-size: 0.7rem;
-  line-height: 1.8;
+  margin: 0 auto;
+  padding: 24px 0 80px;
 }
 
 .combat-intro h2,
 .result-panel h2 {
-  margin: 18px 0 10px;
-  font-size: clamp(2.1rem, 4vw, 4rem);
-  line-height: 0.96;
-  letter-spacing: -0.08em;
+  margin: 10px 0 8px;
+  font-size: clamp(1.8rem, 4vw, 3.2rem);
   text-transform: uppercase;
+  letter-spacing: -0.04em;
+}
+
+.combat-intro p,
+.result-panel > p {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.6;
 }
 
 .combat-actions {
   display: flex;
+  flex-direction: column;
   gap: 12px;
-  margin: 28px 0 30px;
+  margin: 24px 0 32px;
 }
 
-.combat-actions button {
-  flex: 1;
-  text-align: left;
-  color: var(--text-main);
-  background: linear-gradient(135deg, rgba(47, 22, 17, 0.9), rgba(18, 20, 23, 0.9));
-  border-color: rgba(246, 128, 72, 0.56);
-  box-shadow: var(--shadow-glow-orange);
-}
-
-.combat-actions button + button {
-  background: linear-gradient(135deg, rgba(12, 32, 38, 0.92), rgba(18, 20, 23, 0.92));
-  border-color: rgba(84, 196, 255, 0.56);
-  box-shadow: var(--shadow-glow-blue);
-}
-
-.combat-actions button:disabled {
-  opacity: 0.55;
-  cursor: wait;
-}
-
-.combat-score {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 18px;
-  margin: 28px 0;
-}
-
-.combat-score article {
-  padding: 18px;
-  border: 1px solid var(--border-light);
-  background: rgba(15, 20, 27, 0.88);
-}
-
-.combat-score h3,
-.combat-score strong,
-.combat-score span {
-  display: block;
-}
-
-.combat-score strong {
-  margin-top: 8px;
-  color: var(--accent-gold);
-  font-family: 'Syne', 'Segoe UI', sans-serif;
-  font-size: 2.5rem;
-}
-
-.combat-score span {
-  color: var(--text-muted);
-  font-size: 0.55rem;
-  text-transform: uppercase;
-}
-
-.result-stats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.result-stats article {
-  padding: 18px 16px;
-  border: 1px solid var(--border-light);
-  background: rgba(15, 20, 27, 0.88);
-}
-
-.result-stats h3,
-.result-stats h4 {
-  margin: 0 0 12px;
-  color: var(--accent-gold);
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.final-builds {
-  align-items: start;
-}
-
-.final-builds h4 {
-  margin: 24px 0 12px;
-  color: var(--accent-gold);
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.final-stat-value,
-.final-stat-pair {
-  color: var(--text-main);
-  font-size: 0.55rem;
-  line-height: 1.4;
-  text-transform: uppercase;
-}
-
-.final-stat-pair {
-  color: var(--accent-cyan);
-}
-
-.result-stats h4 {
-  margin-top: 24px;
-}
-
-.stat-row,
-.rule-row {
+.btn-simulate {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 7px 0;
-  border-top: 1px solid rgba(160, 174, 175, 0.18);
-  color: var(--text-muted);
-  font-size: 0.58rem;
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 20px;
+  border: 1px solid var(--accent-gold);
+  background: linear-gradient(135deg, var(--accent-gold), var(--accent-orange));
+  color: #181a1b;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  clip-path: var(--clip-soft);
+  cursor: pointer;
+  touch-action: manipulation;
 }
 
-.stat-row strong {
-  color: var(--text-main);
+.manual-choices {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
 }
 
-.rule-row {
-  display: block;
-  line-height: 1.5;
+.manual-choices button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-panel-strong);
+  color: var(--text-soft);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  clip-path: var(--clip-soft);
+  cursor: pointer;
 }
 
-.rule-row small {
-  display: block;
-  color: var(--accent-cyan);
-}
-
-.validation-errors {
-  padding: 16px;
-  border: 1px solid var(--accent-red);
-  color: var(--accent-red);
-  font-size: 0.68rem;
-  line-height: 1.7;
+.manual-choices button:hover {
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
 }
 
 .combat-builds,
 .result-builds {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px;
 }
 
-.result-builds article {
-  padding: 18px 16px;
-  border: 1px solid var(--border-light);
-  background: rgba(15, 20, 27, 0.88);
-}
-
-.result-builds h3 {
-  margin-bottom: 12px;
-  font-size: 1.35rem;
-  letter-spacing: -0.05em;
-  text-transform: uppercase;
-}
-
-.result-builds div {
-  display: flex;
+.combat-score {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 0;
-  border-top: 1px solid rgba(160, 174, 175, 0.18);
-  font-size: 0.58rem;
-  letter-spacing: 0.08em;
+  gap: 16px;
+  margin: 24px 0;
+}
+
+.score-card {
+  padding: 18px;
+  text-align: center;
+  border: 1px solid var(--border-light);
+  background: rgba(15, 20, 27, 0.9);
+  clip-path: var(--clip-soft);
+}
+
+.score-card h3 {
+  margin: 0 0 6px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.score-card strong {
+  display: block;
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  color: var(--accent-gold);
+}
+
+.score-card span {
+  display: block;
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.score-vs {
+  font-family: 'Syne', sans-serif;
+  font-size: 1.4rem;
+  color: var(--accent-orange);
+}
+
+.final-stat-value,
+.final-stat-pair {
+  color: var(--text-main);
+  font-size: 0.52rem;
+  line-height: 1.3;
   text-transform: uppercase;
 }
 
-.result-builds strong {
+.final-stat-pair {
+  color: var(--accent-cyan);
+}
+
+.rules-applied-section {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-light);
+}
+
+.rules-applied-section h4 {
+  margin: 0 0 8px;
   color: var(--accent-gold);
-  text-align: right;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+}
+
+.rule-row {
+  display: block;
+  margin: 4px 0;
+  font-size: 0.58rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.rule-row small {
+  color: var(--accent-cyan);
+  margin-left: 4px;
 }
 
 .result-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 26px;
+  gap: 12px;
+  margin-top: 28px;
 }
 
-.result-actions .primary-button,
-.result-actions .secondary-button {
-  width: auto;
-  min-width: 180px;
+.primary-button,
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 10px 18px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  clip-path: var(--clip-soft);
+  cursor: pointer;
+  touch-action: manipulation;
+  text-decoration: none;
 }
 
+.primary-button {
+  background: linear-gradient(135deg, var(--accent-gold), var(--accent-orange));
+  color: #181a1b;
+  border: 0;
+}
+
+.secondary-button {
+  border: 1px solid var(--border-light);
+  background: var(--bg-panel-strong);
+  color: var(--text-soft);
+}
+
+/* Realtime elements */
 .realtime-game {
   display: grid;
   gap: 18px;
   padding-bottom: 76px;
 }
-.realtime-turn,
-.realtime-draw-zone {
-  border: 1px solid rgba(241, 212, 141, 0.45);
-  background: rgba(30, 27, 20, 0.92);
-  box-shadow: var(--shadow-dark);
-}
+
 .realtime-turn {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 16px 20px;
+  padding: 14px 18px;
+  border: 1px solid rgba(241, 212, 141, 0.45);
+  background: rgba(30, 27, 20, 0.92);
 }
+
 .realtime-turn.active { border-color: rgba(84, 196, 255, 0.7); }
-.realtime-turn strong { color: var(--accent-gold); font-size: clamp(.9rem, 2vw, 1.2rem); letter-spacing: .1em; }
-.realtime-turn span { color: var(--text-muted); font-size: .65rem; text-transform: uppercase; }
+.realtime-turn strong { color: var(--accent-gold); font-size: clamp(0.85rem, 2vw, 1.1rem); }
+.realtime-turn span { color: var(--text-muted); font-size: 0.65rem; text-transform: uppercase; }
+
 .realtime-boards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.realtime-board { min-width: 0; padding: 16px; border: 1px solid rgba(246, 128, 72, .35); background: #353033; }
-.realtime-board:nth-child(2) { border-color: rgba(84, 196, 255, .35); background: #30363b; }
-.realtime-board.is-current { box-shadow: 0 0 0 2px rgba(241, 212, 141, .55); }
-.realtime-board > header { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-.realtime-board h2 { margin-top: 6px; font-size: clamp(1.1rem, 2vw, 1.6rem); text-transform: uppercase; }
-.realtime-board > header > span { color: var(--text-muted); font-size: .62rem; text-transform: uppercase; }
-.realtime-slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
-.realtime-slots button { display: flex; min-width: 0; min-height: 66px; flex-direction: column; justify-content: space-between; gap: 4px; padding: 8px; border: 1px solid rgba(157, 173, 170, .25); background: rgba(11, 14, 18, .72); color: var(--text-muted); text-align: left; }
+.realtime-board { min-width: 0; padding: 16px; border: 1px solid rgba(246, 128, 72, 0.35); background: #353033; }
+.realtime-board:nth-child(2) { border-color: rgba(84, 196, 255, 0.35); background: #30363b; }
+.realtime-board.is-current { box-shadow: 0 0 0 2px rgba(241, 212, 141, 0.55); }
+.realtime-board > header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.realtime-board h2 { margin-top: 4px; font-size: clamp(1.1rem, 2vw, 1.5rem); text-transform: uppercase; }
+.realtime-board > header > span { color: var(--text-muted); font-size: 0.62rem; text-transform: uppercase; }
+
+.realtime-slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.realtime-slots button { display: flex; min-width: 0; min-height: 64px; flex-direction: column; justify-content: space-between; gap: 4px; padding: 6px; border: 1px solid rgba(157, 173, 170, 0.25); background: rgba(11, 14, 18, 0.72); color: var(--text-muted); text-align: left; }
 .realtime-slots button.selectable { border-color: var(--accent-gold); cursor: pointer; }
-.realtime-slots button > span { overflow: hidden; color: var(--accent-gold); font-size: .5rem; letter-spacing: .08em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
-.realtime-slots button strong { overflow: hidden; color: var(--text-main); font-size: .62rem; text-overflow: ellipsis; white-space: nowrap; }
-.realtime-slots button small { overflow: hidden; color: var(--text-muted); font-size: .56rem; text-overflow: ellipsis; white-space: nowrap; }
-.realtime-slots button.filled { border-color: rgba(246, 128, 72, .5); }
-.realtime-draw-zone { display: grid; grid-template-columns: minmax(180px, 280px) 1fr; align-items: center; gap: 24px; padding: 18px; }
-.realtime-drawn-card, .realtime-empty-draw { display: grid; min-height: 84px; place-items: center; margin: 10px 0; border: 1px dashed rgba(241, 212, 141, .5); background: rgba(17, 20, 24, .7); text-align: center; }
-.realtime-drawn-card strong { color: var(--text-main); font-size: .75rem; }
-.realtime-drawn-card span { color: var(--accent-gold); font-size: .55rem; text-transform: uppercase; }
-.realtime-empty-draw { color: var(--accent-gold); font-size: .7rem; letter-spacing: .1em; }
-.realtime-draw-zone button { width: 100%; min-height: 44px; padding: .75rem; border: 0; background: linear-gradient(135deg, var(--accent-gold), var(--accent-orange)); color: #181a1b; font-size: .65rem; font-weight: 700; letter-spacing: .12em; }
-.realtime-draw-zone button:disabled { cursor: not-allowed; opacity: .4; }
-.realtime-current { color: var(--text-muted); font-size: .7rem; line-height: 1.7; }
+.realtime-slots button > span { overflow: hidden; color: var(--accent-gold); font-size: 0.5rem; letter-spacing: 0.08em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.realtime-slots button strong { overflow: hidden; color: var(--text-main); font-size: 0.6rem; text-overflow: ellipsis; white-space: nowrap; }
+.realtime-slots button small { overflow: hidden; color: var(--text-muted); font-size: 0.54rem; text-overflow: ellipsis; white-space: nowrap; }
+.realtime-slots button.filled { border-color: rgba(246, 128, 72, 0.5); }
+
+.realtime-draw-zone { display: grid; grid-template-columns: minmax(180px, 280px) 1fr; align-items: center; gap: 18px; padding: 14px; border: 1px dashed rgba(241, 212, 141, 0.4); margin: 10px 0; }
+.realtime-drawn-card, .realtime-empty-draw { display: grid; min-height: 70px; place-items: center; margin: 6px 0; border: 1px dashed rgba(241, 212, 141, 0.5); background: rgba(17, 20, 24, 0.7); text-align: center; }
+.realtime-drawn-card strong { color: var(--text-main); font-size: 0.72rem; }
+.realtime-drawn-card span { color: var(--accent-gold); font-size: 0.52rem; text-transform: uppercase; }
+.realtime-empty-draw { color: var(--accent-gold); font-size: 0.68rem; letter-spacing: 0.1em; }
+.realtime-draw-zone button { width: 100%; min-height: 42px; padding: 0.65rem; border: 0; background: linear-gradient(135deg, var(--accent-gold), var(--accent-orange)); color: #181a1b; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; }
+.realtime-draw-zone button:disabled { cursor: not-allowed; opacity: 0.4; }
+
 .realtime-result { padding: 20px; border: 1px solid var(--accent-gold); }
-.realtime-result h2 { margin-bottom: 8px; font-size: 1.5rem; text-transform: uppercase; }
-.realtime-result p { color: var(--text-muted); font-size: .7rem; }
+.realtime-result h2 { margin-bottom: 8px; font-size: 1.4rem; text-transform: uppercase; }
+.realtime-result p { color: var(--text-muted); font-size: 0.7rem; }
 
-@media (max-width: 960px) {
-  .game-nav {
-    padding-inline: max(20px, calc((100vw - 1360px) / 2)) !important;
+.manual-result-modal { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: rgba(0, 0, 0, 0.8); padding: 16px; }
+.manual-result-modal section { display: grid; gap: 10px; width: min(100%, 420px); padding: 24px; background: var(--bg-panel); border: 1px solid var(--accent-gold); }
+.manual-result-modal button { min-height: 44px; padding: 10px; border: 1px solid var(--border-light); background: var(--bg-panel-strong); color: var(--text-main); font-size: 0.68rem; font-weight: 700; cursor: pointer; }
+
+/* Responsive Media Queries */
+@media (min-width: 1024px) {
+  .vertical-battle-layout {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    align-items: start;
+    gap: 24px;
   }
 
-  .game-nav-links {
-    gap: 4px;
-  }
-
-  .game-nav-tab {
-    padding-inline: 0.75rem;
+  .battle-center-arena {
+    grid-column: 1 / -1;
   }
 }
 
-@media (max-width: 680px) {
-  .realtime-boards,
-  .realtime-draw-zone { grid-template-columns: 1fr; }
-
-  .realtime-slots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-
-  .construction-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .builds-column {
-    display: grid;
-    gap: 14px;
-  }
-
-  .draw-panel {
-    position: static;
-    grid-column: auto;
-  }
-
-  .combat-builds,
-  .result-builds,
-  .result-stats {
-    grid-template-columns: 1fr;
-  }
-
-  .page-heading {
-    display: block;
-    padding-top: 38px;
-  }
-
-  .turn-status {
-    margin-top: 22px;
-  }
-
+@media (max-width: 900px) {
   .category-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .draw-panel {
-    padding: 16px;
-  }
-
-  .combat-actions {
-    display: grid;
-  }
-
-  .combat-score {
+  .realtime-boards {
     grid-template-columns: 1fr;
   }
 
-  .combat-score > b {
-    text-align: center;
+  .combat-builds,
+  .result-builds {
+    grid-template-columns: 1fr;
   }
 }
 
-@media (max-width: 480px) {
-  .game-shell > * {
-    padding-inline: 14px;
-  }
-
-  .game-nav .brand-logo {
-    height: 40px;
-  }
-
+@media (max-width: 580px) {
   .category-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .manual-choices {
+    grid-template-columns: 1fr;
+  }
+
+  .combat-score {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .score-vs {
+    text-align: center;
+  }
+
   .result-actions {
-    display: grid;
+    flex-direction: column;
+  }
+
+  .result-actions button,
+  .result-actions a {
+    width: 100%;
   }
 }
 </style>
